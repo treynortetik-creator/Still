@@ -121,6 +121,15 @@
                     placeholder="e.g., Q1 Webinar Series">
             </div>
 
+            <!-- Domain Vocabulary -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Domain Vocabulary (optional)</label>
+                <textarea id="magic-words" rows="2"
+                    class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="SafelyYou, Q4, ROI, DON, CMS - helps transcription accuracy"></textarea>
+                <p class="text-sm text-gray-500 mt-1">Enter brand names, acronyms, or technical terms (comma-separated) to improve transcription accuracy</p>
+            </div>
+
             <!-- Submit Button -->
             <div class="pt-4">
                 <button type="submit" id="submit-btn"
@@ -252,6 +261,8 @@
             try {
                 let response;
 
+                const magicWords = document.getElementById('magic-words').value.trim();
+
                 if (uploadMode === 'file') {
                     const formData = new FormData();
                     formData.append('file', selectedFile);
@@ -259,6 +270,9 @@
                     formData.append('asset_types', JSON.stringify(assetTypes));
                     formData.append('asset_quantities', JSON.stringify(assetQuantities));
                     formData.append('campaign_name', document.getElementById('campaign-name').value);
+                    if (magicWords) {
+                        formData.append('magic_words', magicWords);
+                    }
 
                     response = await Auth.fetchWithAuth('/api/upload', {
                         method: 'POST',
@@ -272,6 +286,9 @@
                     formData.append('asset_quantities', JSON.stringify(assetQuantities));
                     formData.append('campaign_name', document.getElementById('campaign-name').value);
                     formData.append('content_name', document.getElementById('content-name').value || 'pasted_content.txt');
+                    if (magicWords) {
+                        formData.append('magic_words', magicWords);
+                    }
 
                     response = await Auth.fetchWithAuth('/api/upload-text', {
                         method: 'POST',

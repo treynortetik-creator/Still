@@ -13,7 +13,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.config import get_settings
 from app.database import init_db
-from app.api import upload, jobs, library, admin, auth
+from app.api import upload, jobs, library, admin, auth, personas
 from app.api import admin_views
 
 settings = get_settings()
@@ -83,6 +83,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(upload.router, prefix="/api", tags=["upload"])
 app.include_router(jobs.router, prefix="/api", tags=["jobs"])
 app.include_router(library.router, prefix="/api", tags=["library"])
+app.include_router(personas.router, prefix="/api", tags=["personas"])
 app.include_router(admin.router, prefix="/admin", tags=["admin-api"])
 app.include_router(admin_views.router, prefix="/admin", tags=["admin-views"])
 
@@ -129,6 +130,12 @@ async def serve_results():
 async def serve_library():
     """Serve library page."""
     return FileResponse(frontend_path / "library.html")
+
+
+@app.get("/settings.html")
+async def serve_settings():
+    """Serve settings page."""
+    return FileResponse(frontend_path / "settings.html")
 
 
 @app.get("/")

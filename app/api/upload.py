@@ -59,6 +59,7 @@ async def upload_content(
     asset_quantities: str = Form(default='{"linkedin": 3, "blog": 1}'),
     processing_mode: str = Form(default="autopilot"),
     campaign_name: Optional[str] = Form(default=None),
+    magic_words: Optional[str] = Form(default=None),
     user_id: int = Depends(get_current_user_id),
 ):
     """
@@ -117,8 +118,8 @@ async def upload_content(
             INSERT INTO jobs (
                 id, user_id, status, original_filename, file_type, file_size,
                 target_persona, asset_types, asset_quantities, processing_mode,
-                campaign_name, current_step, progress
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                campaign_name, magic_words, current_step, progress
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 job_id,
@@ -132,6 +133,7 @@ async def upload_content(
                 json.dumps(asset_quantities_dict),
                 processing_mode,
                 campaign_name,
+                magic_words,
                 "Uploading file",
                 5,
             )
@@ -161,6 +163,7 @@ async def upload_text(
     processing_mode: str = Form(default="autopilot"),
     campaign_name: Optional[str] = Form(default=None),
     content_name: Optional[str] = Form(default="pasted_content.txt"),
+    magic_words: Optional[str] = Form(default=None),
     user_id: int = Depends(get_current_user_id),
 ):
     """
@@ -195,8 +198,8 @@ async def upload_text(
             INSERT INTO jobs (
                 id, user_id, status, original_filename, file_type, file_size,
                 target_persona, asset_types, asset_quantities, processing_mode,
-                campaign_name, current_step, progress, transcript
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                campaign_name, magic_words, current_step, progress, transcript
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 job_id,
@@ -210,6 +213,7 @@ async def upload_text(
                 json.dumps(asset_quantities_dict),
                 processing_mode,
                 campaign_name,
+                magic_words,
                 "Processing text content",
                 10,
                 content,  # Text content is already the transcript

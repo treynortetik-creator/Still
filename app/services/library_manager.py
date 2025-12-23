@@ -94,8 +94,8 @@ async def save_outputs_to_db(outputs: list[dict], job_id: str) -> int:
                 INSERT INTO outputs (
                     job_id, content_type, variation_number,
                     step1_draft, step2_edited, step3_final,
-                    atoms_used, citations, warnings
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    atoms_used, citations, warnings, quality_scores
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     job_id,
@@ -107,6 +107,7 @@ async def save_outputs_to_db(outputs: list[dict], job_id: str) -> int:
                     json.dumps(output.get("atoms_used", [])),
                     json.dumps(output.get("citations", [])),
                     json.dumps(output.get("warnings", [])),
+                    json.dumps(output.get("quality_scores")) if output.get("quality_scores") else None,
                 )
             )
             count += 1

@@ -17,6 +17,8 @@ from app.services.library_manager import (
     save_atoms_to_db,
     save_outputs_to_db,
 )
+from app.services.scoring import batch_score_content
+from app.utils.error_messages import format_pipeline_error, detect_error_type, get_error_message
 
 settings = get_settings()
 
@@ -103,6 +105,7 @@ async def process_job(job_id: str):
         asset_quantities = json.loads(job_data["asset_quantities"]) if job_data["asset_quantities"] else {}
         original_filename = job_data["original_filename"]
         file_type = job_data["file_type"]
+        magic_words = job_data.get("magic_words")
 
         # Check if we already have transcript (text upload)
         transcript = job_data.get("transcript")
@@ -120,7 +123,9 @@ async def process_job(job_id: str):
             if not file_path.exists():
                 raise FileNotFoundError(f"Upload file not found: {file_path}")
 
-            transcript, trans_cost = await transcribe_file(file_path, file_type)
+            transcript, trans_cost = await transcribe_file(
+                file_path, file_type, job_id, user_id, magic_words
+            )
             total_cost += trans_cost
 
             # Save transcript to database
@@ -242,8 +247,25 @@ async def process_job(job_id: str):
         )
         total_cost += fc_cost
 
+        # ======== STEP 5: QUALITY SCORING ========
+        await update_job_status(
+            job_id, JobStatus.FACTCHECKING,
+            "Step 5: Scoring content quality", 92, total_cost
+        )
+        total_cost = 0
+
+        # Get persona title for context
+        from app.services.persona_manager import get_persona
+        persona = await get_persona(target_persona)
+        persona_title = persona.get("title", "") if persona else ""
+
+        scored_drafts, score_cost = await batch_score_content(
+            factchecked_drafts, persona_title
+        )
+        total_cost += score_cost
+
         # ======== SAVE RESULTS ========
-        await save_outputs_to_db(factchecked_drafts, job_id)
+        await save_outputs_to_db(scored_drafts, job_id)
 
         # Mark job complete
         await update_job_status(
@@ -260,12 +282,32 @@ async def process_job(job_id: str):
             await db.commit()
 
     except Exception as e:
-        error_msg = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
-        print(f"Job {job_id} failed: {error_msg}")
+        # Log detailed error for debugging
+        error_detail = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
+        print(f"Job {job_id} failed: {error_detail}")
+
+        # Determine which step failed for context
+        step_context = "unknown"
+        job_data_check = await get_job_data(job_id)
+        if job_data_check:
+            current = job_data_check.get("current_step", "")
+            if "transcrib" in current.lower():
+                step_context = "transcription"
+            elif "atom" in current.lower():
+                step_context = "atomization"
+            elif "draft" in current.lower():
+                step_context = "drafting"
+            elif "edit" in current.lower():
+                step_context = "editing"
+            elif "fact" in current.lower():
+                step_context = "factchecking"
+
+        # Get user-friendly error message
+        user_error = format_pipeline_error(e, step_context, job_id)
 
         await update_job_status(
             job_id, JobStatus.FAILED,
-            "Failed", 0, total_cost, error_msg[:1000]
+            "Failed", 0, total_cost, user_error
         )
 
 
@@ -373,10 +415,13 @@ async def process_job_from_library(job_id: str, atom_content: list[dict]):
             await db.commit()
 
     except Exception as e:
-        error_msg = f"{type(e).__name__}: {str(e)}"
-        print(f"Library job {job_id} failed: {error_msg}")
+        error_detail = f"{type(e).__name__}: {str(e)}"
+        print(f"Library job {job_id} failed: {error_detail}")
+
+        # Get user-friendly error message
+        user_error = format_pipeline_error(e, "generation", job_id)
 
         await update_job_status(
             job_id, JobStatus.FAILED,
-            "Failed", 0, total_cost, error_msg
+            "Failed", 0, total_cost, user_error
         )

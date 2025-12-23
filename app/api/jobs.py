@@ -30,7 +30,7 @@ def estimate_time_remaining(status: str, progress: int) -> Optional[str]:
         return "Less than 1 minute"
 
 
-@router.get("/job/{job_id}/status", response_model=JobStatusResponse)
+@router.get("/job/{job_id}/status")
 async def get_job_status(
     job_id: str,
     user_id: int = Depends(get_current_user_id),
@@ -38,12 +38,14 @@ async def get_job_status(
     """
     Get the current status of a processing job.
 
-    Returns progress percentage, current step, and estimated time remaining.
+    Returns progress percentage, current step, estimated time remaining,
+    and partial transcript preview during processing.
     """
     async with get_db() as db:
         cursor = await db.execute(
             """
-            SELECT id, user_id, status, current_step, progress, error_message
+            SELECT id, user_id, status, current_step, progress, error_message,
+                   transcript, cleaned_transcript
             FROM jobs WHERE id = ? AND user_id = ?
             """,
             (job_id, user_id)
@@ -53,14 +55,22 @@ async def get_job_status(
         if not row:
             raise HTTPException(status_code=404, detail="Job not found")
 
-        return JobStatusResponse(
-            job_id=row["id"],
-            status=JobStatus(row["status"]),
-            current_step=row["current_step"],
-            progress=row["progress"],
-            estimated_time_remaining=estimate_time_remaining(row["status"], row["progress"]),
-            error_message=row["error_message"],
-        )
+        # Get partial transcript preview (first 1000 chars)
+        partial_transcript = None
+        if row["cleaned_transcript"]:
+            partial_transcript = row["cleaned_transcript"][:1000]
+        elif row["transcript"]:
+            partial_transcript = row["transcript"][:1000]
+
+        return {
+            "job_id": row["id"],
+            "status": row["status"],
+            "current_step": row["current_step"],
+            "progress": row["progress"],
+            "estimated_time_remaining": estimate_time_remaining(row["status"], row["progress"]),
+            "error_message": row["error_message"],
+            "partial_transcript": partial_transcript,
+        }
 
 
 @router.get("/job/{job_id}/results")

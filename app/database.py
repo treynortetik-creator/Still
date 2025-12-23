@@ -65,6 +65,7 @@ async def init_db():
                 asset_quantities JSON,
                 processing_mode TEXT DEFAULT 'autopilot',
                 campaign_name TEXT,
+                magic_words TEXT,
                 current_step TEXT,
                 progress INTEGER DEFAULT 0,
                 transcript TEXT,
@@ -105,6 +106,7 @@ async def init_db():
                 atoms_used JSON,
                 citations JSON,
                 warnings JSON,
+                quality_scores JSON,
                 user_edits INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (job_id) REFERENCES jobs(id)

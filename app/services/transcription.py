@@ -33,9 +33,14 @@ async def transcribe_file(
     file_type: str,
     job_id: str = None,
     user_id: int = None,
+    magic_words: str = None,
 ) -> Tuple[str, float]:
     """
     Transcribe audio/video file or extract text from document.
+
+    Args:
+        magic_words: Optional comma-separated list of domain vocabulary
+                    (brand names, acronyms, technical terms) to recognize accurately.
 
     Returns (transcript, cost) tuple.
     """
@@ -72,7 +77,19 @@ async def transcribe_file(
 
     model = genai.GenerativeModel("gemini-2.0-flash")
 
-    prompt = """Transcribe this content completely and accurately.
+    # Build prompt with optional magic words
+    vocabulary_section = ""
+    if magic_words and magic_words.strip():
+        vocabulary_section = f"""
+IMPORTANT VOCABULARY TO RECOGNIZE ACCURATELY:
+{magic_words}
+
+These are domain-specific terms, brand names, acronyms, or technical terms.
+Make sure to transcribe them correctly as written above.
+
+"""
+
+    prompt = f"""{vocabulary_section}Transcribe this content completely and accurately.
 
 Instructions:
 1. Transcribe all spoken words exactly as said

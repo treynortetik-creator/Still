@@ -160,9 +160,63 @@
             return colors[type] || 'gray';
         }
 
+        function getScoreColor(score) {
+            if (score >= 85) return { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-500' };
+            if (score >= 70) return { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-500' };
+            if (score >= 50) return { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-500' };
+            return { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-500' };
+        }
+
+        function renderScoreBadge(scores) {
+            if (!scores || !scores.overall_score) return '';
+
+            const overall = scores.overall_score;
+            const colors = getScoreColor(overall);
+
+            return `
+                <div class="relative group">
+                    <span class="px-2 py-1 rounded text-sm font-medium ${colors.bg} ${colors.text}">
+                        Quality: ${overall}/100
+                    </span>
+                    <div class="absolute z-10 invisible group-hover:visible bg-white border shadow-lg rounded-lg p-4 w-64 -left-20 top-8">
+                        <div class="text-sm font-semibold mb-2 text-gray-800">Quality Breakdown</div>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Hook Quality</span>
+                                <span class="font-medium">${scores.hook_quality?.score || 'N/A'}</span>
+                            </div>
+                            <div class="text-xs text-gray-500 -mt-1">${scores.hook_quality?.reason || ''}</div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Brand Alignment</span>
+                                <span class="font-medium">${scores.brand_alignment?.score || 'N/A'}</span>
+                            </div>
+                            <div class="text-xs text-gray-500 -mt-1">${scores.brand_alignment?.reason || ''}</div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Clarity</span>
+                                <span class="font-medium">${scores.clarity?.score || 'N/A'}</span>
+                            </div>
+                            <div class="text-xs text-gray-500 -mt-1">${scores.clarity?.reason || ''}</div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Engagement</span>
+                                <span class="font-medium">${scores.engagement_potential?.score || 'N/A'}</span>
+                            </div>
+                            <div class="text-xs text-gray-500 -mt-1">${scores.engagement_potential?.reason || ''}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
         function renderOutputs(outputs) {
             const container = document.getElementById('outputs-container');
             container.innerHTML = '';
+
+            // Sort outputs by quality score (highest first)
+            outputs.sort((a, b) => {
+                const scoreA = a.quality_scores?.overall_score || 0;
+                const scoreB = b.quality_scores?.overall_score || 0;
+                return scoreB - scoreA;
+            });
 
             // Group by content type
             const grouped = {};
@@ -200,6 +254,7 @@
                         <div class="flex justify-between items-start mb-4">
                             <div class="flex items-center gap-2">
                                 <span class="text-sm font-medium text-gray-500">Variation ${output.variation_number || index + 1}</span>
+                                ${renderScoreBadge(output.quality_scores)}
                                 ${hasWarnings ? '<span class="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 rounded">Has Warnings</span>' : ''}
                             </div>
                             <button onclick="copyToClipboard(\`${content.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)"

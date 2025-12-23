@@ -89,11 +89,44 @@
                 Estimated time remaining: calculating...
             </div>
 
+            <!-- Pro Tips Section -->
+            <div id="pro-tip-section" class="mt-6 p-4 bg-indigo-50 border border-indigo-100 rounded-lg">
+                <div class="flex items-start">
+                    <span class="text-indigo-500 mr-2 text-lg">Pro Tip</span>
+                    <p id="pro-tip-text" class="text-indigo-700 text-sm transition-opacity duration-500">
+                        Your content library grows automatically with every upload
+                    </p>
+                </div>
+            </div>
+
+            <!-- Transcript Preview (hidden until available) -->
+            <div id="transcript-preview-section" class="hidden mt-6">
+                <h3 class="text-sm font-semibold text-gray-700 mb-2">Transcript Preview</h3>
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-40 overflow-y-auto">
+                    <p id="transcript-preview" class="text-sm text-gray-600 whitespace-pre-wrap"></p>
+                </div>
+            </div>
+
             <!-- Error Message (hidden by default) -->
-            <div id="error-section" class="hidden mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                <h3 class="text-red-800 font-semibold">Processing Failed</h3>
-                <p class="text-red-600 mt-2" id="error-message"></p>
-                <a href="/upload.html" class="inline-block mt-4 text-indigo-600 hover:underline">Try Again</a>
+            <div id="error-section" class="hidden mt-6">
+                <div class="bg-red-50 border border-red-200 rounded-lg overflow-hidden">
+                    <div class="bg-red-100 px-4 py-3 border-b border-red-200">
+                        <h3 class="text-red-800 font-semibold" id="error-title">Processing Failed</h3>
+                    </div>
+                    <div class="p-4">
+                        <p class="text-red-700" id="error-message"></p>
+                        <div class="mt-4 p-3 bg-white border border-red-100 rounded">
+                            <p class="text-sm font-medium text-gray-700">What you can do:</p>
+                            <p class="text-sm text-gray-600 mt-1" id="error-action"></p>
+                        </div>
+                        <div class="mt-4 flex gap-4">
+                            <a href="/upload.html" class="text-indigo-600 hover:underline font-medium">Try Again</a>
+                            <button onclick="retryJob()" id="retry-btn" class="hidden text-indigo-600 hover:underline font-medium">
+                                Retry This Job
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Success Actions (hidden by default) -->
@@ -117,6 +150,34 @@
         if (!jobId) {
             window.location.href = '/upload.html';
         }
+
+        // Pro tips rotation
+        const PROCESSING_TIPS = [
+            "Your content library grows automatically with every upload",
+            "The atomization step extracts reusable quotes, stats, and stories",
+            "Fact-checking runs against your source material to prevent hallucinations",
+            "Persona targeting prioritizes atoms by audience relevance",
+            "Generate new content from your library without uploading source material",
+            "The 4-step pipeline ensures publication-ready quality",
+            "Each job adds 10-20 atoms to your permanent library",
+            "Brand voice is analyzed from your actual content, not questionnaires",
+            "Track which atoms you use most to refine future content",
+            "Save hours of editing with multi-pass quality control"
+        ];
+
+        let currentTipIndex = 0;
+        function rotateTip() {
+            const tipEl = document.getElementById('pro-tip-text');
+            tipEl.style.opacity = '0';
+            setTimeout(() => {
+                currentTipIndex = (currentTipIndex + 1) % PROCESSING_TIPS.length;
+                tipEl.textContent = PROCESSING_TIPS[currentTipIndex];
+                tipEl.style.opacity = '1';
+            }, 300);
+        }
+
+        // Rotate tips every 10 seconds
+        const tipInterval = setInterval(rotateTip, 10000);
 
         const statusMap = {
             'uploading': { step: 0, text: 'Uploading file...' },
@@ -182,10 +243,20 @@
                         `Estimated time remaining: ${data.estimated_time_remaining}`;
                 }
 
+                // Show partial transcript if available
+                if (data.partial_transcript) {
+                    document.getElementById('transcript-preview-section').classList.remove('hidden');
+                    document.getElementById('transcript-preview').textContent = data.partial_transcript + '...';
+                }
+
                 updateStepUI(statusInfo.step);
 
                 if (data.status === 'complete') {
-                    // Success!
+                    // Success! Clear tip rotation
+                    clearInterval(tipInterval);
+                    document.getElementById('pro-tip-section').classList.add('hidden');
+                    document.getElementById('transcript-preview-section').classList.add('hidden');
+
                     document.getElementById('status-icon').innerHTML =
                         '<svg class="h-10 w-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
                     document.getElementById('status-icon').classList.remove('bg-indigo-100');
@@ -199,7 +270,11 @@
                 }
 
                 if (data.status === 'failed') {
-                    // Error
+                    // Error - clear tip rotation
+                    clearInterval(tipInterval);
+                    document.getElementById('pro-tip-section').classList.add('hidden');
+                    document.getElementById('transcript-preview-section').classList.add('hidden');
+
                     document.getElementById('status-icon').innerHTML =
                         '<svg class="h-10 w-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
                     document.getElementById('status-icon').classList.remove('bg-indigo-100');
@@ -208,7 +283,37 @@
                     document.getElementById('status-message').textContent = 'Something went wrong.';
                     document.getElementById('time-remaining').classList.add('hidden');
                     document.getElementById('error-section').classList.remove('hidden');
-                    document.getElementById('error-message').textContent = data.error_message || 'Unknown error';
+
+                    // Parse enhanced error message format: "Title: Message Action"
+                    const errorText = data.error_message || 'Unknown error';
+                    const colonIndex = errorText.indexOf(':');
+                    if (colonIndex > 0 && colonIndex < 50) {
+                        const title = errorText.substring(0, colonIndex);
+                        const rest = errorText.substring(colonIndex + 1).trim();
+
+                        // Try to split message and action at common patterns
+                        const actionPatterns = ['Please ', 'Try ', 'Check ', 'Ensure ', 'Upgrade '];
+                        let message = rest;
+                        let action = 'Try uploading again or contact support if the problem persists.';
+
+                        for (const pattern of actionPatterns) {
+                            const idx = rest.indexOf(pattern);
+                            if (idx > 10) {
+                                message = rest.substring(0, idx).trim();
+                                action = rest.substring(idx).trim();
+                                break;
+                            }
+                        }
+
+                        document.getElementById('error-title').textContent = title;
+                        document.getElementById('error-message').textContent = message;
+                        document.getElementById('error-action').textContent = action;
+                    } else {
+                        document.getElementById('error-title').textContent = 'Processing Failed';
+                        document.getElementById('error-message').textContent = errorText;
+                        document.getElementById('error-action').textContent = 'Try uploading again or contact support if the problem persists.';
+                    }
+
                     return; // Stop polling
                 }
 

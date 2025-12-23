@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - ContentMultiplier</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/auth.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="text-xl font-bold text-indigo-600">ContentMultiplier</a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/upload.html" class="text-gray-600 hover:text-gray-900">Upload</a>
+                    <a href="/library.html" class="text-gray-600 hover:text-gray-900">Library</a>
+                    <a href="/settings.html" class="text-indigo-600 font-medium">Settings</a>
+                    <div id="navbar-user" class="flex items-center"></div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-4xl mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8">Settings</h1>
+
+        <!-- Tabs -->
+        <div class="mb-6 border-b">
+            <div class="flex space-x-8">
+                <button class="tab-btn px-1 pb-4 border-b-2 border-indigo-600 text-indigo-600 font-medium" data-tab="voice-test">
+                    Brand Voice Testing
+                </button>
+                <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="personas">
+                    Personas
+                </button>
+            </div>
+        </div>
+
+        <!-- Brand Voice Testing Tab -->
+        <div id="voice-test-tab" class="space-y-6">
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <h2 class="text-xl font-semibold mb-4">Test Brand Voice Transformation</h2>
+                <p class="text-gray-600 mb-6">
+                    See how your content will be transformed for different audiences. Paste sample text
+                    and select a persona to preview the brand voice transformation.
+                </p>
+
+                <!-- Sample Text Input -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Sample Text</label>
+                    <textarea id="sample-text" rows="6"
+                        class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        placeholder="Enter sample content here to test how it will be transformed for your target audience..."></textarea>
+                    <p class="text-sm text-gray-500 mt-1">10-2000 characters</p>
+                </div>
+
+                <!-- Persona Selection -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Target Persona</label>
+                    <select id="preview-persona"
+                        class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="">Select a persona...</option>
+                    </select>
+                </div>
+
+                <!-- Preview Button -->
+                <button id="preview-btn" onclick="previewVoice()"
+                    class="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    Preview Transformation
+                </button>
+            </div>
+
+            <!-- Results Section (hidden by default) -->
+            <div id="preview-results" class="hidden">
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <div class="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-4">
+                        <h3 class="text-white font-semibold text-lg">Transformation Preview</h3>
+                        <p class="text-indigo-100 text-sm" id="persona-applied">Persona: CEO of Long-Term Care</p>
+                    </div>
+
+                    <div class="p-6">
+                        <!-- Side by Side Comparison -->
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <!-- Original -->
+                            <div>
+                                <div class="flex items-center gap-2 mb-3">
+                                    <span class="px-2 py-1 bg-gray-100 text-gray-600 rounded text-sm font-medium">Original</span>
+                                </div>
+                                <div class="bg-gray-50 border rounded-lg p-4 min-h-[150px]">
+                                    <p id="original-text" class="text-gray-700 whitespace-pre-wrap"></p>
+                                </div>
+                            </div>
+
+                            <!-- Transformed -->
+                            <div>
+                                <div class="flex items-center gap-2 mb-3">
+                                    <span class="px-2 py-1 bg-indigo-100 text-indigo-600 rounded text-sm font-medium">Transformed</span>
+                                </div>
+                                <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4 min-h-[150px]">
+                                    <p id="transformed-text" class="text-gray-700 whitespace-pre-wrap"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Changes Summary -->
+                        <div class="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <h4 class="font-medium text-yellow-800 mb-2">Changes Made</h4>
+                            <ul id="changes-list" class="list-disc list-inside text-sm text-yellow-700 space-y-1">
+                            </ul>
+                        </div>
+
+                        <!-- Copy Button -->
+                        <div class="mt-4 flex justify-end">
+                            <button onclick="copyTransformed()" class="text-indigo-600 hover:underline text-sm">
+                                Copy Transformed Text
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="preview-loading" class="hidden">
+                <div class="bg-white rounded-lg shadow-sm p-8 text-center">
+                    <div class="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto"></div>
+                    <p class="mt-4 text-gray-600">Transforming content...</p>
+                </div>
+            </div>
+
+            <!-- Error Message -->
+            <div id="preview-error" class="hidden mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600"></div>
+        </div>
+
+        <!-- Personas Tab -->
+        <div id="personas-tab" class="hidden">
+            <div id="personas-list" class="space-y-4">
+                <!-- Personas will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Copy Toast -->
+    <div id="copy-toast" class="fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg hidden">
+        Copied to clipboard!
+    </div>
+
+    <script>
+        // Require authentication
+        if (!Auth.requireAuth()) {
+            // Will redirect to login
+        }
+
+        let personas = [];
+        let currentTransformed = '';
+
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.dataset.tab;
+
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    b.classList.remove('border-indigo-600', 'text-indigo-600');
+                    b.classList.add('border-transparent', 'text-gray-500');
+                });
+                btn.classList.remove('border-transparent', 'text-gray-500');
+                btn.classList.add('border-indigo-600', 'text-indigo-600');
+
+                document.getElementById('voice-test-tab').classList.toggle('hidden', tab !== 'voice-test');
+                document.getElementById('personas-tab').classList.toggle('hidden', tab !== 'personas');
+            });
+        });
+
+        async function loadPersonas() {
+            try {
+                const response = await Auth.fetchWithAuth('/api/personas');
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Failed to load personas');
+                }
+
+                personas = data.personas || [];
+
+                // Populate dropdown
+                const select = document.getElementById('preview-persona');
+                personas.forEach(p => {
+                    const option = document.createElement('option');
+                    option.value = p.id;
+                    option.textContent = p.title;
+                    select.appendChild(option);
+                });
+
+                // Render personas list
+                renderPersonasList();
+
+            } catch (err) {
+                console.error('Failed to load personas:', err);
+            }
+        }
+
+        function renderPersonasList() {
+            const container = document.getElementById('personas-list');
+            container.innerHTML = '';
+
+            personas.forEach(persona => {
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-lg shadow-sm p-6';
+
+                const painPoints = persona.pain_points || [];
+                const priorities = persona.priorities || [];
+                const prefs = persona.content_preferences || {};
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="text-lg font-semibold">${persona.title}</h3>
+                            <p class="text-sm text-gray-500">${persona.company_size || ''}</p>
+                        </div>
+                        <span class="px-2 py-1 bg-indigo-100 text-indigo-600 rounded text-sm">${persona.id}</span>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <p class="font-medium text-gray-700 mb-1">Pain Points</p>
+                            <ul class="list-disc list-inside text-gray-600 space-y-1">
+                                ${painPoints.map(p => `<li>${p}</li>`).join('')}
+                            </ul>
+                        </div>
+                        <div>
+                            <p class="font-medium text-gray-700 mb-1">Priorities</p>
+                            <ul class="list-disc list-inside text-gray-600 space-y-1">
+                                ${priorities.map(p => `<li>${p}</li>`).join('')}
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-4 border-t text-sm">
+                        <p class="text-gray-600">
+                            <span class="font-medium">Language:</span> ${persona.language_level || 'Professional'}<br>
+                            <span class="font-medium">Tone:</span> ${prefs.tone || 'Professional'}<br>
+                            <span class="font-medium">Length:</span> ${prefs.length || 'Medium'}
+                        </p>
+                    </div>
+
+                    <div class="mt-4">
+                        <button onclick="testPersona('${persona.id}')"
+                            class="text-indigo-600 hover:underline text-sm font-medium">
+                            Test this persona
+                        </button>
+                    </div>
+                `;
+
+                container.appendChild(card);
+            });
+        }
+
+        function testPersona(personaId) {
+            document.getElementById('preview-persona').value = personaId;
+
+            // Switch to voice test tab
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.remove('border-indigo-600', 'text-indigo-600');
+                b.classList.add('border-transparent', 'text-gray-500');
+            });
+            document.querySelector('[data-tab="voice-test"]').classList.remove('border-transparent', 'text-gray-500');
+            document.querySelector('[data-tab="voice-test"]').classList.add('border-indigo-600', 'text-indigo-600');
+
+            document.getElementById('voice-test-tab').classList.remove('hidden');
+            document.getElementById('personas-tab').classList.add('hidden');
+
+            // Focus on sample text
+            document.getElementById('sample-text').focus();
+        }
+
+        async function previewVoice() {
+            const sampleText = document.getElementById('sample-text').value.trim();
+            const personaId = document.getElementById('preview-persona').value;
+
+            const errorDiv = document.getElementById('preview-error');
+            const resultsDiv = document.getElementById('preview-results');
+            const loadingDiv = document.getElementById('preview-loading');
+
+            errorDiv.classList.add('hidden');
+            resultsDiv.classList.add('hidden');
+
+            // Validate
+            if (!sampleText || sampleText.length < 10) {
+                errorDiv.textContent = 'Please enter at least 10 characters of sample text';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+
+            if (sampleText.length > 2000) {
+                errorDiv.textContent = 'Sample text must be less than 2000 characters';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+
+            if (!personaId) {
+                errorDiv.textContent = 'Please select a target persona';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+
+            // Show loading
+            loadingDiv.classList.remove('hidden');
+            document.getElementById('preview-btn').disabled = true;
+
+            try {
+                const response = await Auth.fetchWithAuth('/api/personas/preview-voice', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        sample_text: sampleText,
+                        persona_id: personaId
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Preview failed');
+                }
+
+                // Show results
+                loadingDiv.classList.add('hidden');
+                resultsDiv.classList.remove('hidden');
+
+                document.getElementById('persona-applied').textContent =
+                    `Persona: ${data.persona_applied.title} (${data.persona_applied.tone})`;
+                document.getElementById('original-text').textContent = data.original_text;
+                document.getElementById('transformed-text').textContent = data.transformed_text;
+
+                currentTransformed = data.transformed_text;
+
+                // Render changes
+                const changesList = document.getElementById('changes-list');
+                changesList.innerHTML = '';
+                (data.changes_summary || []).forEach(change => {
+                    const li = document.createElement('li');
+                    li.textContent = change;
+                    changesList.appendChild(li);
+                });
+
+                if (data.changes_summary.length === 0) {
+                    changesList.innerHTML = '<li>No significant changes needed</li>';
+                }
+
+            } catch (err) {
+                loadingDiv.classList.add('hidden');
+                errorDiv.textContent = err.message;
+                errorDiv.classList.remove('hidden');
+            } finally {
+                document.getElementById('preview-btn').disabled = false;
+            }
+        }
+
+        function copyTransformed() {
+            if (currentTransformed) {
+                navigator.clipboard.writeText(currentTransformed);
+                const toast = document.getElementById('copy-toast');
+                toast.classList.remove('hidden');
+                setTimeout(() => toast.classList.add('hidden'), 2000);
+            }
+        }
+
+        // Load personas on page load
+        loadPersonas();
+    </script>
+</body>
+</html>
