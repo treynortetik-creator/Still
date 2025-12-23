@@ -27,10 +27,6 @@ guessImports = true
 localPort = 5000
 externalPort = 80
 
-[[ports]]
-localPort = 8000
-externalPort = 80
-
 [unitTest]
 language = "python3"
 
