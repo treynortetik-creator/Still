@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-8">Dashboard</h1>
+
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="text-gray-500 text-sm">Active Jobs</div>
+        <div class="text-3xl font-bold text-indigo-600" id="active-jobs">-</div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="text-gray-500 text-sm">Completed Today</div>
+        <div class="text-3xl font-bold text-green-600" id="completed-today">-</div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="text-gray-500 text-sm">Cost Today</div>
+        <div class="text-3xl font-bold text-blue-600" id="cost-today">-</div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="text-gray-500 text-sm">Library Size</div>
+        <div class="text-3xl font-bold text-purple-600" id="library-size">-</div>
+    </div>
+</div>
+
+<!-- Cost Breakdown -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-semibold mb-4">Cost Summary</h2>
+        <div class="space-y-3">
+            <div class="flex justify-between">
+                <span class="text-gray-600">Today</span>
+                <span class="font-medium" id="cost-today-2">$0.00</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-600">This Week</span>
+                <span class="font-medium" id="cost-week">$0.00</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-600">This Month</span>
+                <span class="font-medium" id="cost-month">$0.00</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-semibold mb-4">Quick Actions</h2>
+        <div class="space-y-2">
+            <a href="/upload.html" class="block w-full text-center px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition">
+                New Upload
+            </a>
+            <a href="/admin/prompts" class="block w-full text-center px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 transition">
+                Edit Prompts
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="bg-white rounded-lg shadow">
+    <div class="px-6 py-4 border-b">
+        <h2 class="text-lg font-semibold">Recent Activity</h2>
+    </div>
+    <div class="divide-y" id="recent-activity">
+        <div class="px-6 py-4 text-center text-gray-500">Loading...</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadDashboard() {
+    try {
+        const response = await fetch('/admin/dashboard');
+        const data = await response.json();
+
+        document.getElementById('active-jobs').textContent = data.active_jobs;
+        document.getElementById('completed-today').textContent = data.completed_today;
+        document.getElementById('cost-today').textContent = '$' + data.costs.today.toFixed(4);
+        document.getElementById('library-size').textContent = data.library_size;
+
+        document.getElementById('cost-today-2').textContent = '$' + data.costs.today.toFixed(4);
+        document.getElementById('cost-week').textContent = '$' + data.costs.this_week.toFixed(4);
+        document.getElementById('cost-month').textContent = '$' + data.costs.this_month.toFixed(4);
+
+        // Recent activity
+        const activityDiv = document.getElementById('recent-activity');
+        if (data.recent_activity.length === 0) {
+            activityDiv.innerHTML = '<div class="px-6 py-4 text-center text-gray-500">No recent activity</div>';
+        } else {
+            activityDiv.innerHTML = data.recent_activity.map(job => `
+                <div class="px-6 py-4 flex justify-between items-center">
+                    <div>
+                        <span class="font-medium">${job.filename || 'Unknown'}</span>
+                        <span class="ml-2 px-2 py-0.5 text-xs rounded ${
+                            job.status === 'complete' ? 'bg-green-100 text-green-700' :
+                            job.status === 'failed' ? 'bg-red-100 text-red-700' :
+                            'bg-yellow-100 text-yellow-700'
+                        }">${job.status}</span>
+                    </div>
+                    <a href="/results.html?job_id=${job.id}" class="text-indigo-600 hover:underline text-sm">View</a>
+                </div>
+            `).join('');
+        }
+    } catch (err) {
+        console.error('Failed to load dashboard:', err);
+    }
+}
+
+loadDashboard();
+// Refresh every 30 seconds
+setInterval(loadDashboard, 30000);
+</script>
+{% endblock %}

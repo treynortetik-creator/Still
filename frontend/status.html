@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Processing Status - ContentMultiplier</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="text-xl font-bold text-indigo-600">ContentMultiplier</a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/upload.html" class="text-gray-600 hover:text-gray-900">Upload</a>
+                    <a href="/library.html" class="text-gray-600 hover:text-gray-900">Library</a>
+                    <a href="/admin/dashboard" class="text-gray-600 hover:text-gray-900">Admin</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-2xl mx-auto px-4 py-16">
+        <div class="bg-white rounded-lg shadow-sm p-8">
+            <!-- Status Header -->
+            <div class="text-center mb-8">
+                <div id="status-icon" class="w-20 h-20 mx-auto mb-4 rounded-full bg-indigo-100 flex items-center justify-center">
+                    <svg class="animate-spin h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </div>
+                <h1 class="text-2xl font-bold" id="status-title">Processing Your Content</h1>
+                <p class="text-gray-600 mt-2" id="status-message">This may take a few minutes...</p>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="mb-8">
+                <div class="flex justify-between text-sm text-gray-600 mb-2">
+                    <span id="current-step">Initializing...</span>
+                    <span id="progress-percent">0%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-3">
+                    <div id="progress-bar" class="bg-indigo-600 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Pipeline Steps -->
+            <div class="space-y-4 mb-8">
+                <div class="flex items-center" id="step-transcribe">
+                    <div class="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center mr-3 step-circle">
+                        <span class="text-sm">1</span>
+                    </div>
+                    <span class="text-gray-500">Transcribing & Cleaning</span>
+                </div>
+                <div class="flex items-center" id="step-atomize">
+                    <div class="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center mr-3 step-circle">
+                        <span class="text-sm">2</span>
+                    </div>
+                    <span class="text-gray-500">Extracting Content Atoms</span>
+                </div>
+                <div class="flex items-center" id="step-draft">
+                    <div class="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center mr-3 step-circle">
+                        <span class="text-sm">3</span>
+                    </div>
+                    <span class="text-gray-500">Drafting Content</span>
+                </div>
+                <div class="flex items-center" id="step-edit">
+                    <div class="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center mr-3 step-circle">
+                        <span class="text-sm">4</span>
+                    </div>
+                    <span class="text-gray-500">Editing for Audience</span>
+                </div>
+                <div class="flex items-center" id="step-factcheck">
+                    <div class="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center mr-3 step-circle">
+                        <span class="text-sm">5</span>
+                    </div>
+                    <span class="text-gray-500">Fact-Checking</span>
+                </div>
+            </div>
+
+            <!-- Estimated Time -->
+            <div class="text-center text-gray-500 text-sm" id="time-remaining">
+                Estimated time remaining: calculating...
+            </div>
+
+            <!-- Error Message (hidden by default) -->
+            <div id="error-section" class="hidden mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <h3 class="text-red-800 font-semibold">Processing Failed</h3>
+                <p class="text-red-600 mt-2" id="error-message"></p>
+                <a href="/upload.html" class="inline-block mt-4 text-indigo-600 hover:underline">Try Again</a>
+            </div>
+
+            <!-- Success Actions (hidden by default) -->
+            <div id="success-section" class="hidden mt-6 text-center">
+                <a href="#" id="view-results-btn"
+                    class="inline-block bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-indigo-700 transition">
+                    View Results
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const jobId = new URLSearchParams(window.location.search).get('job_id');
+
+        if (!jobId) {
+            window.location.href = '/upload.html';
+        }
+
+        const statusMap = {
+            'uploading': { step: 0, text: 'Uploading file...' },
+            'transcribing': { step: 1, text: 'Transcribing content...' },
+            'cleaning': { step: 1, text: 'Cleaning transcript...' },
+            'atomizing': { step: 2, text: 'Extracting content atoms...' },
+            'drafting': { step: 3, text: 'Drafting content...' },
+            'editing': { step: 4, text: 'Editing for audience...' },
+            'factchecking': { step: 5, text: 'Fact-checking...' },
+            'complete': { step: 6, text: 'Complete!' },
+            'failed': { step: -1, text: 'Failed' }
+        };
+
+        function updateStepUI(currentStep) {
+            const steps = ['step-transcribe', 'step-atomize', 'step-draft', 'step-edit', 'step-factcheck'];
+
+            steps.forEach((stepId, index) => {
+                const stepEl = document.getElementById(stepId);
+                const circle = stepEl.querySelector('.step-circle');
+                const text = stepEl.querySelector('span:last-child');
+
+                if (index + 1 < currentStep) {
+                    // Completed
+                    circle.classList.remove('border-gray-300', 'border-indigo-600');
+                    circle.classList.add('bg-green-500', 'border-green-500', 'text-white');
+                    circle.innerHTML = '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>';
+                    text.classList.remove('text-gray-500', 'text-indigo-600', 'font-semibold');
+                    text.classList.add('text-green-600');
+                } else if (index + 1 === currentStep) {
+                    // Current
+                    circle.classList.remove('border-gray-300', 'bg-green-500', 'border-green-500');
+                    circle.classList.add('border-indigo-600', 'text-indigo-600');
+                    text.classList.remove('text-gray-500', 'text-green-600');
+                    text.classList.add('text-indigo-600', 'font-semibold');
+                } else {
+                    // Pending
+                    circle.classList.remove('border-indigo-600', 'bg-green-500', 'border-green-500', 'text-indigo-600', 'text-white');
+                    circle.classList.add('border-gray-300');
+                    circle.innerHTML = `<span class="text-sm">${index + 1}</span>`;
+                    text.classList.remove('text-indigo-600', 'text-green-600', 'font-semibold');
+                    text.classList.add('text-gray-500');
+                }
+            });
+        }
+
+        async function checkStatus() {
+            try {
+                const response = await fetch(`/api/job/${jobId}/status`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Failed to fetch status');
+                }
+
+                const statusInfo = statusMap[data.status] || { step: 0, text: data.status };
+
+                document.getElementById('current-step').textContent = data.current_step || statusInfo.text;
+                document.getElementById('progress-percent').textContent = `${data.progress}%`;
+                document.getElementById('progress-bar').style.width = `${data.progress}%`;
+
+                if (data.estimated_time_remaining) {
+                    document.getElementById('time-remaining').textContent =
+                        `Estimated time remaining: ${data.estimated_time_remaining}`;
+                }
+
+                updateStepUI(statusInfo.step);
+
+                if (data.status === 'complete') {
+                    // Success!
+                    document.getElementById('status-icon').innerHTML =
+                        '<svg class="h-10 w-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+                    document.getElementById('status-icon').classList.remove('bg-indigo-100');
+                    document.getElementById('status-icon').classList.add('bg-green-100');
+                    document.getElementById('status-title').textContent = 'Content Generated!';
+                    document.getElementById('status-message').textContent = 'Your content is ready to view.';
+                    document.getElementById('time-remaining').classList.add('hidden');
+                    document.getElementById('success-section').classList.remove('hidden');
+                    document.getElementById('view-results-btn').href = `/results.html?job_id=${jobId}`;
+                    return; // Stop polling
+                }
+
+                if (data.status === 'failed') {
+                    // Error
+                    document.getElementById('status-icon').innerHTML =
+                        '<svg class="h-10 w-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+                    document.getElementById('status-icon').classList.remove('bg-indigo-100');
+                    document.getElementById('status-icon').classList.add('bg-red-100');
+                    document.getElementById('status-title').textContent = 'Processing Failed';
+                    document.getElementById('status-message').textContent = 'Something went wrong.';
+                    document.getElementById('time-remaining').classList.add('hidden');
+                    document.getElementById('error-section').classList.remove('hidden');
+                    document.getElementById('error-message').textContent = data.error_message || 'Unknown error';
+                    return; // Stop polling
+                }
+
+                // Continue polling
+                setTimeout(checkStatus, 3000);
+
+            } catch (err) {
+                console.error('Status check failed:', err);
+                setTimeout(checkStatus, 5000);
+            }
+        }
+
+        // Start polling
+        checkStatus();
+    </script>
+</body>
+</html>

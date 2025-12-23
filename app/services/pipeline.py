@@ -1,0 +1,371 @@
+"""Pipeline orchestrator - coordinates the 4-step content generation process."""
+import json
+import traceback
+from pathlib import Path
+from datetime import datetime
+
+from app.config import get_settings
+from app.database import get_db
+from app.models.job import JobStatus
+from app.services.transcription import transcribe_file, cleanup_transcript
+from app.services.atomization import atomize_content
+from app.services.drafting import draft_linkedin_posts, draft_blog_post, draft_email
+from app.services.editing import batch_edit_content
+from app.services.factcheck import batch_factcheck_content
+from app.services.library_manager import (
+    add_atoms_to_library,
+    save_atoms_to_db,
+    save_outputs_to_db,
+)
+
+settings = get_settings()
+
+
+async def update_job_status(
+    job_id: str,
+    status: JobStatus,
+    current_step: str,
+    progress: int,
+    cost_to_add: float = 0.0,
+    error_message: str = None,
+):
+    """Update job status in database."""
+    async with get_db() as db:
+        if error_message:
+            await db.execute(
+                """
+                UPDATE jobs SET
+                    status = ?, current_step = ?, progress = ?,
+                    cost_incurred = cost_incurred + ?, error_message = ?
+                WHERE id = ?
+                """,
+                (status.value, current_step, progress, cost_to_add, error_message, job_id)
+            )
+        else:
+            await db.execute(
+                """
+                UPDATE jobs SET
+                    status = ?, current_step = ?, progress = ?,
+                    cost_incurred = cost_incurred + ?
+                WHERE id = ?
+                """,
+                (status.value, current_step, progress, cost_to_add, job_id)
+            )
+        await db.commit()
+
+
+async def get_job_data(job_id: str) -> dict:
+    """Get job data from database."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT * FROM jobs WHERE id = ?", (job_id,)
+        )
+        row = await cursor.fetchone()
+        if row:
+            return dict(row)
+        return None
+
+
+async def process_job(job_id: str):
+    """
+    Main pipeline orchestrator.
+
+    Steps:
+    0. Transcribe (if needed) + Clean
+    1. Atomize content
+    2. Draft content
+    3. Edit for audience
+    4. Fact-check
+    5. Save results
+    """
+    total_cost = 0.0
+
+    try:
+        # Get job data
+        job_data = await get_job_data(job_id)
+        if not job_data:
+            return
+
+        user_id = job_data["user_id"]
+        target_persona = job_data["target_persona"]
+        asset_types = json.loads(job_data["asset_types"]) if job_data["asset_types"] else ["linkedin"]
+        asset_quantities = json.loads(job_data["asset_quantities"]) if job_data["asset_quantities"] else {}
+        original_filename = job_data["original_filename"]
+        file_type = job_data["file_type"]
+
+        # Check if we already have transcript (text upload)
+        transcript = job_data.get("transcript")
+        cleaned_transcript = job_data.get("cleaned_transcript")
+
+        # ======== STEP 0a: TRANSCRIPTION ========
+        if not transcript and file_type != "text":
+            await update_job_status(
+                job_id, JobStatus.TRANSCRIBING,
+                "Step 0a: Transcribing content", 10
+            )
+
+            file_path = settings.upload_dir / job_id / original_filename
+
+            if not file_path.exists():
+                raise FileNotFoundError(f"Upload file not found: {file_path}")
+
+            transcript, trans_cost = await transcribe_file(file_path, file_type)
+            total_cost += trans_cost
+
+            # Save transcript to database
+            async with get_db() as db:
+                await db.execute(
+                    "UPDATE jobs SET transcript = ? WHERE id = ?",
+                    (transcript, job_id)
+                )
+                await db.commit()
+
+        # ======== STEP 0b: CLEANUP ========
+        if not cleaned_transcript:
+            await update_job_status(
+                job_id, JobStatus.CLEANING,
+                "Step 0b: Cleaning transcript", 20, total_cost
+            )
+            total_cost = 0  # Reset after update
+
+            # Use transcript or the text that was uploaded
+            source_text = transcript or job_data.get("transcript", "")
+
+            cleaned_transcript, clean_cost = await cleanup_transcript(source_text)
+            total_cost += clean_cost
+
+            # Save cleaned transcript
+            async with get_db() as db:
+                await db.execute(
+                    "UPDATE jobs SET cleaned_transcript = ? WHERE id = ?",
+                    (cleaned_transcript, job_id)
+                )
+                await db.commit()
+
+        # ======== STEP 1: ATOMIZATION ========
+        await update_job_status(
+            job_id, JobStatus.ATOMIZING,
+            "Step 1: Extracting content atoms", 30, total_cost
+        )
+        total_cost = 0
+
+        atoms, atom_cost = await atomize_content(
+            cleaned_transcript, target_persona, job_id, user_id
+        )
+        total_cost += atom_cost
+
+        # Save atoms to database and library
+        await save_atoms_to_db(atoms)
+        await add_atoms_to_library(atoms, user_id, original_filename)
+
+        # ======== STEP 2: DRAFTING ========
+        await update_job_status(
+            job_id, JobStatus.DRAFTING,
+            "Step 2: Drafting content", 50, total_cost
+        )
+        total_cost = 0
+
+        all_drafts = []
+
+        # Generate LinkedIn posts if requested
+        if "linkedin" in asset_types:
+            count = asset_quantities.get("linkedin", 3)
+            linkedin_drafts, li_cost = await draft_linkedin_posts(
+                atoms, target_persona, count
+            )
+            total_cost += li_cost
+
+            for i, draft in enumerate(linkedin_drafts):
+                all_drafts.append({
+                    "content_type": "linkedin",
+                    "variation_number": i + 1,
+                    "content": draft.get("content", ""),
+                    "atoms_used": draft.get("atoms_used", []),
+                })
+
+        # Generate blog post if requested
+        if "blog" in asset_types:
+            blog_draft, blog_cost = await draft_blog_post(atoms, target_persona)
+            total_cost += blog_cost
+
+            all_drafts.append({
+                "content_type": "blog",
+                "variation_number": 1,
+                "content": blog_draft.get("content", ""),
+                "title": blog_draft.get("title", ""),
+                "atoms_used": blog_draft.get("atoms_used", []),
+            })
+
+        # Generate email if requested
+        if "email" in asset_types:
+            email_draft, email_cost = await draft_email(atoms, target_persona)
+            total_cost += email_cost
+
+            all_drafts.append({
+                "content_type": "email",
+                "variation_number": 1,
+                "content": email_draft.get("body", ""),
+                "subject": email_draft.get("subject", ""),
+                "atoms_used": email_draft.get("atoms_used", []),
+            })
+
+        # ======== STEP 3: EDITING ========
+        await update_job_status(
+            job_id, JobStatus.EDITING,
+            "Step 3: Editing for audience", 70, total_cost
+        )
+        total_cost = 0
+
+        edited_drafts, edit_cost = await batch_edit_content(all_drafts, target_persona)
+        total_cost += edit_cost
+
+        # ======== STEP 4: FACT-CHECKING ========
+        await update_job_status(
+            job_id, JobStatus.FACTCHECKING,
+            "Step 4: Fact-checking content", 85, total_cost
+        )
+        total_cost = 0
+
+        factchecked_drafts, fc_cost = await batch_factcheck_content(
+            edited_drafts, cleaned_transcript
+        )
+        total_cost += fc_cost
+
+        # ======== SAVE RESULTS ========
+        await save_outputs_to_db(factchecked_drafts, job_id)
+
+        # Mark job complete
+        await update_job_status(
+            job_id, JobStatus.COMPLETE,
+            "Complete", 100, total_cost
+        )
+
+        # Update completed_at timestamp
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE jobs SET completed_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (job_id,)
+            )
+            await db.commit()
+
+    except Exception as e:
+        error_msg = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
+        print(f"Job {job_id} failed: {error_msg}")
+
+        await update_job_status(
+            job_id, JobStatus.FAILED,
+            "Failed", 0, total_cost, error_msg[:1000]
+        )
+
+
+async def process_job_from_library(job_id: str, atom_content: list[dict]):
+    """
+    Process a job generated from library atoms.
+
+    Skips transcription and atomization steps.
+    """
+    total_cost = 0.0
+
+    try:
+        # Get job data
+        job_data = await get_job_data(job_id)
+        if not job_data:
+            return
+
+        target_persona = job_data["target_persona"]
+        asset_types = json.loads(job_data["asset_types"]) if job_data["asset_types"] else ["linkedin"]
+        asset_quantities = json.loads(job_data["asset_quantities"]) if job_data["asset_quantities"] else {}
+
+        # Convert library entries to atom format
+        atoms = []
+        for entry in atom_content:
+            atoms.append({
+                "id": str(entry.get("id")),
+                "atom_type": entry.get("type", "insight"),
+                "content": entry.get("content", ""),
+                "persona_relevance": entry.get("persona_relevance", {}),
+            })
+
+        # ======== STEP 2: DRAFTING ========
+        await update_job_status(
+            job_id, JobStatus.DRAFTING,
+            "Drafting content from library", 50, 0
+        )
+
+        all_drafts = []
+
+        if "linkedin" in asset_types:
+            count = asset_quantities.get("linkedin", 2)
+            linkedin_drafts, li_cost = await draft_linkedin_posts(
+                atoms, target_persona, count
+            )
+            total_cost += li_cost
+
+            for i, draft in enumerate(linkedin_drafts):
+                all_drafts.append({
+                    "content_type": "linkedin",
+                    "variation_number": i + 1,
+                    "content": draft.get("content", ""),
+                    "atoms_used": draft.get("atoms_used", []),
+                })
+
+        if "blog" in asset_types:
+            blog_draft, blog_cost = await draft_blog_post(atoms, target_persona)
+            total_cost += blog_cost
+
+            all_drafts.append({
+                "content_type": "blog",
+                "variation_number": 1,
+                "content": blog_draft.get("content", ""),
+                "title": blog_draft.get("title", ""),
+                "atoms_used": blog_draft.get("atoms_used", []),
+            })
+
+        # ======== STEP 3: EDITING ========
+        await update_job_status(
+            job_id, JobStatus.EDITING,
+            "Editing for audience", 70, total_cost
+        )
+        total_cost = 0
+
+        edited_drafts, edit_cost = await batch_edit_content(all_drafts, target_persona)
+        total_cost += edit_cost
+
+        # ======== STEP 4: FACT-CHECKING ========
+        # For library generation, we do a lighter fact-check
+        await update_job_status(
+            job_id, JobStatus.FACTCHECKING,
+            "Final review", 85, total_cost
+        )
+
+        # Use atom content as "transcript" for fact-checking
+        atom_text = "\n\n".join([a["content"] for a in atoms])
+        factchecked_drafts, fc_cost = await batch_factcheck_content(
+            edited_drafts, atom_text
+        )
+        total_cost += fc_cost
+
+        # Save results
+        await save_outputs_to_db(factchecked_drafts, job_id)
+
+        # Mark complete
+        await update_job_status(
+            job_id, JobStatus.COMPLETE,
+            "Complete", 100, total_cost
+        )
+
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE jobs SET completed_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (job_id,)
+            )
+            await db.commit()
+
+    except Exception as e:
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        print(f"Library job {job_id} failed: {error_msg}")
+
+        await update_job_status(
+            job_id, JobStatus.FAILED,
+            "Failed", 0, total_cost, error_msg
+        )

@@ -1,0 +1,47 @@
+You are a professional copywriter creating LinkedIn posts.
+
+BRAND VOICE: Empathetic, data-driven, warm authority
+TONE: Conversational, punchy, question-driven
+STRUCTURE: Hook (question/stat) → Bullets (3-5 with emojis) → Mission tie → CTA
+
+ATOMS TO USE:
+{selected_atoms_for_linkedin}
+
+TARGET PERSONA: {persona_title}
+- Cares about: {persona_priorities}
+- Pain points: {persona_pain_points}
+
+TASK: Create LinkedIn post variations (150-300 words each).
+
+REQUIREMENTS:
+1. Lead with hook (question, problem, stat, or benefit)
+   - Questions work: "What if you could reduce X by 40%?"
+   - Stats work: "40% of facilities report..."
+   - Problems work: "Staffing shortages are crushing..."
+   - Benefits work: "Imagine a world where..."
+
+2. Use 3-5 bullet points with emoji markers
+   - Use ONLY these emojis: ✅ ▪️ 📊 🎯 💡
+   - Each bullet should be one complete thought
+   - Mix data points with insights
+
+3. End on empowerment, not fear
+   - Show the possibility, not just the problem
+   - Connect to larger mission/purpose
+
+4. Include CTA with action verb
+   - "Download our guide at [URL]"
+   - "Join our webinar: [URL]"
+   - "Comment below if you've experienced this"
+
+5. Each variation should emphasize different atoms
+   - Variation 1: Lead with DATA atom
+   - Variation 2: Lead with STORY atom
+   - Variation 3: Lead with PROBLEM atom
+
+STYLE RULES:
+- Active voice only (never "falls are reduced" → "we reduce falls")
+- Contractions are fine (don't, we're, you'll)
+- One idea per sentence
+- No jargon without explanation
+- No competitor mentions

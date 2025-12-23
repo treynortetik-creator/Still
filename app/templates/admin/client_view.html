@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Clients{% endblock %}
+{% block nav_clients %}active{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-8">Client Management</h1>
+
+<!-- Client List -->
+<div class="bg-white rounded-lg shadow overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tier</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jobs</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Cost</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+            </tr>
+        </thead>
+        <tbody id="client-list" class="divide-y divide-gray-200">
+            <tr>
+                <td colspan="6" class="px-6 py-4 text-center text-gray-500">Loading...</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Client Detail Modal -->
+<div id="client-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="px-6 py-4 border-b flex justify-between items-center">
+            <h2 class="text-xl font-semibold" id="modal-title">Client Details</h2>
+            <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <div class="p-6" id="modal-content">
+            Loading...
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadClients() {
+    try {
+        const response = await fetch('/admin/clients');
+        const data = await response.json();
+
+        const tbody = document.getElementById('client-list');
+
+        if (data.clients.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">No clients yet</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.clients.map(client => `
+            <tr>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="font-medium">${client.email}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 py-1 text-xs rounded ${
+                        client.subscription_tier === 'pro' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'
+                    }">${client.subscription_tier}</span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">${client.job_count}</td>
+                <td class="px-6 py-4 whitespace-nowrap">$${client.total_cost.toFixed(4)}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    ${new Date(client.created_at).toLocaleDateString()}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <button onclick="showClientDetail(${client.id})"
+                        class="text-indigo-600 hover:underline">
+                        View Details
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        console.error('Failed to load clients:', err);
+    }
+}
+
+async function showClientDetail(clientId) {
+    document.getElementById('client-modal').classList.remove('hidden');
+    document.getElementById('modal-content').innerHTML = 'Loading...';
+
+    try {
+        const response = await fetch(`/admin/clients/${clientId}`);
+        const data = await response.json();
+
+        document.getElementById('modal-title').textContent = data.email;
+        document.getElementById('modal-content').innerHTML = `
+            <div class="space-y-6">
+                <!-- Stats -->
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="bg-gray-50 rounded p-4">
+                        <div class="text-sm text-gray-500">Total Cost</div>
+                        <div class="text-xl font-bold">$${data.total_cost.toFixed(4)}</div>
+                    </div>
+                    <div class="bg-gray-50 rounded p-4">
+                        <div class="text-sm text-gray-500">Tier</div>
+                        <div class="text-xl font-bold">${data.subscription_tier}</div>
+                    </div>
+                    <div class="bg-gray-50 rounded p-4">
+                        <div class="text-sm text-gray-500">Member Since</div>
+                        <div class="text-xl font-bold">${new Date(data.created_at).toLocaleDateString()}</div>
+                    </div>
+                </div>
+
+                <!-- Library Stats -->
+                <div>
+                    <h3 class="font-semibold mb-2">Library Contents</h3>
+                    <div class="flex flex-wrap gap-2">
+                        ${Object.entries(data.library_stats).map(([type, count]) =>
+                            `<span class="px-3 py-1 bg-gray-100 rounded">${type}: ${count}</span>`
+                        ).join('') || '<span class="text-gray-500">No library entries</span>'}
+                    </div>
+                </div>
+
+                <!-- Recent Jobs -->
+                <div>
+                    <h3 class="font-semibold mb-2">Recent Jobs</h3>
+                    <div class="divide-y border rounded">
+                        ${data.recent_jobs.length ? data.recent_jobs.map(job => `
+                            <div class="px-4 py-3 flex justify-between items-center">
+                                <div>
+                                    <span class="font-medium">${job.original_filename || 'Unknown'}</span>
+                                    <span class="ml-2 px-2 py-0.5 text-xs rounded ${
+                                        job.status === 'complete' ? 'bg-green-100 text-green-700' :
+                                        job.status === 'failed' ? 'bg-red-100 text-red-700' :
+                                        'bg-yellow-100 text-yellow-700'
+                                    }">${job.status}</span>
+                                </div>
+                                <span class="text-sm text-gray-500">$${job.cost_incurred.toFixed(4)}</span>
+                            </div>
+                        `).join('') : '<div class="px-4 py-3 text-gray-500">No jobs yet</div>'}
+                    </div>
+                </div>
+            </div>
+        `;
+    } catch (err) {
+        document.getElementById('modal-content').innerHTML = `
+            <div class="text-red-600">Failed to load client details</div>
+        `;
+    }
+}
+
+function closeModal() {
+    document.getElementById('client-modal').classList.add('hidden');
+}
+
+// Close on escape
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModal();
+});
+
+// Initial load
+loadClients();
+</script>
+{% endblock %}

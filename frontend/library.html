@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Library - ContentMultiplier</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="text-xl font-bold text-indigo-600">ContentMultiplier</a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/upload.html" class="text-gray-600 hover:text-gray-900">Upload</a>
+                    <a href="/library.html" class="text-indigo-600 font-medium">Library</a>
+                    <a href="/admin/dashboard" class="text-gray-600 hover:text-gray-900">Admin</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-3xl font-bold">Content Library</h1>
+                <p class="text-gray-600 mt-1" id="library-stats">Loading...</p>
+            </div>
+            <button id="generate-btn" disabled
+                class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                Generate from Selected (<span id="selected-count">0</span>)
+            </button>
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
+            <div class="flex flex-wrap gap-4">
+                <!-- Type Filter -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <select id="filter-type" class="border border-gray-300 rounded-lg px-3 py-2">
+                        <option value="">All Types</option>
+                        <option value="data">Data</option>
+                        <option value="story">Story</option>
+                        <option value="insight">Insight</option>
+                        <option value="problem">Problem</option>
+                        <option value="solution">Solution</option>
+                    </select>
+                </div>
+
+                <!-- Persona Filter -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Persona</label>
+                    <select id="filter-persona" class="border border-gray-300 rounded-lg px-3 py-2">
+                        <option value="">All Personas</option>
+                        <option value="ceo_longterm_care">CEO of Long-Term Care</option>
+                        <option value="don_memory_care">Director of Nursing</option>
+                        <option value="marketing_director">Marketing Director</option>
+                    </select>
+                </div>
+
+                <!-- Min Relevance -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Min Relevance</label>
+                    <select id="filter-relevance" class="border border-gray-300 rounded-lg px-3 py-2">
+                        <option value="1">1+</option>
+                        <option value="2">2+</option>
+                        <option value="3">3+</option>
+                        <option value="4">4+</option>
+                        <option value="5">5 only</option>
+                    </select>
+                </div>
+
+                <!-- Search -->
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                    <input type="text" id="filter-search" placeholder="Search content..."
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                </div>
+
+                <div class="flex items-end">
+                    <button id="apply-filters" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200">
+                        Apply Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Library Grid -->
+        <div id="library-container" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="col-span-full text-center py-12">
+                <div class="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto"></div>
+                <p class="mt-4 text-gray-600">Loading library...</p>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="mt-8 flex justify-center gap-2" id="pagination"></div>
+    </div>
+
+    <!-- Generate Modal -->
+    <div id="generate-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <h2 class="text-xl font-bold mb-4">Generate Content from Library</h2>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Target Persona</label>
+                    <select id="gen-persona" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                        <option value="ceo_longterm_care">CEO of Long-Term Care Facility</option>
+                        <option value="don_memory_care">Director of Nursing (Memory Care)</option>
+                        <option value="marketing_director">Marketing Director (Senior Living)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Content Types</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="gen-linkedin" checked class="rounded border-gray-300">
+                            <span class="ml-2">LinkedIn Posts</span>
+                            <input type="number" id="gen-linkedin-qty" value="2" min="1" max="5"
+                                class="ml-auto w-16 border border-gray-300 rounded px-2 py-1 text-center">
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" id="gen-blog" class="rounded border-gray-300">
+                            <span class="ml-2">Blog Post</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="selected-atoms-preview" class="p-3 bg-gray-50 rounded text-sm">
+                    <strong>Selected atoms:</strong>
+                    <div id="atoms-preview-list" class="mt-2 space-y-1"></div>
+                </div>
+            </div>
+
+            <div class="mt-6 flex gap-3">
+                <button id="cancel-generate" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button id="confirm-generate" class="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                    Generate
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Copy Toast -->
+    <div id="copy-toast" class="fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg hidden">
+        Copied to clipboard!
+    </div>
+
+    <script>
+        let allEntries = [];
+        let selectedIds = new Set();
+        let currentPage = 0;
+        const pageSize = 24;
+
+        function getTypeColor(type) {
+            const colors = {
+                'data': 'blue',
+                'story': 'green',
+                'insight': 'purple',
+                'problem': 'red',
+                'solution': 'yellow'
+            };
+            return colors[type] || 'gray';
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text);
+            const toast = document.getElementById('copy-toast');
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 2000);
+        }
+
+        function updateSelectedCount() {
+            document.getElementById('selected-count').textContent = selectedIds.size;
+            document.getElementById('generate-btn').disabled = selectedIds.size === 0;
+        }
+
+        function toggleSelect(id, content) {
+            if (selectedIds.has(id)) {
+                selectedIds.delete(id);
+            } else {
+                selectedIds.add(id);
+            }
+            updateSelectedCount();
+
+            // Update card styling
+            const card = document.querySelector(`[data-entry-id="${id}"]`);
+            if (card) {
+                card.classList.toggle('ring-2', selectedIds.has(id));
+                card.classList.toggle('ring-indigo-500', selectedIds.has(id));
+            }
+        }
+
+        function renderLibrary(entries) {
+            const container = document.getElementById('library-container');
+            container.innerHTML = '';
+
+            if (entries.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <p class="text-gray-500">No entries found</p>
+                        <a href="/upload.html" class="text-indigo-600 hover:underline mt-2 inline-block">
+                            Upload content to build your library
+                        </a>
+                    </div>
+                `;
+                return;
+            }
+
+            entries.forEach(entry => {
+                const color = getTypeColor(entry.entry_type);
+                const isSelected = selectedIds.has(entry.id);
+
+                const card = document.createElement('div');
+                card.className = `bg-white p-4 rounded-lg shadow-sm border-l-4 border-${color}-500 cursor-pointer hover:shadow-md transition ${isSelected ? 'ring-2 ring-indigo-500' : ''}`;
+                card.dataset.entryId = entry.id;
+
+                const relevance = entry.persona_relevance ? Object.entries(entry.persona_relevance).map(([k, v]) => `${k.split('_')[0]}: ${v}`).join(', ') : '';
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-semibold text-${color}-600 uppercase">${entry.entry_type}</span>
+                        <input type="checkbox" ${isSelected ? 'checked' : ''}
+                            class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                            onclick="event.stopPropagation(); toggleSelect(${entry.id}, '${entry.content.replace(/'/g, "\\'")}')">
+                    </div>
+                    <p class="text-gray-700 text-sm line-clamp-3">${escapeHtml(entry.content)}</p>
+                    <div class="mt-3 flex flex-wrap gap-1">
+                        ${entry.tags && entry.tags.length ? entry.tags.slice(0, 3).map(tag =>
+                            `<span class="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">${escapeHtml(tag)}</span>`
+                        ).join('') : ''}
+                    </div>
+                    <div class="mt-2 flex justify-between text-xs text-gray-400">
+                        <span>Used ${entry.times_used || 0}x</span>
+                        ${relevance ? `<span>${relevance}</span>` : ''}
+                    </div>
+                `;
+
+                card.addEventListener('click', (e) => {
+                    if (e.target.type !== 'checkbox') {
+                        toggleSelect(entry.id, entry.content);
+                        const checkbox = card.querySelector('input[type="checkbox"]');
+                        checkbox.checked = selectedIds.has(entry.id);
+                    }
+                });
+
+                container.appendChild(card);
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function loadLibrary() {
+            const type = document.getElementById('filter-type').value;
+            const persona = document.getElementById('filter-persona').value;
+            const minRelevance = document.getElementById('filter-relevance').value;
+            const search = document.getElementById('filter-search').value;
+
+            const params = new URLSearchParams();
+            if (type) params.set('entry_type', type);
+            if (persona) params.set('persona', persona);
+            if (minRelevance) params.set('min_relevance', minRelevance);
+            if (search) params.set('search', search);
+            params.set('limit', pageSize);
+            params.set('offset', currentPage * pageSize);
+
+            try {
+                const response = await fetch(`/api/library?${params}`);
+                const data = await response.json();
+
+                document.getElementById('library-stats').textContent =
+                    `${data.total} entries in library`;
+
+                allEntries = data.entries;
+                renderLibrary(allEntries);
+
+                // Render pagination
+                const totalPages = Math.ceil(data.total / pageSize);
+                const pagination = document.getElementById('pagination');
+                pagination.innerHTML = '';
+
+                if (totalPages > 1) {
+                    for (let i = 0; i < totalPages; i++) {
+                        const btn = document.createElement('button');
+                        btn.textContent = i + 1;
+                        btn.className = `px-3 py-1 rounded ${i === currentPage ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`;
+                        btn.onclick = () => {
+                            currentPage = i;
+                            loadLibrary();
+                        };
+                        pagination.appendChild(btn);
+                    }
+                }
+
+            } catch (err) {
+                console.error('Failed to load library:', err);
+            }
+        }
+
+        // Load stats
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/library/stats');
+                const data = await response.json();
+
+                document.getElementById('library-stats').textContent =
+                    `${data.total_entries} total entries`;
+            } catch (err) {
+                console.error('Failed to load stats:', err);
+            }
+        }
+
+        // Event listeners
+        document.getElementById('apply-filters').addEventListener('click', () => {
+            currentPage = 0;
+            loadLibrary();
+        });
+
+        document.getElementById('filter-search').addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') {
+                currentPage = 0;
+                loadLibrary();
+            }
+        });
+
+        document.getElementById('generate-btn').addEventListener('click', () => {
+            // Populate preview
+            const previewList = document.getElementById('atoms-preview-list');
+            previewList.innerHTML = '';
+
+            const selectedEntries = allEntries.filter(e => selectedIds.has(e.id));
+            selectedEntries.forEach(entry => {
+                const div = document.createElement('div');
+                div.className = 'text-gray-600';
+                div.textContent = `• ${entry.content.substring(0, 60)}...`;
+                previewList.appendChild(div);
+            });
+
+            document.getElementById('generate-modal').classList.remove('hidden');
+        });
+
+        document.getElementById('cancel-generate').addEventListener('click', () => {
+            document.getElementById('generate-modal').classList.add('hidden');
+        });
+
+        document.getElementById('confirm-generate').addEventListener('click', async () => {
+            const persona = document.getElementById('gen-persona').value;
+            const assetTypes = [];
+            const assetQuantities = {};
+
+            if (document.getElementById('gen-linkedin').checked) {
+                assetTypes.push('linkedin');
+                assetQuantities.linkedin = parseInt(document.getElementById('gen-linkedin-qty').value);
+            }
+            if (document.getElementById('gen-blog').checked) {
+                assetTypes.push('blog');
+                assetQuantities.blog = 1;
+            }
+
+            if (assetTypes.length === 0) {
+                alert('Please select at least one content type');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/generate-from-library', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        atom_ids: Array.from(selectedIds),
+                        target_persona: persona,
+                        asset_types: assetTypes,
+                        asset_quantities: assetQuantities
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    window.location.href = `/status.html?job_id=${data.job_id}`;
+                } else {
+                    throw new Error(data.detail || 'Generation failed');
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        });
+
+        // Initial load
+        loadLibrary();
+        loadStats();
+    </script>
+</body>
+</html>

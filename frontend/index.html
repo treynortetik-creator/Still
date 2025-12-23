@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ContentMultiplier - AI Content Repurposing</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="text-xl font-bold text-indigo-600">ContentMultiplier</a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/upload.html" class="text-gray-600 hover:text-gray-900">Upload</a>
+                    <a href="/library.html" class="text-gray-600 hover:text-gray-900">Library</a>
+                    <a href="/admin/dashboard" class="text-gray-600 hover:text-gray-900">Admin</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h1 class="text-4xl font-bold mb-4">Transform Your Content</h1>
+            <p class="text-xl opacity-90 mb-8">Upload once, create everywhere. AI-powered content repurposing for busy marketers.</p>
+            <a href="/upload.html" class="bg-white text-indigo-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition">
+                Get Started
+            </a>
+        </div>
+    </div>
+
+    <!-- How It Works -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <h2 class="text-3xl font-bold text-center mb-12">How It Works</h2>
+
+        <div class="grid md:grid-cols-4 gap-8">
+            <div class="text-center">
+                <div class="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span class="text-2xl">1</span>
+                </div>
+                <h3 class="font-semibold mb-2">Upload</h3>
+                <p class="text-gray-600">Upload your webinar, podcast, PDF, or paste text</p>
+            </div>
+
+            <div class="text-center">
+                <div class="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span class="text-2xl">2</span>
+                </div>
+                <h3 class="font-semibold mb-2">Atomize</h3>
+                <p class="text-gray-600">AI extracts reusable quotes, stats, and stories</p>
+            </div>
+
+            <div class="text-center">
+                <div class="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span class="text-2xl">3</span>
+                </div>
+                <h3 class="font-semibold mb-2">Draft & Edit</h3>
+                <p class="text-gray-600">Generate brand-aligned content for each channel</p>
+            </div>
+
+            <div class="text-center">
+                <div class="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span class="text-2xl">4</span>
+                </div>
+                <h3 class="font-semibold mb-2">Publish</h3>
+                <p class="text-gray-600">Get fact-checked content ready for each platform</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Content Types -->
+    <div class="bg-gray-100 py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold text-center mb-12">One Upload, Multiple Outputs</h2>
+
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="bg-white p-6 rounded-lg shadow-sm">
+                    <h3 class="font-semibold text-lg mb-2">LinkedIn Posts</h3>
+                    <p class="text-gray-600 mb-4">Engaging posts optimized for your target persona with hooks, bullets, and CTAs.</p>
+                    <span class="text-indigo-600">3 variations per job</span>
+                </div>
+
+                <div class="bg-white p-6 rounded-lg shadow-sm">
+                    <h3 class="font-semibold text-lg mb-2">Blog Posts</h3>
+                    <p class="text-gray-600 mb-4">SEO-friendly articles with proper structure, headings, and internal link suggestions.</p>
+                    <span class="text-indigo-600">800-1,200 words</span>
+                </div>
+
+                <div class="bg-white p-6 rounded-lg shadow-sm">
+                    <h3 class="font-semibold text-lg mb-2">Email Campaigns</h3>
+                    <p class="text-gray-600 mb-4">Subject lines, preview text, and body copy designed for conversions.</p>
+                    <span class="text-indigo-600">Ready to send</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Content Library -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div class="md:flex items-center gap-12">
+            <div class="md:w-1/2 mb-8 md:mb-0">
+                <h2 class="text-3xl font-bold mb-4">Your Content Library Grows</h2>
+                <p class="text-gray-600 mb-4">
+                    Every piece of content you upload adds to your permanent library of reusable atoms -
+                    quotes, statistics, stories, and insights tagged by persona relevance.
+                </p>
+                <p class="text-gray-600 mb-6">
+                    Generate fresh content anytime by combining library atoms. No new uploads needed.
+                </p>
+                <a href="/library.html" class="text-indigo-600 font-semibold hover:underline">
+                    Browse Your Library →
+                </a>
+            </div>
+            <div class="md:w-1/2 bg-gray-100 p-8 rounded-lg">
+                <div class="space-y-4">
+                    <div class="bg-white p-4 rounded shadow-sm border-l-4 border-blue-500">
+                        <span class="text-xs text-blue-600 font-semibold">DATA</span>
+                        <p class="text-sm mt-1">"40% reduction in staff documentation time..."</p>
+                    </div>
+                    <div class="bg-white p-4 rounded shadow-sm border-l-4 border-green-500">
+                        <span class="text-xs text-green-600 font-semibold">STORY</span>
+                        <p class="text-sm mt-1">"Sunrise Senior Living implemented this in 30 days..."</p>
+                    </div>
+                    <div class="bg-white p-4 rounded shadow-sm border-l-4 border-purple-500">
+                        <span class="text-xs text-purple-600 font-semibold">INSIGHT</span>
+                        <p class="text-sm mt-1">"The 3-step framework for reducing burnout..."</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="bg-indigo-600 text-white py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 class="text-3xl font-bold mb-4">Ready to Multiply Your Content?</h2>
+            <p class="text-xl opacity-90 mb-8">Upload your first piece and see the magic happen.</p>
+            <a href="/upload.html" class="bg-white text-indigo-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition">
+                Upload Content Now
+            </a>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-gray-400 py-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p>&copy; 2025 ContentMultiplier. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+</html>

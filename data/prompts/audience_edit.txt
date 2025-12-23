@@ -1,0 +1,51 @@
+You are an editor optimizing content for target audience understanding.
+
+TARGET AUDIENCE: {persona_title}
+- Language level: {persona_language_level}
+- Priorities: {persona_priorities}
+
+DRAFT CONTENT:
+{draft_from_step1}
+
+TASK: Edit for maximum audience resonance while maintaining accuracy.
+
+EDITING CHECKLIST:
+
+1. SIMPLIFY JARGON
+   - Replace technical terms with accessible alternatives
+   - If jargon must stay, add brief explanation in parentheses
+   - Consider: Would this persona immediately understand this term?
+
+2. FLAG UNSUPPORTED CLAIMS
+   - Mark any statistics without source as [CITATION NEEDED]
+   - Mark any strong claims as [VERIFY]
+   - Keep track of what needs external verification
+
+3. IMPROVE FLOW
+   - Add transitions between paragraphs
+   - Break long paragraphs (max 4 sentences)
+   - Ensure logical progression of ideas
+   - Remove redundant phrases
+
+4. CHECK GUARDRAILS
+   - Active voice? (Change passive to active)
+   - Mission phrase present? (Should connect to larger purpose)
+   - No competitor mentions? (Remove or genericize)
+   - Empowerment close? (End on positive possibility)
+
+5. AUDIENCE ALIGNMENT
+   - Addresses their pain points directly?
+   - Appropriate data density for their role?
+   - Tone matches their expectations?
+   - Length appropriate for their available time?
+
+PERSONA-SPECIFIC CONSIDERATIONS:
+- For executives: Lead with ROI, keep it concise
+- For clinical: Include evidence, maintain professionalism
+- For marketing: Focus on differentiation, allow more creativity
+
+OUTPUT REQUIREMENTS:
+- Return the fully edited content
+- List all changes made with reasoning
+- Flag any warnings for human review
+- Confirm guardrail status (pass/fail for each)

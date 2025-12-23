@@ -1,0 +1,175 @@
+"""Content atomization service - Step 0 of the pipeline."""
+import json
+import uuid
+from typing import Tuple
+import google.generativeai as genai
+
+from app.config import get_settings, calculate_cost
+from app.services.prompt_manager import get_rendered_prompt
+from app.services.persona_manager import get_persona
+
+settings = get_settings()
+
+
+async def atomize_content(
+    cleaned_transcript: str,
+    target_persona_id: str,
+    job_id: str,
+    user_id: int,
+) -> Tuple[list[dict], float]:
+    """
+    Extract reusable content atoms from transcript.
+
+    Atoms are categorized as: data, insight, story, problem, solution.
+    Each atom is scored for relevance to the target persona.
+
+    Returns (atoms_list, cost) tuple.
+    """
+    # Get persona details
+    persona = await get_persona(target_persona_id)
+    if not persona:
+        raise ValueError(f"Persona not found: {target_persona_id}")
+
+    # Get and render the atomization prompt
+    variables = {
+        "target_persona_title": persona["title"],
+        "persona_pain_points": ", ".join(persona["pain_points"]),
+        "persona_priorities": ", ".join(persona["priorities"]),
+        "cleaned_transcript": cleaned_transcript,
+    }
+
+    prompt, config = await get_rendered_prompt("atomization", variables)
+
+    # Call Gemini
+    genai.configure(api_key=settings.gemini_api_key)
+    model = genai.GenerativeModel(config["model"])
+
+    # Add JSON output instruction
+    full_prompt = prompt + """
+
+OUTPUT FORMAT:
+Return valid JSON with this structure:
+{
+  "atoms": [
+    {
+      "type": "data|insight|story|problem|solution",
+      "content": "The actual content extracted",
+      "source_location": "timestamp or section reference",
+      "relevance_to_persona": 1-5,
+      "why_relevant": "Brief explanation",
+      "tags": ["tag1", "tag2"]
+    }
+  ],
+  "summary": "Brief summary of what was extracted",
+  "recommended_distribution": {
+    "linkedin": ["atom indexes best for LinkedIn"],
+    "blog": ["atom indexes best for blog"],
+    "email": ["atom indexes best for email"]
+  }
+}"""
+
+    response = model.generate_content(
+        full_prompt,
+        generation_config=genai.GenerationConfig(
+            response_mime_type="application/json",
+            max_output_tokens=config["max_tokens"],
+        )
+    )
+
+    # Parse response
+    try:
+        result = json.loads(response.text)
+    except json.JSONDecodeError:
+        # Try to extract JSON from response
+        text = response.text
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        if start >= 0 and end > start:
+            result = json.loads(text[start:end])
+        else:
+            raise ValueError("Failed to parse atomization response as JSON")
+
+    # Process atoms
+    atoms = []
+    for atom_data in result.get("atoms", []):
+        atom = {
+            "id": str(uuid.uuid4()),
+            "job_id": job_id,
+            "user_id": user_id,
+            "atom_type": atom_data.get("type", "insight"),
+            "content": atom_data.get("content", ""),
+            "source_location": atom_data.get("source_location"),
+            "tags": atom_data.get("tags", []),
+            "persona_relevance": {
+                target_persona_id: atom_data.get("relevance_to_persona", 3)
+            },
+            "why_relevant": atom_data.get("why_relevant"),
+        }
+        atoms.append(atom)
+
+    # Calculate cost
+    input_tokens = response.usage_metadata.prompt_token_count
+    output_tokens = response.usage_metadata.candidates_token_count
+    cost = calculate_cost(config["model"], input_tokens, output_tokens)
+
+    return atoms, cost
+
+
+def select_atoms_for_content_type(
+    atoms: list[dict],
+    content_type: str,
+    persona_id: str,
+    count: int = 5,
+) -> list[dict]:
+    """
+    Select the best atoms for a specific content type.
+
+    Prioritizes by persona relevance and atom type appropriateness.
+    """
+    # Type preferences by content type
+    type_preferences = {
+        "linkedin": ["data", "insight", "story"],
+        "blog": ["problem", "insight", "solution", "data", "story"],
+        "email": ["problem", "solution", "data"],
+    }
+
+    preferred_types = type_preferences.get(content_type, ["insight", "data"])
+
+    # Score atoms
+    scored_atoms = []
+    for atom in atoms:
+        score = 0
+
+        # Persona relevance (0-5)
+        relevance = atom.get("persona_relevance", {}).get(persona_id, 3)
+        score += relevance * 2
+
+        # Type preference bonus
+        atom_type = atom.get("atom_type", "insight")
+        if atom_type in preferred_types:
+            score += (len(preferred_types) - preferred_types.index(atom_type))
+
+        scored_atoms.append((score, atom))
+
+    # Sort by score descending and return top N
+    scored_atoms.sort(key=lambda x: x[0], reverse=True)
+
+    return [atom for _, atom in scored_atoms[:count]]
+
+
+def group_atoms_by_type(atoms: list[dict]) -> dict[str, list[dict]]:
+    """Group atoms by their type for easier access in prompts."""
+    grouped = {
+        "data": [],
+        "insight": [],
+        "story": [],
+        "problem": [],
+        "solution": [],
+    }
+
+    for atom in atoms:
+        atom_type = atom.get("atom_type", "insight")
+        if atom_type in grouped:
+            grouped[atom_type].append(atom)
+
+    return grouped

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Results - ContentMultiplier</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="text-xl font-bold text-indigo-600">ContentMultiplier</a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/upload.html" class="text-gray-600 hover:text-gray-900">Upload</a>
+                    <a href="/library.html" class="text-gray-600 hover:text-gray-900">Library</a>
+                    <a href="/admin/dashboard" class="text-gray-600 hover:text-gray-900">Admin</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-3xl font-bold" id="job-title">Results</h1>
+                <p class="text-gray-600 mt-1" id="job-meta">Loading...</p>
+            </div>
+            <div class="flex gap-4">
+                <a href="/library.html" class="text-indigo-600 hover:underline">View in Library</a>
+                <a href="/upload.html" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
+                    New Upload
+                </a>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="mb-6 border-b">
+            <div class="flex space-x-8">
+                <button class="tab-btn px-1 pb-4 border-b-2 border-indigo-600 text-indigo-600 font-medium" data-tab="outputs">
+                    Generated Content
+                </button>
+                <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="atoms">
+                    Extracted Atoms
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="text-center py-12">
+            <div class="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto"></div>
+            <p class="mt-4 text-gray-600">Loading results...</p>
+        </div>
+
+        <!-- Outputs Tab -->
+        <div id="outputs-tab" class="hidden">
+            <div id="outputs-container" class="space-y-6"></div>
+        </div>
+
+        <!-- Atoms Tab -->
+        <div id="atoms-tab" class="hidden">
+            <div class="mb-4 flex gap-2">
+                <button class="atom-filter px-3 py-1 rounded-full bg-gray-200 text-gray-700 text-sm" data-type="all">All</button>
+                <button class="atom-filter px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-sm" data-type="data">Data</button>
+                <button class="atom-filter px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm" data-type="story">Stories</button>
+                <button class="atom-filter px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-sm" data-type="insight">Insights</button>
+                <button class="atom-filter px-3 py-1 rounded-full bg-red-100 text-red-700 text-sm" data-type="problem">Problems</button>
+                <button class="atom-filter px-3 py-1 rounded-full bg-yellow-100 text-yellow-700 text-sm" data-type="solution">Solutions</button>
+            </div>
+            <div id="atoms-container" class="grid md:grid-cols-2 gap-4"></div>
+        </div>
+
+        <!-- Cost Info -->
+        <div class="mt-8 p-4 bg-gray-100 rounded-lg">
+            <div class="flex justify-between items-center">
+                <span class="text-gray-600">Processing Cost:</span>
+                <span class="font-semibold" id="total-cost">$0.00</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Copy Toast -->
+    <div id="copy-toast" class="fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg hidden">
+        Copied to clipboard!
+    </div>
+
+    <script>
+        const jobId = new URLSearchParams(window.location.search).get('job_id');
+
+        if (!jobId) {
+            window.location.href = '/upload.html';
+        }
+
+        let currentTab = 'outputs';
+        let allAtoms = [];
+
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.dataset.tab;
+                currentTab = tab;
+
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    b.classList.remove('border-indigo-600', 'text-indigo-600');
+                    b.classList.add('border-transparent', 'text-gray-500');
+                });
+                btn.classList.remove('border-transparent', 'text-gray-500');
+                btn.classList.add('border-indigo-600', 'text-indigo-600');
+
+                document.getElementById('outputs-tab').classList.toggle('hidden', tab !== 'outputs');
+                document.getElementById('atoms-tab').classList.toggle('hidden', tab !== 'atoms');
+            });
+        });
+
+        // Atom filtering
+        document.querySelectorAll('.atom-filter').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const type = btn.dataset.type;
+                filterAtoms(type);
+
+                document.querySelectorAll('.atom-filter').forEach(b => {
+                    b.classList.remove('ring-2', 'ring-offset-2', 'ring-indigo-500');
+                });
+                btn.classList.add('ring-2', 'ring-offset-2', 'ring-indigo-500');
+            });
+        });
+
+        function filterAtoms(type) {
+            const container = document.getElementById('atoms-container');
+            const atoms = type === 'all' ? allAtoms : allAtoms.filter(a => a.type === type);
+            renderAtoms(atoms);
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text);
+            const toast = document.getElementById('copy-toast');
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 2000);
+        }
+
+        function getTypeColor(type) {
+            const colors = {
+                'data': 'blue',
+                'story': 'green',
+                'insight': 'purple',
+                'problem': 'red',
+                'solution': 'yellow'
+            };
+            return colors[type] || 'gray';
+        }
+
+        function renderOutputs(outputs) {
+            const container = document.getElementById('outputs-container');
+            container.innerHTML = '';
+
+            // Group by content type
+            const grouped = {};
+            outputs.forEach(output => {
+                const type = output.content_type;
+                if (!grouped[type]) grouped[type] = [];
+                grouped[type].push(output);
+            });
+
+            for (const [type, items] of Object.entries(grouped)) {
+                const section = document.createElement('div');
+                section.className = 'bg-white rounded-lg shadow-sm overflow-hidden';
+
+                const typeTitle = type.charAt(0).toUpperCase() + type.slice(1);
+
+                section.innerHTML = `
+                    <div class="bg-gray-50 px-6 py-4 border-b">
+                        <h2 class="text-lg font-semibold">${typeTitle} (${items.length})</h2>
+                    </div>
+                    <div class="divide-y" id="outputs-${type}"></div>
+                `;
+
+                container.appendChild(section);
+
+                const outputsDiv = section.querySelector(`#outputs-${type}`);
+
+                items.forEach((output, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'p-6';
+
+                    const content = output.step3_final || output.step2_edited || output.step1_draft || '';
+                    const hasWarnings = output.warnings && output.warnings.length > 0;
+
+                    item.innerHTML = `
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm font-medium text-gray-500">Variation ${output.variation_number || index + 1}</span>
+                                ${hasWarnings ? '<span class="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 rounded">Has Warnings</span>' : ''}
+                            </div>
+                            <button onclick="copyToClipboard(\`${content.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)"
+                                class="text-indigo-600 hover:underline text-sm">
+                                Copy
+                            </button>
+                        </div>
+                        <div class="prose max-w-none">
+                            <div class="whitespace-pre-wrap text-gray-700">${escapeHtml(content)}</div>
+                        </div>
+                        ${hasWarnings ? `
+                            <div class="mt-4 p-3 bg-yellow-50 rounded text-sm">
+                                <strong class="text-yellow-700">Warnings:</strong>
+                                <ul class="mt-1 list-disc list-inside text-yellow-600">
+                                    ${output.warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}
+                                </ul>
+                            </div>
+                        ` : ''}
+
+                        <!-- Version Toggle -->
+                        <details class="mt-4">
+                            <summary class="text-sm text-gray-500 cursor-pointer hover:text-gray-700">
+                                View all versions
+                            </summary>
+                            <div class="mt-2 space-y-2 text-sm">
+                                ${output.step1_draft ? `
+                                    <div class="p-3 bg-gray-50 rounded">
+                                        <strong>Step 1 (Draft):</strong>
+                                        <p class="mt-1 whitespace-pre-wrap">${escapeHtml(output.step1_draft.substring(0, 300))}...</p>
+                                    </div>
+                                ` : ''}
+                                ${output.step2_edited ? `
+                                    <div class="p-3 bg-gray-50 rounded">
+                                        <strong>Step 2 (Edited):</strong>
+                                        <p class="mt-1 whitespace-pre-wrap">${escapeHtml(output.step2_edited.substring(0, 300))}...</p>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </details>
+                    `;
+
+                    outputsDiv.appendChild(item);
+                });
+            }
+        }
+
+        function renderAtoms(atoms) {
+            const container = document.getElementById('atoms-container');
+            container.innerHTML = '';
+
+            atoms.forEach(atom => {
+                const color = getTypeColor(atom.type);
+                const card = document.createElement('div');
+                card.className = `bg-white p-4 rounded-lg shadow-sm border-l-4 border-${color}-500`;
+
+                const relevance = atom.persona_relevance ? Object.values(atom.persona_relevance)[0] : null;
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-semibold text-${color}-600 uppercase">${atom.type}</span>
+                        ${relevance ? `<span class="text-xs text-gray-500">Relevance: ${relevance}/5</span>` : ''}
+                    </div>
+                    <p class="text-gray-700 text-sm">${escapeHtml(atom.content)}</p>
+                    ${atom.source_location ? `<p class="text-xs text-gray-400 mt-2">Source: ${escapeHtml(atom.source_location)}</p>` : ''}
+                    <div class="mt-3 flex gap-2">
+                        ${atom.tags && atom.tags.length ? atom.tags.map(tag =>
+                            `<span class="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">${escapeHtml(tag)}</span>`
+                        ).join('') : ''}
+                    </div>
+                    <button onclick="copyToClipboard(\`${atom.content.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)"
+                        class="mt-3 text-xs text-indigo-600 hover:underline">
+                        Copy
+                    </button>
+                `;
+
+                container.appendChild(card);
+            });
+
+            if (atoms.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 col-span-2 text-center py-8">No atoms found</p>';
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function loadResults() {
+            try {
+                const response = await fetch(`/api/job/${jobId}/results`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Failed to load results');
+                }
+
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('outputs-tab').classList.remove('hidden');
+
+                // Update header
+                document.getElementById('job-title').textContent = data.original_filename || 'Results';
+                document.getElementById('job-meta').textContent =
+                    `${data.outputs.length} outputs generated | ${data.atoms.length} atoms extracted`;
+                document.getElementById('total-cost').textContent = `$${data.cost_incurred.toFixed(4)}`;
+
+                // Render outputs
+                renderOutputs(data.outputs);
+
+                // Store atoms and render
+                allAtoms = data.atoms;
+                renderAtoms(allAtoms);
+
+            } catch (err) {
+                console.error('Failed to load results:', err);
+                document.getElementById('loading').innerHTML = `
+                    <p class="text-red-600">Failed to load results: ${err.message}</p>
+                    <a href="/upload.html" class="text-indigo-600 hover:underline mt-4 inline-block">Upload New Content</a>
+                `;
+            }
+        }
+
+        loadResults();
+    </script>
+</body>
+</html>
