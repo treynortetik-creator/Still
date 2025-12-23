@@ -3,10 +3,11 @@ language = "python3"
 entrypoint = "app/main.py"
 
 hidden = [".pythonlibs", "__pycache__", "*.pyc", ".git", "database/*.db"]
-modules = ["python-3.12", "web", "nodejs-20", "nix"]
+modules = ["web", "nodejs-20", "nix", "python-3.11"]
 
 [nix]
 channel = "stable-25_05"
+packages = ["cargo", "libiconv", "libxcrypt", "rustc"]
 
 [env]
 PYTHONPATH = "${REPL_HOME}"
@@ -53,7 +54,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python -m uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload"
+args = "python -m uvicorn app.main:app --host 0.0.0.0 --port 5000"
 waitForPort = 5000
 
 [agent]
