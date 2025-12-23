@@ -7,7 +7,7 @@ from datetime import datetime
 from app.config import get_settings
 from app.database import get_db
 from app.models.job import JobStatus
-from app.services.transcription import transcribe_file, cleanup_transcript
+from app.services.transcription import transcribe_file, cleanup_transcript, extract_document_content
 from app.services.atomization import atomize_content
 from app.services.drafting import draft_linkedin_posts, draft_blog_post, draft_email
 from app.services.editing import batch_edit_content
@@ -111,52 +111,114 @@ async def process_job(job_id: str):
         transcript = job_data.get("transcript")
         cleaned_transcript = job_data.get("cleaned_transcript")
 
-        # ======== STEP 0a: TRANSCRIPTION ========
-        if not transcript and file_type != "text":
-            await update_job_status(
-                job_id, JobStatus.TRANSCRIBING,
-                "Step 0a: Transcribing content", 10
-            )
+        file_path = settings.upload_dir / str(user_id) / job_id / original_filename
 
-            file_path = settings.upload_dir / str(user_id) / job_id / original_filename
+        # Determine processing path based on file type
+        # Documents (PDF, DOCX, TXT, MD) go directly to extraction → atomization
+        # Audio/Video go through transcription → cleanup → atomization
+        is_document = file_type == "document"
+        is_audio_video = file_type in ["audio", "video"]
 
-            if not file_path.exists():
-                raise FileNotFoundError(f"Upload file not found: {file_path}")
-
-            transcript, trans_cost = await transcribe_file(
-                file_path, file_type, job_id, user_id, magic_words
-            )
-            total_cost += trans_cost
-
-            # Save transcript to database
-            async with get_db() as db:
-                await db.execute(
-                    "UPDATE jobs SET transcript = ? WHERE id = ?",
-                    (transcript, job_id)
+        if is_document:
+            # ======== DOCUMENT PATH: Extract content directly ========
+            if not cleaned_transcript:
+                await update_job_status(
+                    job_id, JobStatus.TRANSCRIBING,
+                    "Extracting document content", 15
                 )
-                await db.commit()
 
-        # ======== STEP 0b: CLEANUP ========
-        if not cleaned_transcript:
-            await update_job_status(
-                job_id, JobStatus.CLEANING,
-                "Step 0b: Cleaning transcript", 20, total_cost
-            )
-            total_cost = 0  # Reset after update
+                if not file_path.exists():
+                    raise FileNotFoundError(f"Upload file not found: {file_path}")
 
-            # Use transcript or the text that was uploaded
-            source_text = transcript or job_data.get("transcript", "")
-
-            cleaned_transcript, clean_cost = await cleanup_transcript(source_text)
-            total_cost += clean_cost
-
-            # Save cleaned transcript
-            async with get_db() as db:
-                await db.execute(
-                    "UPDATE jobs SET cleaned_transcript = ? WHERE id = ?",
-                    (cleaned_transcript, job_id)
+                # Extract document content with image/graph analysis
+                # This goes directly to cleaned_transcript (no cleanup needed for documents)
+                extracted_content, extract_cost = await extract_document_content(
+                    file_path, job_id, user_id
                 )
-                await db.commit()
+                total_cost += extract_cost
+
+                # For documents, the extracted content IS the cleaned transcript
+                # No cleanup step needed since it's not spoken content
+                cleaned_transcript = extracted_content
+                transcript = extracted_content
+
+                # Save both transcript and cleaned_transcript
+                async with get_db() as db:
+                    await db.execute(
+                        "UPDATE jobs SET transcript = ?, cleaned_transcript = ? WHERE id = ?",
+                        (transcript, cleaned_transcript, job_id)
+                    )
+                    await db.commit()
+
+        elif is_audio_video:
+            # ======== AUDIO/VIDEO PATH: Transcribe → Cleanup ========
+            # Step 0a: Transcription
+            if not transcript:
+                await update_job_status(
+                    job_id, JobStatus.TRANSCRIBING,
+                    "Step 0a: Transcribing content", 10
+                )
+
+                if not file_path.exists():
+                    raise FileNotFoundError(f"Upload file not found: {file_path}")
+
+                transcript, trans_cost = await transcribe_file(
+                    file_path, file_type, job_id, user_id, magic_words
+                )
+                total_cost += trans_cost
+
+                # Save transcript to database
+                async with get_db() as db:
+                    await db.execute(
+                        "UPDATE jobs SET transcript = ? WHERE id = ?",
+                        (transcript, job_id)
+                    )
+                    await db.commit()
+
+            # Step 0b: Cleanup (for spoken content with filler words, etc.)
+            if not cleaned_transcript:
+                await update_job_status(
+                    job_id, JobStatus.CLEANING,
+                    "Step 0b: Cleaning transcript", 20, total_cost
+                )
+                total_cost = 0  # Reset after update
+
+                # Use transcript or the text that was uploaded
+                source_text = transcript or job_data.get("transcript", "")
+
+                cleaned_transcript, clean_cost = await cleanup_transcript(source_text)
+                total_cost += clean_cost
+
+                # Save cleaned transcript
+                async with get_db() as db:
+                    await db.execute(
+                        "UPDATE jobs SET cleaned_transcript = ? WHERE id = ?",
+                        (cleaned_transcript, job_id)
+                    )
+                    await db.commit()
+
+        else:
+            # ======== TEXT UPLOAD PATH (file_type == "text") ========
+            # Text was already saved to transcript, just need cleanup
+            if not cleaned_transcript:
+                await update_job_status(
+                    job_id, JobStatus.CLEANING,
+                    "Processing text content", 20, total_cost
+                )
+                total_cost = 0
+
+                source_text = transcript or job_data.get("transcript", "")
+
+                # For pasted text, do a light cleanup
+                cleaned_transcript, clean_cost = await cleanup_transcript(source_text)
+                total_cost += clean_cost
+
+                async with get_db() as db:
+                    await db.execute(
+                        "UPDATE jobs SET cleaned_transcript = ? WHERE id = ?",
+                        (cleaned_transcript, job_id)
+                    )
+                    await db.commit()
 
         # ======== STEP 1: ATOMIZATION ========
         await update_job_status(

@@ -26,7 +26,7 @@ limiter = Limiter(key_func=get_remote_address)
 ALLOWED_EXTENSIONS = {
     "video": [".mp4", ".mov", ".avi", ".webm", ".mkv"],
     "audio": [".mp3", ".wav", ".m4a", ".ogg", ".flac"],
-    "document": [".pdf", ".txt", ".md", ".docx"],
+    "document": [".pdf", ".txt", ".md", ".docx", ".png", ".jpg", ".jpeg", ".gif", ".webp"],
 }
 
 ALLOWED_MIME_TYPES = {
@@ -34,6 +34,7 @@ ALLOWED_MIME_TYPES = {
     "audio/mpeg", "audio/wav", "audio/x-m4a", "audio/ogg", "audio/flac",
     "application/pdf", "text/plain", "text/markdown",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "image/png", "image/jpeg", "image/gif", "image/webp",
 }
 
 
