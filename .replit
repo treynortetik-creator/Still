@@ -1,8 +1,8 @@
-run = "python -m uvicorn app.main:app --host 0.0.0.0 --port 8000"
+run = "pip install -r requirements.txt && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000"
 language = "python3"
 entrypoint = "app/main.py"
 
-hidden = [".pythonlibs", "__pycache__", "*.pyc", ".git"]
+hidden = [".pythonlibs", "__pycache__", "*.pyc", ".git", "database/*.db"]
 
 [nix]
 channel = "stable-23_11"
@@ -12,8 +12,7 @@ PYTHONPATH = "${REPL_HOME}"
 PYTHONUNBUFFERED = "1"
 
 [deployment]
-run = ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-deploymentTarget = "cloudrun"
+run = ["sh", "-c", "pip install -r requirements.txt && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000"]
 
 [packager]
 language = "python3"
@@ -29,3 +28,28 @@ externalPort = 80
 
 [unitTest]
 language = "python3"
+
+# Workflows for Replit's new interface
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start Server"
+
+[[workflows.workflow]]
+name = "Start Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pip install -r requirements.txt && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000"
+waitForPort = 8000

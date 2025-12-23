@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     # API Keys
     gemini_api_key: str = ""
     anthropic_api_key: str = ""
+    openrouter_api_key: str = ""  # Alternative to Anthropic
+
+    # API Configuration
+    use_openrouter: bool = False  # Set to True to use OpenRouter instead of Anthropic
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
 
     # Database
     database_url: str = "sqlite+aiosqlite:///./database/contentmultiplier.db"

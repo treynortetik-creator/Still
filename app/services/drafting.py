@@ -1,7 +1,7 @@
 """Content drafting service - Step 1 of the pipeline."""
 import json
 import os
-from typing import Tuple
+from typing import Tuple, Union
 import anthropic
 
 from app.config import get_settings, calculate_cost
@@ -12,6 +12,25 @@ from app.utils.retry import retry_async, claude_circuit_breaker
 
 settings = get_settings()
 
+# Try to import openai for OpenRouter support
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+
+
+def use_openrouter() -> bool:
+    """Check if we should use OpenRouter instead of Anthropic."""
+    # Use OpenRouter if explicitly enabled and API key is set
+    if settings.use_openrouter:
+        api_key = settings.openrouter_api_key or os.getenv("OPENROUTER_API_KEY")
+        return bool(api_key)
+    # Also auto-detect: if no Anthropic key but OpenRouter key exists
+    anthropic_key = settings.anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")
+    openrouter_key = settings.openrouter_api_key or os.getenv("OPENROUTER_API_KEY")
+    return not anthropic_key and bool(openrouter_key)
+
 
 def get_anthropic_client():
     """Get Anthropic client."""
@@ -19,6 +38,91 @@ def get_anthropic_client():
     if not api_key:
         raise ValueError("ANTHROPIC_API_KEY not configured")
     return anthropic.Anthropic(api_key=api_key)
+
+
+def get_openrouter_client():
+    """Get OpenRouter client (OpenAI-compatible)."""
+    if not OPENAI_AVAILABLE:
+        raise ImportError("openai package required for OpenRouter. Run: pip install openai")
+
+    api_key = settings.openrouter_api_key or os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
+        raise ValueError("OPENROUTER_API_KEY not configured")
+
+    return openai.OpenAI(
+        api_key=api_key,
+        base_url=settings.openrouter_base_url,
+    )
+
+
+async def call_llm(prompt: str, model: str, max_tokens: int) -> Tuple[str, int, int]:
+    """
+    Call LLM (Anthropic or OpenRouter) and return response.
+
+    Returns (response_text, input_tokens, output_tokens)
+    """
+    if use_openrouter():
+        # Use OpenRouter (OpenAI-compatible API)
+        client = get_openrouter_client()
+
+        # Map Anthropic model names to OpenRouter format
+        openrouter_model = model
+        if "claude" in model.lower():
+            # OpenRouter uses format like "anthropic/claude-3.5-sonnet"
+            if "opus-4" in model or "opus-4-5" in model:
+                openrouter_model = "anthropic/claude-sonnet-4"  # closest available
+            elif "sonnet" in model:
+                openrouter_model = "anthropic/claude-3.5-sonnet"
+            else:
+                openrouter_model = "anthropic/claude-3.5-sonnet"
+
+        async def do_call():
+            return client.chat.completions.create(
+                model=openrouter_model,
+                max_tokens=max_tokens,
+                messages=[{"role": "user", "content": prompt}],
+                extra_headers={
+                    "HTTP-Referer": "https://contentmultiplier.com",
+                    "X-Title": "ContentMultiplier",
+                }
+            )
+
+        response = await retry_async(
+            do_call,
+            max_retries=3,
+            base_delay=2.0,
+            context="openrouter_call",
+        )
+
+        response_text = response.choices[0].message.content
+        input_tokens = response.usage.prompt_tokens if response.usage else 0
+        output_tokens = response.usage.completion_tokens if response.usage else 0
+
+        return response_text, input_tokens, output_tokens
+
+    else:
+        # Use Anthropic directly
+        client = get_anthropic_client()
+
+        async def do_call():
+            return client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                messages=[{"role": "user", "content": prompt}],
+            )
+
+        message = await retry_async(
+            do_call,
+            max_retries=3,
+            base_delay=2.0,
+            context="anthropic_call",
+        )
+
+        response_text = message.content[0].text
+        input_tokens = message.usage.input_tokens
+        output_tokens = message.usage.output_tokens
+
+        return response_text, input_tokens, output_tokens
 
 
 async def draft_linkedin_posts(
@@ -71,24 +175,10 @@ OUTPUT FORMAT (valid JSON):
   ]
 }}"""
 
-    client = get_anthropic_client()
-
-    async def do_draft():
-        return client.messages.create(
-            model=config["model"],
-            max_tokens=config["max_tokens"],
-            messages=[{"role": "user", "content": full_prompt}],
-        )
-
-    # Use retry logic for API call
-    message = await retry_async(
-        do_draft,
-        max_retries=3,
-        base_delay=2.0,
-        context="draft_linkedin_posts",
+    # Call LLM (supports both Anthropic and OpenRouter)
+    response_text, input_tokens, output_tokens = await call_llm(
+        full_prompt, config["model"], config["max_tokens"]
     )
-
-    response_text = message.content[0].text
 
     # Parse response
     try:
@@ -105,11 +195,7 @@ OUTPUT FORMAT (valid JSON):
     drafts = result.get("posts", [])
 
     # Calculate cost
-    cost = calculate_cost(
-        config["model"],
-        message.usage.input_tokens,
-        message.usage.output_tokens
-    )
+    cost = calculate_cost(config["model"], input_tokens, output_tokens)
 
     return drafts, cost
 
@@ -159,24 +245,10 @@ OUTPUT FORMAT (valid JSON):
   "sections": ["Section 1 title", "Section 2 title", "Section 3 title"]
 }"""
 
-    client = get_anthropic_client()
-
-    async def do_draft():
-        return client.messages.create(
-            model=config["model"],
-            max_tokens=config["max_tokens"],
-            messages=[{"role": "user", "content": full_prompt}],
-        )
-
-    # Use retry logic for API call
-    message = await retry_async(
-        do_draft,
-        max_retries=3,
-        base_delay=2.0,
-        context="draft_blog_post",
+    # Call LLM (supports both Anthropic and OpenRouter)
+    response_text, input_tokens, output_tokens = await call_llm(
+        full_prompt, config["model"], config["max_tokens"]
     )
-
-    response_text = message.content[0].text
 
     # Parse response
     try:
@@ -190,11 +262,7 @@ OUTPUT FORMAT (valid JSON):
             raise ValueError("Failed to parse blog draft as JSON")
 
     # Calculate cost
-    cost = calculate_cost(
-        config["model"],
-        message.usage.input_tokens,
-        message.usage.output_tokens
-    )
+    cost = calculate_cost(config["model"], input_tokens, output_tokens)
 
     return result, cost
 
@@ -241,24 +309,10 @@ OUTPUT FORMAT (valid JSON):
   "atoms_used": ["atom content snippets used"]
 }"""
 
-    client = get_anthropic_client()
-
-    async def do_draft():
-        return client.messages.create(
-            model=config["model"],
-            max_tokens=config["max_tokens"],
-            messages=[{"role": "user", "content": full_prompt}],
-        )
-
-    # Use retry logic for API call
-    message = await retry_async(
-        do_draft,
-        max_retries=3,
-        base_delay=2.0,
-        context="draft_email",
+    # Call LLM (supports both Anthropic and OpenRouter)
+    response_text, input_tokens, output_tokens = await call_llm(
+        full_prompt, config["model"], config["max_tokens"]
     )
-
-    response_text = message.content[0].text
 
     try:
         result = json.loads(response_text)
@@ -270,10 +324,6 @@ OUTPUT FORMAT (valid JSON):
         else:
             raise ValueError("Failed to parse email draft as JSON")
 
-    cost = calculate_cost(
-        config["model"],
-        message.usage.input_tokens,
-        message.usage.output_tokens
-    )
+    cost = calculate_cost(config["model"], input_tokens, output_tokens)
 
     return result, cost
