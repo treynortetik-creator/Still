@@ -112,20 +112,18 @@
 
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Drafting Model</label>
-                <select id="model-drafting" class="w-full border border-gray-300 rounded px-3 py-2">
-                    <optgroup label="OpenRouter Models">
-                        <option value="anthropic/claude-sonnet-4">Claude Sonnet 4</option>
-                        <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
-                        <option value="anthropic/claude-3-opus">Claude 3 Opus</option>
-                        <option value="openai/gpt-4o">GPT-4o</option>
-                        <option value="openai/gpt-4-turbo">GPT-4 Turbo</option>
-                        <option value="google/gemini-pro-1.5">Gemini Pro 1.5</option>
-                    </optgroup>
-                    <optgroup label="Direct Anthropic">
-                        <option value="claude-opus-4-5-20251101">Claude Opus 4.5 (Direct)</option>
-                    </optgroup>
-                </select>
+                <div class="flex gap-2">
+                    <select id="model-drafting" class="flex-1 border border-gray-300 rounded px-3 py-2">
+                        <option value="">Loading models...</option>
+                    </select>
+                    <button onclick="loadOpenRouterModels()" 
+                        id="refresh-models-btn"
+                        class="px-3 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 whitespace-nowrap">
+                        Refresh
+                    </button>
+                </div>
                 <p class="text-xs text-gray-500 mt-1">Primary content generation model</p>
+                <p id="models-status" class="text-xs text-yellow-600 mt-1"></p>
             </div>
 
             <div>
@@ -169,6 +167,57 @@
 
 {% block scripts %}
 <script>
+let openrouterModels = [];
+
+async function loadOpenRouterModels() {
+    const statusEl = document.getElementById('models-status');
+    const btnEl = document.getElementById('refresh-models-btn');
+    const selectEl = document.getElementById('model-drafting');
+    
+    try {
+        btnEl.disabled = true;
+        statusEl.textContent = 'Loading models...';
+        selectEl.innerHTML = '<option value="">Loading...</option>';
+        
+        const response = await fetch('/api/admin/openrouter-models');
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to fetch models');
+        }
+        
+        const data = await response.json();
+        openrouterModels = data.models;
+        
+        // Populate dropdown
+        selectEl.innerHTML = '<option value="">-- Select a model --</option>';
+        
+        openrouterModels.forEach(model => {
+            const option = document.createElement('option');
+            option.value = model.id;
+            option.textContent = `${model.name}`;
+            selectEl.appendChild(option);
+        });
+        
+        // Restore selected value if it exists
+        const savedValue = selectEl.dataset.savedValue;
+        if (savedValue) {
+            selectEl.value = savedValue;
+        }
+        
+        statusEl.textContent = `${openrouterModels.length} models available`;
+        statusEl.className = 'text-xs text-green-600 mt-1';
+        
+    } catch (err) {
+        statusEl.textContent = `Error: ${err.message}. Make sure OpenRouter API key is configured.`;
+        statusEl.className = 'text-xs text-red-600 mt-1';
+        selectEl.innerHTML = '<option value="">Error loading models</option>';
+        console.error('Failed to load OpenRouter models:', err);
+    } finally {
+        btnEl.disabled = false;
+    }
+}
+
 async function loadSettings() {
     try {
         const response = await fetch('/api/admin/settings');
@@ -192,10 +241,14 @@ async function loadSettings() {
         if (data.models) {
             if (data.models.transcription) document.getElementById('model-transcription').value = data.models.transcription;
             if (data.models.atomization) document.getElementById('model-atomization').value = data.models.atomization;
-            if (data.models.drafting) document.getElementById('model-drafting').value = data.models.drafting;
+            if (data.models.drafting) document.getElementById('model-drafting').dataset.savedValue = data.models.drafting;
             if (data.models.editing) document.getElementById('model-editing').value = data.models.editing;
             if (data.models.factcheck) document.getElementById('model-factcheck').value = data.models.factcheck;
         }
+        
+        // Load OpenRouter models
+        await loadOpenRouterModels();
+        
     } catch (err) {
         console.error('Failed to load settings:', err);
     }

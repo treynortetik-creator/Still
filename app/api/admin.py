@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Query, Body
 from typing import Optional, Dict
 from pydantic import BaseModel
+import httpx
 
 from app.database import get_db
 from app.services import settings_manager
@@ -510,3 +511,50 @@ async def save_model_config(config: ModelConfig):
         "factcheck": config.factcheck
     })
     return {"status": "ok", "models": config.model_dump()}
+
+
+@router.get("/openrouter-models")
+async def get_openrouter_models():
+    """Fetch available models from OpenRouter."""
+    openrouter_key = os.environ.get("OPENROUTER_API_KEY")
+    
+    if not openrouter_key:
+        raise HTTPException(status_code=400, detail="OpenRouter API key not configured")
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://openrouter.ai/api/v1/models",
+                headers={"Authorization": f"Bearer {openrouter_key}"}
+            )
+            
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail="Failed to fetch OpenRouter models"
+                )
+            
+            data = response.json()
+            models = data.get("data", [])
+            
+            # Format models for frontend (id and name)
+            formatted_models = [
+                {
+                    "id": model.get("id"),
+                    "name": model.get("name", model.get("id")),
+                    "pricing": model.get("pricing", {})
+                }
+                for model in models
+                if model.get("id")
+            ]
+            
+            # Sort by name
+            formatted_models.sort(key=lambda x: x["name"])
+            
+            return {"models": formatted_models}
+            
+    except httpx.RequestError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to connect to OpenRouter: {str(e)}"
+        )

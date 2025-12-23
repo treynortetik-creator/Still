@@ -27,6 +27,8 @@ OpenRouter support is available as an alternative to direct Anthropic API access
 ### Admin Settings
 - **Settings Page** (`/admin/settings`): Configure API keys and model selection
 - **Model Selection**: Admin can select specific models for each pipeline step (transcription, atomization, drafting, editing, fact-checking)
+- **OpenRouter Dynamic Models**: Drafting model dropdown dynamically loads all available models from OpenRouter when API key is configured
+- **Model Refresh**: Users can click the Refresh button to reload available OpenRouter models
 - **API Key Management**: Keys entered in admin UI are session-only; use Replit Secrets for persistence
 - **Settings Storage**: Model configuration persists in `data/settings.json`
 
