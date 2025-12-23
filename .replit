@@ -1,0 +1,31 @@
+run = "python -m uvicorn app.main:app --host 0.0.0.0 --port 8000"
+language = "python3"
+entrypoint = "app/main.py"
+
+hidden = [".pythonlibs", "__pycache__", "*.pyc", ".git"]
+
+[nix]
+channel = "stable-23_11"
+
+[env]
+PYTHONPATH = "${REPL_HOME}"
+PYTHONUNBUFFERED = "1"
+
+[deployment]
+run = ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+deploymentTarget = "cloudrun"
+
+[packager]
+language = "python3"
+
+[packager.features]
+enabledForHosting = true
+packageSearch = true
+guessImports = true
+
+[[ports]]
+localPort = 8000
+externalPort = 80
+
+[unitTest]
+language = "python3"
