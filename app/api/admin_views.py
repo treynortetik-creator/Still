@@ -37,3 +37,9 @@ async def admin_clients(request: Request):
 async def admin_library(request: Request):
     """Render library browser."""
     return templates.TemplateResponse("library_browser.html", {"request": request})
+
+
+@router.get("/settings", response_class=HTMLResponse)
+async def admin_settings(request: Request):
+    """Render settings page."""
+    return templates.TemplateResponse("settings.html", {"request": request})

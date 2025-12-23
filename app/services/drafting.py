@@ -9,6 +9,7 @@ from app.services.prompt_manager import get_rendered_prompt
 from app.services.persona_manager import get_persona
 from app.services.atomization import select_atoms_for_content_type, group_atoms_by_type
 from app.utils.retry import retry_async, claude_circuit_breaker
+from app.services import settings_manager
 
 settings = get_settings()
 
@@ -22,7 +23,11 @@ except ImportError:
 
 def use_openrouter() -> bool:
     """Check if we should use OpenRouter instead of Anthropic."""
-    # Use OpenRouter if explicitly enabled and API key is set
+    # Check settings_manager first (admin-configured toggle)
+    if settings_manager.is_openrouter_enabled():
+        api_key = settings.openrouter_api_key or os.getenv("OPENROUTER_API_KEY")
+        return bool(api_key)
+    # Fall back to config setting
     if settings.use_openrouter:
         api_key = settings.openrouter_api_key or os.getenv("OPENROUTER_API_KEY")
         return bool(api_key)
@@ -55,12 +60,17 @@ def get_openrouter_client():
     )
 
 
-async def call_llm(prompt: str, model: str, max_tokens: int) -> Tuple[str, int, int]:
+async def call_llm(prompt: str, model: str, max_tokens: int) -> Tuple[str, int, int, str]:
     """
     Call LLM (Anthropic or OpenRouter) and return response.
 
-    Returns (response_text, input_tokens, output_tokens)
+    Returns (response_text, input_tokens, output_tokens, actual_model_used)
     """
+    # Override model with admin settings if available
+    admin_model = settings_manager.get_model_for_step("drafting")
+    if admin_model:
+        model = admin_model
+
     if use_openrouter():
         # Use OpenRouter (OpenAI-compatible API)
         client = get_openrouter_client()
@@ -98,7 +108,7 @@ async def call_llm(prompt: str, model: str, max_tokens: int) -> Tuple[str, int, 
         input_tokens = response.usage.prompt_tokens if response.usage else 0
         output_tokens = response.usage.completion_tokens if response.usage else 0
 
-        return response_text, input_tokens, output_tokens
+        return response_text, input_tokens, output_tokens, openrouter_model
 
     else:
         # Use Anthropic directly
@@ -122,7 +132,7 @@ async def call_llm(prompt: str, model: str, max_tokens: int) -> Tuple[str, int, 
         input_tokens = message.usage.input_tokens
         output_tokens = message.usage.output_tokens
 
-        return response_text, input_tokens, output_tokens
+        return response_text, input_tokens, output_tokens, model
 
 
 async def draft_linkedin_posts(
@@ -176,7 +186,7 @@ OUTPUT FORMAT (valid JSON):
 }}"""
 
     # Call LLM (supports both Anthropic and OpenRouter)
-    response_text, input_tokens, output_tokens = await call_llm(
+    response_text, input_tokens, output_tokens, actual_model = await call_llm(
         full_prompt, config["model"], config["max_tokens"]
     )
 
@@ -194,8 +204,8 @@ OUTPUT FORMAT (valid JSON):
 
     drafts = result.get("posts", [])
 
-    # Calculate cost
-    cost = calculate_cost(config["model"], input_tokens, output_tokens)
+    # Calculate cost using actual model invoked
+    cost = calculate_cost(actual_model, input_tokens, output_tokens)
 
     return drafts, cost
 
@@ -246,7 +256,7 @@ OUTPUT FORMAT (valid JSON):
 }"""
 
     # Call LLM (supports both Anthropic and OpenRouter)
-    response_text, input_tokens, output_tokens = await call_llm(
+    response_text, input_tokens, output_tokens, actual_model = await call_llm(
         full_prompt, config["model"], config["max_tokens"]
     )
 
@@ -261,8 +271,8 @@ OUTPUT FORMAT (valid JSON):
         else:
             raise ValueError("Failed to parse blog draft as JSON")
 
-    # Calculate cost
-    cost = calculate_cost(config["model"], input_tokens, output_tokens)
+    # Calculate cost using actual model invoked
+    cost = calculate_cost(actual_model, input_tokens, output_tokens)
 
     return result, cost
 
@@ -310,7 +320,7 @@ OUTPUT FORMAT (valid JSON):
 }"""
 
     # Call LLM (supports both Anthropic and OpenRouter)
-    response_text, input_tokens, output_tokens = await call_llm(
+    response_text, input_tokens, output_tokens, actual_model = await call_llm(
         full_prompt, config["model"], config["max_tokens"]
     )
 
@@ -324,6 +334,7 @@ OUTPUT FORMAT (valid JSON):
         else:
             raise ValueError("Failed to parse email draft as JSON")
 
-    cost = calculate_cost(config["model"], input_tokens, output_tokens)
+    # Calculate cost using actual model invoked
+    cost = calculate_cost(actual_model, input_tokens, output_tokens)
 
     return result, cost

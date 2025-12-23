@@ -8,6 +8,7 @@ import google.generativeai as genai
 
 from app.config import get_settings, calculate_cost
 from app.utils.retry import retry_async, gemini_circuit_breaker
+from app.services import settings_manager
 
 settings = get_settings()
 
@@ -75,7 +76,8 @@ async def transcribe_file(
     ext = file_path.suffix.lower()
     mime_type = mime_types.get(ext, "application/octet-stream")
 
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model_name = settings_manager.get_model_for_step("transcription")
+    model = genai.GenerativeModel(model_name)
 
     # Build prompt with optional magic words
     vocabulary_section = ""
@@ -131,7 +133,7 @@ Output the full transcript only, no additional commentary."""
     # Calculate cost
     input_tokens = response.usage_metadata.prompt_token_count
     output_tokens = response.usage_metadata.candidates_token_count
-    cost = calculate_cost("gemini-2.0-flash", input_tokens, output_tokens)
+    cost = calculate_cost(model_name, input_tokens, output_tokens)
 
     return transcript, cost
 
@@ -148,7 +150,8 @@ async def cleanup_transcript(
     """
     init_gemini()
 
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model_name = settings_manager.get_model_for_step("transcription")
+    model = genai.GenerativeModel(model_name)
 
     prompt = f"""Clean up this transcript while preserving all meaningful content.
 
@@ -188,6 +191,6 @@ OUTPUT REQUIREMENTS:
     # Calculate cost
     input_tokens = response.usage_metadata.prompt_token_count
     output_tokens = response.usage_metadata.candidates_token_count
-    cost = calculate_cost("gemini-2.0-flash", input_tokens, output_tokens)
+    cost = calculate_cost(model_name, input_tokens, output_tokens)
 
     return cleaned, cost

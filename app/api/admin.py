@@ -1,10 +1,13 @@
 """Admin API endpoints."""
 import json
+import os
 from datetime import datetime, timedelta
-from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
+from fastapi import APIRouter, HTTPException, Query, Body
+from typing import Optional, Dict
+from pydantic import BaseModel
 
 from app.database import get_db
+from app.services import settings_manager
 
 router = APIRouter()
 
@@ -435,3 +438,75 @@ async def get_logs(
         ]
 
         return {"logs": logs}
+
+
+# Pydantic models for settings endpoints
+class ApiKeyRequest(BaseModel):
+    provider: str
+    key: str
+
+
+class OpenRouterToggle(BaseModel):
+    enabled: bool
+
+
+class ModelConfig(BaseModel):
+    transcription: str
+    atomization: str
+    drafting: str
+    editing: str
+    factcheck: str
+
+
+@router.get("/settings")
+async def get_settings():
+    """Get current settings including API key status and model config."""
+    settings = settings_manager.get_settings()
+    api_keys = settings_manager.get_api_key_status()
+    
+    return {
+        "api_keys": api_keys,
+        "use_openrouter": settings.get("use_openrouter", False),
+        "models": settings.get("models", {})
+    }
+
+
+@router.post("/settings/apikey")
+async def save_api_key(request: ApiKeyRequest):
+    """
+    Save API key - stores in environment for current session.
+    Note: For permanent storage, keys should be set in Replit Secrets.
+    """
+    provider = request.provider.lower()
+    key = request.key
+    
+    if provider == "openrouter":
+        os.environ["OPENROUTER_API_KEY"] = key
+    elif provider == "gemini":
+        os.environ["GEMINI_API_KEY"] = key
+    elif provider == "anthropic":
+        os.environ["ANTHROPIC_API_KEY"] = key
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown provider: {provider}")
+    
+    return {"status": "ok", "message": f"{provider} API key saved for this session"}
+
+
+@router.post("/settings/openrouter")
+async def toggle_openrouter(request: OpenRouterToggle):
+    """Toggle OpenRouter usage."""
+    settings_manager.set_openrouter_enabled(request.enabled)
+    return {"status": "ok", "use_openrouter": request.enabled}
+
+
+@router.post("/settings/models")
+async def save_model_config(config: ModelConfig):
+    """Save model configuration for each pipeline step."""
+    settings_manager.set_model_config({
+        "transcription": config.transcription,
+        "atomization": config.atomization,
+        "drafting": config.drafting,
+        "editing": config.editing,
+        "factcheck": config.factcheck
+    })
+    return {"status": "ok", "models": config.model_dump()}

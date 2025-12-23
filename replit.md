@@ -24,6 +24,12 @@ The system uses three AI providers in a specific pipeline:
 
 OpenRouter support is available as an alternative to direct Anthropic API access.
 
+### Admin Settings
+- **Settings Page** (`/admin/settings`): Configure API keys and model selection
+- **Model Selection**: Admin can select specific models for each pipeline step (transcription, atomization, drafting, editing, fact-checking)
+- **API Key Management**: Keys entered in admin UI are session-only; use Replit Secrets for persistence
+- **Settings Storage**: Model configuration persists in `data/settings.json`
+
 ### Content Processing Pipeline
 1. **Transcription**: Convert audio/video/PDF to text using Gemini
 2. **Atomization**: Extract reusable content atoms (data, insights, stories, problems, solutions)

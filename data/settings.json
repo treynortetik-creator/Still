@@ -1,0 +1,10 @@
+{
+  "use_openrouter": false,
+  "models": {
+    "transcription": "gemini-2.0-flash",
+    "atomization": "gemini-2.0-flash",
+    "drafting": "anthropic/claude-3.5-sonnet",
+    "editing": "gemini-2.0-flash",
+    "factcheck": "gemini-2.5-flash"
+  }
+}

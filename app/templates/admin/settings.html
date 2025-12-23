@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+
+{% block title %}Settings{% endblock %}
+{% block nav_settings %}active{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-8">Settings</h1>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- API Keys Section -->
+    <div class="bg-white rounded-lg shadow">
+        <div class="px-6 py-4 border-b">
+            <h2 class="text-lg font-semibold">API Keys</h2>
+            <p class="text-sm text-gray-500">Configure your AI provider API keys</p>
+        </div>
+        <div class="p-6">
+            <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p class="text-sm text-blue-800">
+                    <strong>Note:</strong> Keys entered here are for testing and last until the server restarts.
+                    For permanent storage, add them to <strong>Replit Secrets</strong> (Tools → Secrets) with these names:
+                    <code class="bg-blue-100 px-1 rounded">OPENROUTER_API_KEY</code>,
+                    <code class="bg-blue-100 px-1 rounded">GEMINI_API_KEY</code>,
+                    <code class="bg-blue-100 px-1 rounded">ANTHROPIC_API_KEY</code>
+                </p>
+            </div>
+        </div>
+        <div class="px-6 pb-6 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">OpenRouter API Key</label>
+                <div class="flex gap-2">
+                    <input type="password" id="openrouter-key" placeholder="sk-or-..."
+                        class="flex-1 border border-gray-300 rounded px-3 py-2">
+                    <button onclick="saveApiKey('openrouter')" 
+                        class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                        Save
+                    </button>
+                </div>
+                <div class="mt-1 flex items-center gap-2">
+                    <span id="openrouter-status" class="text-sm"></span>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Gemini API Key</label>
+                <div class="flex gap-2">
+                    <input type="password" id="gemini-key" placeholder="AIza..."
+                        class="flex-1 border border-gray-300 rounded px-3 py-2">
+                    <button onclick="saveApiKey('gemini')" 
+                        class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                        Save
+                    </button>
+                </div>
+                <div class="mt-1 flex items-center gap-2">
+                    <span id="gemini-status" class="text-sm"></span>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Anthropic API Key</label>
+                <div class="flex gap-2">
+                    <input type="password" id="anthropic-key" placeholder="sk-ant-..."
+                        class="flex-1 border border-gray-300 rounded px-3 py-2">
+                    <button onclick="saveApiKey('anthropic')" 
+                        class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                        Save
+                    </button>
+                </div>
+                <div class="mt-1 flex items-center gap-2">
+                    <span id="anthropic-status" class="text-sm"></span>
+                </div>
+            </div>
+
+            <div class="pt-4 border-t">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <label class="text-sm font-medium text-gray-700">Use OpenRouter for Drafting</label>
+                        <p class="text-xs text-gray-500">Use OpenRouter instead of direct Anthropic API</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="use-openrouter" class="sr-only peer" onchange="toggleOpenRouter()">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Model Selection Per Step -->
+    <div class="bg-white rounded-lg shadow">
+        <div class="px-6 py-4 border-b">
+            <h2 class="text-lg font-semibold">Model Configuration</h2>
+            <p class="text-sm text-gray-500">Select AI models for each pipeline step</p>
+        </div>
+        <div class="p-6 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Transcription Model</label>
+                <select id="model-transcription" class="w-full border border-gray-300 rounded px-3 py-2">
+                    <option value="gemini-2.0-flash">Gemini 2.0 Flash (Recommended)</option>
+                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Used for audio/video transcription and PDF extraction</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Atomization Model</label>
+                <select id="model-atomization" class="w-full border border-gray-300 rounded px-3 py-2">
+                    <option value="gemini-2.0-flash">Gemini 2.0 Flash (Recommended)</option>
+                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Used to extract content atoms from transcripts</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Drafting Model</label>
+                <select id="model-drafting" class="w-full border border-gray-300 rounded px-3 py-2">
+                    <optgroup label="OpenRouter Models">
+                        <option value="anthropic/claude-sonnet-4">Claude Sonnet 4</option>
+                        <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+                        <option value="anthropic/claude-3-opus">Claude 3 Opus</option>
+                        <option value="openai/gpt-4o">GPT-4o</option>
+                        <option value="openai/gpt-4-turbo">GPT-4 Turbo</option>
+                        <option value="google/gemini-pro-1.5">Gemini Pro 1.5</option>
+                    </optgroup>
+                    <optgroup label="Direct Anthropic">
+                        <option value="claude-opus-4-5-20251101">Claude Opus 4.5 (Direct)</option>
+                    </optgroup>
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Primary content generation model</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Editing Model</label>
+                <select id="model-editing" class="w-full border border-gray-300 rounded px-3 py-2">
+                    <option value="gemini-2.0-flash">Gemini 2.0 Flash (Recommended)</option>
+                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Used to refine and polish generated content</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Fact-checking Model</label>
+                <select id="model-factcheck" class="w-full border border-gray-300 rounded px-3 py-2">
+                    <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended)</option>
+                    <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Verifies claims against source material</p>
+            </div>
+
+            <div class="pt-4">
+                <button onclick="saveModelConfig()" 
+                    class="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                    Save Model Configuration
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success Toast -->
+<div id="success-toast" class="hidden fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg">
+    Settings saved successfully!
+</div>
+
+<!-- Error Toast -->
+<div id="error-toast" class="hidden fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg">
+    <span id="error-message">Failed to save settings</span>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadSettings() {
+    try {
+        const response = await fetch('/api/admin/settings');
+        const data = await response.json();
+        
+        // API key status
+        document.getElementById('openrouter-status').innerHTML = data.api_keys.openrouter 
+            ? '<span class="text-green-600">Configured</span>' 
+            : '<span class="text-yellow-600">Not set</span>';
+        document.getElementById('gemini-status').innerHTML = data.api_keys.gemini 
+            ? '<span class="text-green-600">Configured</span>' 
+            : '<span class="text-yellow-600">Not set</span>';
+        document.getElementById('anthropic-status').innerHTML = data.api_keys.anthropic 
+            ? '<span class="text-green-600">Configured</span>' 
+            : '<span class="text-yellow-600">Not set</span>';
+        
+        // OpenRouter toggle
+        document.getElementById('use-openrouter').checked = data.use_openrouter;
+        
+        // Model selections
+        if (data.models) {
+            if (data.models.transcription) document.getElementById('model-transcription').value = data.models.transcription;
+            if (data.models.atomization) document.getElementById('model-atomization').value = data.models.atomization;
+            if (data.models.drafting) document.getElementById('model-drafting').value = data.models.drafting;
+            if (data.models.editing) document.getElementById('model-editing').value = data.models.editing;
+            if (data.models.factcheck) document.getElementById('model-factcheck').value = data.models.factcheck;
+        }
+    } catch (err) {
+        console.error('Failed to load settings:', err);
+    }
+}
+
+async function saveApiKey(provider) {
+    const inputId = provider + '-key';
+    const key = document.getElementById(inputId).value;
+    
+    if (!key) {
+        showError('Please enter an API key');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/admin/settings/apikey', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ provider, key })
+        });
+        
+        if (response.ok) {
+            document.getElementById(inputId).value = '';
+            showSuccess();
+            loadSettings();
+        } else {
+            const data = await response.json();
+            showError(data.detail || 'Failed to save API key');
+        }
+    } catch (err) {
+        showError('Failed to save API key');
+    }
+}
+
+async function toggleOpenRouter() {
+    const enabled = document.getElementById('use-openrouter').checked;
+    
+    try {
+        const response = await fetch('/api/admin/settings/openrouter', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ enabled })
+        });
+        
+        if (response.ok) {
+            showSuccess();
+        } else {
+            showError('Failed to update setting');
+        }
+    } catch (err) {
+        showError('Failed to update setting');
+    }
+}
+
+async function saveModelConfig() {
+    const models = {
+        transcription: document.getElementById('model-transcription').value,
+        atomization: document.getElementById('model-atomization').value,
+        drafting: document.getElementById('model-drafting').value,
+        editing: document.getElementById('model-editing').value,
+        factcheck: document.getElementById('model-factcheck').value
+    };
+    
+    try {
+        const response = await fetch('/api/admin/settings/models', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(models)
+        });
+        
+        if (response.ok) {
+            showSuccess();
+        } else {
+            showError('Failed to save model configuration');
+        }
+    } catch (err) {
+        showError('Failed to save model configuration');
+    }
+}
+
+function showSuccess() {
+    const toast = document.getElementById('success-toast');
+    toast.classList.remove('hidden');
+    setTimeout(() => toast.classList.add('hidden'), 3000);
+}
+
+function showError(message) {
+    const toast = document.getElementById('error-toast');
+    document.getElementById('error-message').textContent = message;
+    toast.classList.remove('hidden');
+    setTimeout(() => toast.classList.add('hidden'), 3000);
+}
+
+loadSettings();
+</script>
+{% endblock %}
