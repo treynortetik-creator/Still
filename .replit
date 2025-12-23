@@ -3,9 +3,10 @@ language = "python3"
 entrypoint = "app/main.py"
 
 hidden = [".pythonlibs", "__pycache__", "*.pyc", ".git", "database/*.db"]
+modules = ["python-3.12", "web", "nodejs-20", "nix"]
 
 [nix]
-channel = "stable-23_11"
+channel = "stable-25_05"
 
 [env]
 PYTHONPATH = "${REPL_HOME}"
