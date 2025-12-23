@@ -92,56 +92,86 @@
             <p class="text-sm text-gray-500">Select AI models for each pipeline step</p>
         </div>
         <div class="p-6 space-y-4">
+            <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+                <p class="text-sm text-blue-800">
+                    <strong>Model Selection Precedence:</strong> Settings here override any model selection in the Prompt Editor. 
+                    Select a model below to use it for all jobs, or leave blank to use the model specified in each prompt.
+                </p>
+            </div>
+
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Transcription Model</label>
-                <select id="model-transcription" class="w-full border border-gray-300 rounded px-3 py-2">
-                    <option value="gemini-2.0-flash">Gemini 2.0 Flash (Recommended)</option>
-                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                </select>
+                <div class="flex gap-2">
+                    <select id="model-transcription" class="flex-1 border border-gray-300 rounded px-3 py-2">
+                        <option value="">-- Select a model --</option>
+                    </select>
+                    <button onclick="loadOpenRouterModels('transcription')" 
+                        class="px-3 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 whitespace-nowrap">
+                        Load
+                    </button>
+                </div>
                 <p class="text-xs text-gray-500 mt-1">Used for audio/video transcription and PDF extraction</p>
+                <p id="status-transcription" class="text-xs mt-1"></p>
             </div>
 
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Atomization Model</label>
-                <select id="model-atomization" class="w-full border border-gray-300 rounded px-3 py-2">
-                    <option value="gemini-2.0-flash">Gemini 2.0 Flash (Recommended)</option>
-                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                </select>
+                <div class="flex gap-2">
+                    <select id="model-atomization" class="flex-1 border border-gray-300 rounded px-3 py-2">
+                        <option value="">-- Select a model --</option>
+                    </select>
+                    <button onclick="loadOpenRouterModels('atomization')" 
+                        class="px-3 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 whitespace-nowrap">
+                        Load
+                    </button>
+                </div>
                 <p class="text-xs text-gray-500 mt-1">Used to extract content atoms from transcripts</p>
+                <p id="status-atomization" class="text-xs mt-1"></p>
             </div>
 
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Drafting Model</label>
                 <div class="flex gap-2">
                     <select id="model-drafting" class="flex-1 border border-gray-300 rounded px-3 py-2">
-                        <option value="">Loading models...</option>
+                        <option value="">-- Select a model --</option>
                     </select>
-                    <button onclick="loadOpenRouterModels()" 
-                        id="refresh-models-btn"
+                    <button onclick="loadOpenRouterModels('drafting')" 
                         class="px-3 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 whitespace-nowrap">
-                        Refresh
+                        Load
                     </button>
                 </div>
                 <p class="text-xs text-gray-500 mt-1">Primary content generation model</p>
-                <p id="models-status" class="text-xs text-yellow-600 mt-1"></p>
+                <p id="status-drafting" class="text-xs mt-1"></p>
             </div>
 
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Editing Model</label>
-                <select id="model-editing" class="w-full border border-gray-300 rounded px-3 py-2">
-                    <option value="gemini-2.0-flash">Gemini 2.0 Flash (Recommended)</option>
-                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                </select>
+                <div class="flex gap-2">
+                    <select id="model-editing" class="flex-1 border border-gray-300 rounded px-3 py-2">
+                        <option value="">-- Select a model --</option>
+                    </select>
+                    <button onclick="loadOpenRouterModels('editing')" 
+                        class="px-3 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 whitespace-nowrap">
+                        Load
+                    </button>
+                </div>
                 <p class="text-xs text-gray-500 mt-1">Used to refine and polish generated content</p>
+                <p id="status-editing" class="text-xs mt-1"></p>
             </div>
 
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Fact-checking Model</label>
-                <select id="model-factcheck" class="w-full border border-gray-300 rounded px-3 py-2">
-                    <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended)</option>
-                    <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                </select>
+                <div class="flex gap-2">
+                    <select id="model-factcheck" class="flex-1 border border-gray-300 rounded px-3 py-2">
+                        <option value="">-- Select a model --</option>
+                    </select>
+                    <button onclick="loadOpenRouterModels('factcheck')" 
+                        class="px-3 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 whitespace-nowrap">
+                        Load
+                    </button>
+                </div>
                 <p class="text-xs text-gray-500 mt-1">Verifies claims against source material</p>
+                <p id="status-factcheck" class="text-xs mt-1"></p>
             </div>
 
             <div class="pt-4">
@@ -169,14 +199,14 @@
 <script>
 let openrouterModels = [];
 
-async function loadOpenRouterModels() {
-    const statusEl = document.getElementById('models-status');
-    const btnEl = document.getElementById('refresh-models-btn');
-    const selectEl = document.getElementById('model-drafting');
+async function loadOpenRouterModels(stepName) {
+    const statusEl = document.getElementById(`status-${stepName}`);
+    const selectEl = document.getElementById(`model-${stepName}`);
+    const btnEl = event.target;
     
     try {
         btnEl.disabled = true;
-        statusEl.textContent = 'Loading models...';
+        statusEl.textContent = 'Loading...';
         selectEl.innerHTML = '<option value="">Loading...</option>';
         
         const response = await fetch('/api/admin/openrouter-models');
@@ -195,7 +225,7 @@ async function loadOpenRouterModels() {
         openrouterModels.forEach(model => {
             const option = document.createElement('option');
             option.value = model.id;
-            option.textContent = `${model.name}`;
+            option.textContent = model.name;
             selectEl.appendChild(option);
         });
         
@@ -206,13 +236,13 @@ async function loadOpenRouterModels() {
         }
         
         statusEl.textContent = `${openrouterModels.length} models available`;
-        statusEl.className = 'text-xs text-green-600 mt-1';
+        statusEl.className = 'text-xs text-green-600';
         
     } catch (err) {
-        statusEl.textContent = `Error: ${err.message}. Make sure OpenRouter API key is configured.`;
-        statusEl.className = 'text-xs text-red-600 mt-1';
+        statusEl.textContent = `Error: ${err.message}`;
+        statusEl.className = 'text-xs text-red-600';
         selectEl.innerHTML = '<option value="">Error loading models</option>';
-        console.error('Failed to load OpenRouter models:', err);
+        console.error(`Failed to load OpenRouter models for ${stepName}:`, err);
     } finally {
         btnEl.disabled = false;
     }
@@ -237,17 +267,14 @@ async function loadSettings() {
         // OpenRouter toggle
         document.getElementById('use-openrouter').checked = data.use_openrouter;
         
-        // Model selections
+        // Model selections - save them for later restoration
         if (data.models) {
-            if (data.models.transcription) document.getElementById('model-transcription').value = data.models.transcription;
-            if (data.models.atomization) document.getElementById('model-atomization').value = data.models.atomization;
+            if (data.models.transcription) document.getElementById('model-transcription').dataset.savedValue = data.models.transcription;
+            if (data.models.atomization) document.getElementById('model-atomization').dataset.savedValue = data.models.atomization;
             if (data.models.drafting) document.getElementById('model-drafting').dataset.savedValue = data.models.drafting;
-            if (data.models.editing) document.getElementById('model-editing').value = data.models.editing;
-            if (data.models.factcheck) document.getElementById('model-factcheck').value = data.models.factcheck;
+            if (data.models.editing) document.getElementById('model-editing').dataset.savedValue = data.models.editing;
+            if (data.models.factcheck) document.getElementById('model-factcheck').dataset.savedValue = data.models.factcheck;
         }
-        
-        // Load OpenRouter models
-        await loadOpenRouterModels();
         
     } catch (err) {
         console.error('Failed to load settings:', err);
