@@ -71,6 +71,7 @@ async def transcribe_file(
         ".ogg": "audio/ogg",
         ".flac": "audio/flac",
         ".pdf": "application/pdf",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     }
 
     ext = file_path.suffix.lower()
@@ -194,3 +195,114 @@ OUTPUT REQUIREMENTS:
     cost = calculate_cost(model_name, input_tokens, output_tokens)
 
     return cleaned, cost
+
+
+async def extract_document_content(
+    file_path: Path,
+    job_id: str = None,
+    user_id: int = None,
+) -> Tuple[str, float]:
+    """
+    Extract text content from documents (PDF, DOCX) with image/graph analysis.
+
+    Unlike transcribe_file, this function:
+    - Extracts text directly from documents
+    - Analyzes any images, charts, graphs, or visual content
+    - Returns content ready for atomization (no cleanup needed)
+
+    Returns (extracted_content, cost) tuple.
+    """
+    init_gemini()
+
+    file_size = file_path.stat().st_size
+    file_size_mb = file_size / (1024 * 1024)
+    ext = file_path.suffix.lower()
+
+    # For plain text files, just read directly (no API cost)
+    if ext in [".txt", ".md"]:
+        async with aiofiles.open(file_path, "r", errors="ignore") as f:
+            content = await f.read()
+        return content, 0.0
+
+    # MIME types for documents
+    mime_types = {
+        ".pdf": "application/pdf",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+    }
+
+    mime_type = mime_types.get(ext, "application/octet-stream")
+
+    model_name = settings_manager.get_model_for_step("transcription")
+    model = genai.GenerativeModel(model_name)
+
+    # Build extraction prompt with image analysis
+    prompt = """Extract all content from this document comprehensively.
+
+EXTRACTION INSTRUCTIONS:
+
+1. TEXT CONTENT:
+   - Extract all readable text content completely
+   - Preserve the logical structure and organization
+   - Maintain headings, subheadings, and section breaks
+   - Keep bullet points, numbered lists, and formatting cues
+   - Preserve any quotes, citations, or references
+
+2. VISUAL CONTENT ANALYSIS (VERY IMPORTANT):
+   - For any images, charts, graphs, diagrams, or visual elements:
+     * Describe what the visual shows
+     * Extract any data points, numbers, or statistics visible
+     * Explain the key insights or trends depicted
+     * Transcribe any text or labels within the visual
+   - Format visual analysis as: [VISUAL: description and analysis]
+
+3. TABLES AND DATA:
+   - Extract table contents in a readable format
+   - Preserve column relationships and data alignment
+   - Note any footnotes or annotations
+
+4. OUTPUT FORMAT:
+   - Present the content in a clean, well-organized manner
+   - Use clear paragraph breaks
+   - Keep the original flow and narrative structure
+   - Include visual content analysis inline where the visuals appear
+
+Extract the complete document content now:"""
+
+    async def do_extract():
+        if file_size_mb > 20:
+            # Use file upload for large files
+            uploaded_file = genai.upload_file(path=str(file_path))
+            return model.generate_content([uploaded_file, prompt])
+        else:
+            # Read file directly for smaller files
+            async with aiofiles.open(file_path, "rb") as f:
+                file_content = await f.read()
+
+            return model.generate_content([
+                {"mime_type": mime_type, "data": file_content},
+                prompt
+            ])
+
+    # Use retry logic for API call
+    response = await retry_async(
+        do_extract,
+        max_retries=3,
+        base_delay=2.0,
+        job_id=job_id,
+        user_id=user_id,
+        context="extract_document_content",
+    )
+
+    extracted_content = response.text
+
+    # Calculate cost
+    input_tokens = response.usage_metadata.prompt_token_count
+    output_tokens = response.usage_metadata.candidates_token_count
+    cost = calculate_cost(model_name, input_tokens, output_tokens)
+
+    return extracted_content, cost
