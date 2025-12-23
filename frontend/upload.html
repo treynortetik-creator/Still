@@ -6,6 +6,7 @@
     <title>Upload Content - ContentMultiplier</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/auth.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
     <!-- Navigation -->
@@ -18,7 +19,7 @@
                 <div class="flex items-center space-x-4">
                     <a href="/upload.html" class="text-indigo-600 font-medium">Upload</a>
                     <a href="/library.html" class="text-gray-600 hover:text-gray-900">Library</a>
-                    <a href="/admin/dashboard" class="text-gray-600 hover:text-gray-900">Admin</a>
+                    <div id="navbar-user" class="flex items-center"></div>
                 </div>
             </div>
         </div>
@@ -134,6 +135,11 @@
     </div>
 
     <script>
+        // Require authentication
+        if (!Auth.requireAuth()) {
+            // Will redirect to login
+        }
+
         let uploadMode = 'file';
         let selectedFile = null;
 
@@ -254,7 +260,7 @@
                     formData.append('asset_quantities', JSON.stringify(assetQuantities));
                     formData.append('campaign_name', document.getElementById('campaign-name').value);
 
-                    response = await fetch('/api/upload', {
+                    response = await Auth.fetchWithAuth('/api/upload', {
                         method: 'POST',
                         body: formData
                     });
@@ -267,7 +273,7 @@
                     formData.append('campaign_name', document.getElementById('campaign-name').value);
                     formData.append('content_name', document.getElementById('content-name').value || 'pasted_content.txt');
 
-                    response = await fetch('/api/upload-text', {
+                    response = await Auth.fetchWithAuth('/api/upload-text', {
                         method: 'POST',
                         body: formData
                     });

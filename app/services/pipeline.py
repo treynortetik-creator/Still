@@ -29,7 +29,7 @@ async def update_job_status(
     cost_to_add: float = 0.0,
     error_message: str = None,
 ):
-    """Update job status in database."""
+    """Update job status in database and track user costs."""
     async with get_db() as db:
         if error_message:
             await db.execute(
@@ -51,6 +51,17 @@ async def update_job_status(
                 """,
                 (status.value, current_step, progress, cost_to_add, job_id)
             )
+
+        # Update user's total cost if cost was added
+        if cost_to_add > 0:
+            await db.execute(
+                """
+                UPDATE users SET total_cost_incurred = total_cost_incurred + ?
+                WHERE id = (SELECT user_id FROM jobs WHERE id = ?)
+                """,
+                (cost_to_add, job_id)
+            )
+
         await db.commit()
 
 
@@ -104,7 +115,7 @@ async def process_job(job_id: str):
                 "Step 0a: Transcribing content", 10
             )
 
-            file_path = settings.upload_dir / job_id / original_filename
+            file_path = settings.upload_dir / str(user_id) / job_id / original_filename
 
             if not file_path.exists():
                 raise FileNotFoundError(f"Upload file not found: {file_path}")

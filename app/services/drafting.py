@@ -8,6 +8,7 @@ from app.config import get_settings, calculate_cost
 from app.services.prompt_manager import get_rendered_prompt
 from app.services.persona_manager import get_persona
 from app.services.atomization import select_atoms_for_content_type, group_atoms_by_type
+from app.utils.retry import retry_async, claude_circuit_breaker
 
 settings = get_settings()
 
@@ -72,10 +73,19 @@ OUTPUT FORMAT (valid JSON):
 
     client = get_anthropic_client()
 
-    message = client.messages.create(
-        model=config["model"],
-        max_tokens=config["max_tokens"],
-        messages=[{"role": "user", "content": full_prompt}],
+    async def do_draft():
+        return client.messages.create(
+            model=config["model"],
+            max_tokens=config["max_tokens"],
+            messages=[{"role": "user", "content": full_prompt}],
+        )
+
+    # Use retry logic for API call
+    message = await retry_async(
+        do_draft,
+        max_retries=3,
+        base_delay=2.0,
+        context="draft_linkedin_posts",
     )
 
     response_text = message.content[0].text
@@ -151,10 +161,19 @@ OUTPUT FORMAT (valid JSON):
 
     client = get_anthropic_client()
 
-    message = client.messages.create(
-        model=config["model"],
-        max_tokens=config["max_tokens"],
-        messages=[{"role": "user", "content": full_prompt}],
+    async def do_draft():
+        return client.messages.create(
+            model=config["model"],
+            max_tokens=config["max_tokens"],
+            messages=[{"role": "user", "content": full_prompt}],
+        )
+
+    # Use retry logic for API call
+    message = await retry_async(
+        do_draft,
+        max_retries=3,
+        base_delay=2.0,
+        context="draft_blog_post",
     )
 
     response_text = message.content[0].text
@@ -224,10 +243,19 @@ OUTPUT FORMAT (valid JSON):
 
     client = get_anthropic_client()
 
-    message = client.messages.create(
-        model=config["model"],
-        max_tokens=config["max_tokens"],
-        messages=[{"role": "user", "content": full_prompt}],
+    async def do_draft():
+        return client.messages.create(
+            model=config["model"],
+            max_tokens=config["max_tokens"],
+            messages=[{"role": "user", "content": full_prompt}],
+        )
+
+    # Use retry logic for API call
+    message = await retry_async(
+        do_draft,
+        max_retries=3,
+        base_delay=2.0,
+        context="draft_email",
     )
 
     response_text = message.content[0].text

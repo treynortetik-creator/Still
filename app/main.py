@@ -1,19 +1,34 @@
 """Main FastAPI application for ContentMultiplier."""
 import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
 from pathlib import Path
 
-from fastapi.responses import FileResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from app.config import get_settings
 from app.database import init_db
-from app.api import upload, jobs, library, admin
+from app.api import upload, jobs, library, admin, auth
 from app.api import admin_views
 
 settings = get_settings()
+
+# Configure rate limiter
+def get_user_id_or_ip(request: Request) -> str:
+    """Get user ID from auth header or fall back to IP address."""
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        # Use token hash as identifier (not the full token for security)
+        token = auth_header[7:]
+        return f"user:{hash(token) % 1000000}"
+    return get_remote_address(request)
+
+limiter = Limiter(key_func=get_user_id_or_ip)
 
 
 @asynccontextmanager
@@ -50,6 +65,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Add rate limiter to app state
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -60,6 +79,7 @@ app.add_middleware(
 )
 
 # Include API routers
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(upload.router, prefix="/api", tags=["upload"])
 app.include_router(jobs.router, prefix="/api", tags=["jobs"])
 app.include_router(library.router, prefix="/api", tags=["library"])
@@ -75,6 +95,18 @@ if frontend_path.exists():
 
 
 # Serve frontend HTML files
+@app.get("/login.html")
+async def serve_login():
+    """Serve login page."""
+    return FileResponse(frontend_path / "login.html")
+
+
+@app.get("/register.html")
+async def serve_register():
+    """Serve register page."""
+    return FileResponse(frontend_path / "register.html")
+
+
 @app.get("/upload.html")
 async def serve_upload():
     """Serve upload page."""

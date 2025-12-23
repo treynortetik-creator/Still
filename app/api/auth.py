@@ -1,0 +1,227 @@
+"""Authentication API endpoints."""
+import json
+from datetime import datetime
+from fastapi import APIRouter, HTTPException, Depends, Header, Request
+from pydantic import BaseModel, EmailStr
+from typing import Optional
+
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+from app.database import get_db
+from app.services.auth import (
+    get_password_hash,
+    verify_password,
+    create_access_token,
+    decode_access_token,
+    blacklist_token,
+    validate_email,
+    validate_password,
+)
+
+router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
+
+
+class UserRegister(BaseModel):
+    """User registration request."""
+    email: str
+    password: str
+    confirm_password: str
+
+
+class UserLogin(BaseModel):
+    """User login request."""
+    email: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    """Token response."""
+    access_token: str
+    token_type: str = "bearer"
+    user: dict
+
+
+class UserResponse(BaseModel):
+    """User response."""
+    id: int
+    email: str
+    subscription_tier: str
+    created_at: str
+
+
+@router.post("/register", response_model=TokenResponse)
+@limiter.limit("5/hour")  # 5 registrations per hour per IP
+async def register(request: Request, user_data: UserRegister):
+    """
+    Register a new user.
+
+    - Validates email format
+    - Validates password strength (8+ chars, upper, lower, number)
+    - Checks password confirmation matches
+    - Creates user in database
+    - Returns JWT token
+    """
+    # Validate email
+    if not validate_email(user_data.email):
+        raise HTTPException(status_code=400, detail="Invalid email format")
+
+    # Validate password
+    is_valid, error_msg = validate_password(user_data.password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+
+    # Check passwords match
+    if user_data.password != user_data.confirm_password:
+        raise HTTPException(status_code=400, detail="Passwords do not match")
+
+    async with get_db() as db:
+        # Check if email already exists
+        cursor = await db.execute(
+            "SELECT id FROM users WHERE email = ?",
+            (user_data.email.lower(),)
+        )
+        if await cursor.fetchone():
+            raise HTTPException(status_code=400, detail="Email already registered")
+
+        # Create user
+        hashed_password = get_password_hash(user_data.password)
+        cursor = await db.execute(
+            """
+            INSERT INTO users (email, password_hash, subscription_tier, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (user_data.email.lower(), hashed_password, "free", datetime.utcnow().isoformat())
+        )
+        await db.commit()
+        user_id = cursor.lastrowid
+
+        # Create token
+        token = create_access_token({"sub": str(user_id), "email": user_data.email.lower()})
+
+        return TokenResponse(
+            access_token=token,
+            user={
+                "id": user_id,
+                "email": user_data.email.lower(),
+                "subscription_tier": "free",
+            }
+        )
+
+
+@router.post("/login", response_model=TokenResponse)
+@limiter.limit("10/minute")  # 10 login attempts per minute per IP
+async def login(request: Request, user_data: UserLogin):
+    """
+    Login with email and password.
+
+    Returns JWT token on success.
+    """
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT id, email, password_hash, subscription_tier FROM users WHERE email = ?",
+            (user_data.email.lower(),)
+        )
+        user = await cursor.fetchone()
+
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        if not verify_password(user_data.password, user["password_hash"]):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        # Create token
+        token = create_access_token({"sub": str(user["id"]), "email": user["email"]})
+
+        return TokenResponse(
+            access_token=token,
+            user={
+                "id": user["id"],
+                "email": user["email"],
+                "subscription_tier": user["subscription_tier"],
+            }
+        )
+
+
+@router.post("/logout")
+async def logout(authorization: Optional[str] = Header(None)):
+    """
+    Logout user by blacklisting their token.
+    """
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    # Extract token from "Bearer <token>"
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = parts[1]
+    blacklist_token(token)
+
+    return {"message": "Logged out successfully"}
+
+
+@router.get("/me", response_model=UserResponse)
+async def get_current_user(authorization: Optional[str] = Header(None)):
+    """
+    Get current authenticated user info.
+    """
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = parts[1]
+    payload = decode_access_token(token)
+
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = payload.get("sub")
+
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT id, email, subscription_tier, created_at FROM users WHERE id = ?",
+            (user_id,)
+        )
+        user = await cursor.fetchone()
+
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+
+        return UserResponse(
+            id=user["id"],
+            email=user["email"],
+            subscription_tier=user["subscription_tier"],
+            created_at=user["created_at"] or "",
+        )
+
+
+# Dependency for protected routes
+async def get_current_user_id(authorization: Optional[str] = Header(None)) -> int:
+    """
+    Dependency to get current user ID from token.
+    Use in route functions: user_id: int = Depends(get_current_user_id)
+    """
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = parts[1]
+    payload = decode_access_token(token)
+
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    return int(user_id)

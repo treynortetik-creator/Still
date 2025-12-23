@@ -6,6 +6,7 @@
     <title>Content Library - ContentMultiplier</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/auth.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
     <!-- Navigation -->
@@ -18,7 +19,7 @@
                 <div class="flex items-center space-x-4">
                     <a href="/upload.html" class="text-gray-600 hover:text-gray-900">Upload</a>
                     <a href="/library.html" class="text-indigo-600 font-medium">Library</a>
-                    <a href="/admin/dashboard" class="text-gray-600 hover:text-gray-900">Admin</a>
+                    <div id="navbar-user" class="flex items-center"></div>
                 </div>
             </div>
         </div>
@@ -157,6 +158,11 @@
     </div>
 
     <script>
+        // Require authentication
+        if (!Auth.requireAuth()) {
+            // Will redirect to login
+        }
+
         let allEntries = [];
         let selectedIds = new Set();
         let currentPage = 0;
@@ -279,7 +285,7 @@
             params.set('offset', currentPage * pageSize);
 
             try {
-                const response = await fetch(`/api/library?${params}`);
+                const response = await Auth.fetchWithAuth(`/api/library?${params}`);
                 const data = await response.json();
 
                 document.getElementById('library-stats').textContent =
@@ -314,7 +320,7 @@
         // Load stats
         async function loadStats() {
             try {
-                const response = await fetch('/api/library/stats');
+                const response = await Auth.fetchWithAuth('/api/library/stats');
                 const data = await response.json();
 
                 document.getElementById('library-stats').textContent =
@@ -377,7 +383,7 @@
             }
 
             try {
-                const response = await fetch('/api/generate-from-library', {
+                const response = await Auth.fetchWithAuth('/api/generate-from-library', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

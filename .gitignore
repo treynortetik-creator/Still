@@ -43,6 +43,9 @@ ENV/
 data/jobs/*/
 database/*.db
 
+# Backups
+backups/
+
 # Logs
 *.log
 

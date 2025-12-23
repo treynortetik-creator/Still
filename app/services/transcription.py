@@ -7,6 +7,7 @@ from typing import Optional, Tuple
 import google.generativeai as genai
 
 from app.config import get_settings, calculate_cost
+from app.utils.retry import retry_async, gemini_circuit_breaker
 
 settings = get_settings()
 
@@ -19,7 +20,20 @@ def init_gemini():
     genai.configure(api_key=api_key)
 
 
-async def transcribe_file(file_path: Path, file_type: str) -> Tuple[str, float]:
+async def _call_gemini_transcribe(model, content, prompt) -> tuple:
+    """Helper to call Gemini for transcription with retry support."""
+    response = await gemini_circuit_breaker.call(
+        lambda: model.generate_content([content, prompt])
+    )
+    return response
+
+
+async def transcribe_file(
+    file_path: Path,
+    file_type: str,
+    job_id: str = None,
+    user_id: int = None,
+) -> Tuple[str, float]:
     """
     Transcribe audio/video file or extract text from document.
 
@@ -70,19 +84,30 @@ Instructions:
 
 Output the full transcript only, no additional commentary."""
 
-    if file_size_mb > 20:
-        # Use file upload for large files
-        uploaded_file = genai.upload_file(path=str(file_path))
-        response = model.generate_content([uploaded_file, prompt])
-    else:
-        # Read file directly for smaller files
-        async with aiofiles.open(file_path, "rb") as f:
-            file_content = await f.read()
+    async def do_transcribe():
+        if file_size_mb > 20:
+            # Use file upload for large files
+            uploaded_file = genai.upload_file(path=str(file_path))
+            return model.generate_content([uploaded_file, prompt])
+        else:
+            # Read file directly for smaller files
+            async with aiofiles.open(file_path, "rb") as f:
+                file_content = await f.read()
 
-        response = model.generate_content([
-            {"mime_type": mime_type, "data": file_content},
-            prompt
-        ])
+            return model.generate_content([
+                {"mime_type": mime_type, "data": file_content},
+                prompt
+            ])
+
+    # Use retry logic for API call
+    response = await retry_async(
+        do_transcribe,
+        max_retries=3,
+        base_delay=2.0,
+        job_id=job_id,
+        user_id=user_id,
+        context="transcribe_file",
+    )
 
     transcript = response.text
 
@@ -94,7 +119,11 @@ Output the full transcript only, no additional commentary."""
     return transcript, cost
 
 
-async def cleanup_transcript(transcript: str) -> Tuple[str, float]:
+async def cleanup_transcript(
+    transcript: str,
+    job_id: str = None,
+    user_id: int = None,
+) -> Tuple[str, float]:
     """
     Clean up transcript by removing filler words, fixing formatting.
 
@@ -124,7 +153,18 @@ OUTPUT REQUIREMENTS:
 - Do not summarize - keep all content
 - Maintain the original meaning and flow"""
 
-    response = model.generate_content(prompt)
+    async def do_cleanup():
+        return model.generate_content(prompt)
+
+    # Use retry logic for API call
+    response = await retry_async(
+        do_cleanup,
+        max_retries=3,
+        base_delay=2.0,
+        job_id=job_id,
+        user_id=user_id,
+        context="cleanup_transcript",
+    )
 
     cleaned = response.text
 

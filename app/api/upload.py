@@ -5,15 +5,22 @@ import asyncio
 import aiofiles
 from datetime import datetime
 from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Depends, Request
 from typing import Optional
+
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.config import get_settings
 from app.database import get_db
 from app.models.job import JobResponse, JobStatus
+from app.api.auth import get_current_user_id
 
 router = APIRouter()
 settings = get_settings()
+
+# Rate limiter (uses app state limiter)
+limiter = Limiter(key_func=get_remote_address)
 
 # Allowed file types
 ALLOWED_EXTENSIONS = {
@@ -42,7 +49,9 @@ def get_file_type(filename: str, content_type: str) -> Optional[str]:
 
 
 @router.post("/upload", response_model=JobResponse)
+@limiter.limit("10/hour")  # 10 uploads per hour per user
 async def upload_content(
+    request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     target_persona: str = Form(...),
@@ -50,6 +59,7 @@ async def upload_content(
     asset_quantities: str = Form(default='{"linkedin": 3, "blog": 1}'),
     processing_mode: str = Form(default="autopilot"),
     campaign_name: Optional[str] = Form(default=None),
+    user_id: int = Depends(get_current_user_id),
 ):
     """
     Upload content for processing.
@@ -90,8 +100,8 @@ async def upload_content(
     # Create job ID
     job_id = str(uuid.uuid4())
 
-    # Create job directory
-    job_dir = settings.upload_dir / job_id
+    # Create job directory (scoped by user_id)
+    job_dir = settings.upload_dir / str(user_id) / job_id
     job_dir.mkdir(parents=True, exist_ok=True)
 
     # Save uploaded file
@@ -112,7 +122,7 @@ async def upload_content(
             """,
             (
                 job_id,
-                1,  # Default user for MVP
+                user_id,
                 JobStatus.UPLOADING.value,
                 file.filename,
                 file_type,
@@ -140,7 +150,9 @@ async def upload_content(
 
 
 @router.post("/upload-text", response_model=JobResponse)
+@limiter.limit("10/hour")  # 10 uploads per hour per user
 async def upload_text(
+    request: Request,
     background_tasks: BackgroundTasks,
     content: str = Form(...),
     target_persona: str = Form(...),
@@ -149,6 +161,7 @@ async def upload_text(
     processing_mode: str = Form(default="autopilot"),
     campaign_name: Optional[str] = Form(default=None),
     content_name: Optional[str] = Form(default="pasted_content.txt"),
+    user_id: int = Depends(get_current_user_id),
 ):
     """
     Upload text content directly (paste text instead of file).
@@ -166,8 +179,8 @@ async def upload_text(
     # Create job ID
     job_id = str(uuid.uuid4())
 
-    # Create job directory
-    job_dir = settings.upload_dir / job_id
+    # Create job directory (scoped by user_id)
+    job_dir = settings.upload_dir / str(user_id) / job_id
     job_dir.mkdir(parents=True, exist_ok=True)
 
     # Save text content
@@ -187,7 +200,7 @@ async def upload_text(
             """,
             (
                 job_id,
-                1,  # Default user for MVP
+                user_id,
                 JobStatus.UPLOADING.value,
                 content_name,
                 "text",

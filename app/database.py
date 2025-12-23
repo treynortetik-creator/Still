@@ -25,10 +25,31 @@ async def init_db():
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 email TEXT UNIQUE NOT NULL,
+                password_hash TEXT,
                 subscription_tier TEXT DEFAULT 'free',
                 credits_remaining INTEGER DEFAULT 0,
+                total_cost_incurred REAL DEFAULT 0.0,
                 byok_enabled BOOLEAN DEFAULT 0,
                 api_keys JSON,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_login TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS rate_limits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                action_type TEXT NOT NULL,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS error_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                job_id TEXT,
+                error_type TEXT NOT NULL,
+                error_message TEXT,
+                stack_trace TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -126,6 +147,8 @@ async def init_db():
             CREATE INDEX IF NOT EXISTS idx_atoms_type ON atoms(atom_type);
             CREATE INDEX IF NOT EXISTS idx_content_library_user_id ON content_library(user_id);
             CREATE INDEX IF NOT EXISTS idx_content_library_type ON content_library(entry_type);
+            CREATE INDEX IF NOT EXISTS idx_rate_limits_user ON rate_limits(user_id, action_type, timestamp);
+            CREATE INDEX IF NOT EXISTS idx_error_logs_user ON error_logs(user_id, created_at);
         """)
 
         await db.commit()

@@ -1,11 +1,12 @@
 """Content library API endpoints."""
 import json
 import uuid
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends
 from typing import Optional
 
 from app.database import get_db
 from app.models.job import JobResponse, JobStatus
+from app.api.auth import get_current_user_id
 
 router = APIRouter()
 
@@ -18,6 +19,7 @@ async def get_library(
     search: Optional[str] = Query(None, description="Search in content"),
     limit: int = Query(50, description="Number of results"),
     offset: int = Query(0, description="Offset for pagination"),
+    user_id: int = Depends(get_current_user_id),
 ):
     """
     Get content library entries with filtering.
@@ -25,7 +27,7 @@ async def get_library(
     async with get_db() as db:
         # Build query
         query = "SELECT * FROM content_library WHERE user_id = ?"
-        params = [1]  # Default user for MVP
+        params = [user_id]
 
         if entry_type:
             query += " AND entry_type = ?"
@@ -67,7 +69,7 @@ async def get_library(
 
         # Get total count
         count_query = "SELECT COUNT(*) FROM content_library WHERE user_id = ?"
-        count_params = [1]
+        count_params = [user_id]
 
         if entry_type:
             count_query += " AND entry_type = ?"
@@ -89,7 +91,7 @@ async def get_library(
 
 
 @router.get("/library/stats")
-async def get_library_stats():
+async def get_library_stats(user_id: int = Depends(get_current_user_id)):
     """
     Get statistics about the content library.
     """
@@ -102,14 +104,14 @@ async def get_library_stats():
             WHERE user_id = ?
             GROUP BY entry_type
             """,
-            (1,)
+            (user_id,)
         )
         type_counts = {row["entry_type"]: row["count"] for row in await cursor.fetchall()}
 
         # Total count
         cursor = await db.execute(
             "SELECT COUNT(*) FROM content_library WHERE user_id = ?",
-            (1,)
+            (user_id,)
         )
         total = (await cursor.fetchone())[0]
 
@@ -122,7 +124,7 @@ async def get_library_stats():
             ORDER BY times_used DESC
             LIMIT 5
             """,
-            (1,)
+            (user_id,)
         )
         most_used = [
             {"id": row["id"], "content": row["content"][:100], "times_used": row["times_used"]}
@@ -143,6 +145,7 @@ async def generate_from_library(
     target_persona: str,
     asset_types: list[str] = ["linkedin"],
     asset_quantities: dict[str, int] = {"linkedin": 2},
+    user_id: int = Depends(get_current_user_id),
 ):
     """
     Generate new content using existing library entries.
@@ -161,7 +164,7 @@ async def generate_from_library(
             FROM content_library
             WHERE id IN ({placeholders}) AND user_id = ?
             """,
-            (*atom_ids, 1)
+            (*atom_ids, user_id)
         )
         atoms = await cursor.fetchall()
 
@@ -191,7 +194,7 @@ async def generate_from_library(
             """,
             (
                 job_id,
-                1,
+                user_id,
                 JobStatus.DRAFTING.value,
                 "library_generation",
                 "library",
@@ -230,14 +233,14 @@ async def generate_from_library(
 
 
 @router.delete("/library/{entry_id}")
-async def delete_library_entry(entry_id: int):
+async def delete_library_entry(entry_id: int, user_id: int = Depends(get_current_user_id)):
     """
     Delete a library entry.
     """
     async with get_db() as db:
         cursor = await db.execute(
             "SELECT id FROM content_library WHERE id = ? AND user_id = ?",
-            (entry_id, 1)
+            (entry_id, user_id)
         )
         if not await cursor.fetchone():
             raise HTTPException(status_code=404, detail="Entry not found")
@@ -249,14 +252,14 @@ async def delete_library_entry(entry_id: int):
 
 
 @router.put("/library/{entry_id}/notes")
-async def update_library_notes(entry_id: int, notes: str):
+async def update_library_notes(entry_id: int, notes: str, user_id: int = Depends(get_current_user_id)):
     """
     Update user notes for a library entry.
     """
     async with get_db() as db:
         cursor = await db.execute(
             "SELECT id FROM content_library WHERE id = ? AND user_id = ?",
-            (entry_id, 1)
+            (entry_id, user_id)
         )
         if not await cursor.fetchone():
             raise HTTPException(status_code=404, detail="Entry not found")

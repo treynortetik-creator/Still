@@ -7,6 +7,7 @@ import google.generativeai as genai
 from app.config import get_settings, calculate_cost
 from app.services.prompt_manager import get_rendered_prompt
 from app.services.persona_manager import get_persona
+from app.utils.retry import retry_async, gemini_circuit_breaker
 
 settings = get_settings()
 
@@ -68,12 +69,23 @@ Return valid JSON with this structure:
   }
 }"""
 
-    response = model.generate_content(
-        full_prompt,
-        generation_config=genai.GenerationConfig(
-            response_mime_type="application/json",
-            max_output_tokens=config["max_tokens"],
+    async def do_atomize():
+        return model.generate_content(
+            full_prompt,
+            generation_config=genai.GenerationConfig(
+                response_mime_type="application/json",
+                max_output_tokens=config["max_tokens"],
+            )
         )
+
+    # Use retry logic for API call
+    response = await retry_async(
+        do_atomize,
+        max_retries=3,
+        base_delay=2.0,
+        job_id=job_id,
+        user_id=user_id,
+        context="atomize_content",
     )
 
     # Parse response

@@ -6,6 +6,7 @@
     <title>Results - ContentMultiplier</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/auth.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
     <!-- Navigation -->
@@ -18,7 +19,7 @@
                 <div class="flex items-center space-x-4">
                     <a href="/upload.html" class="text-gray-600 hover:text-gray-900">Upload</a>
                     <a href="/library.html" class="text-gray-600 hover:text-gray-900">Library</a>
-                    <a href="/admin/dashboard" class="text-gray-600 hover:text-gray-900">Admin</a>
+                    <div id="navbar-user" class="flex items-center"></div>
                 </div>
             </div>
         </div>
@@ -90,6 +91,11 @@
     </div>
 
     <script>
+        // Require authentication
+        if (!Auth.requireAuth()) {
+            // Will redirect to login
+        }
+
         const jobId = new URLSearchParams(window.location.search).get('job_id');
 
         if (!jobId) {
@@ -285,7 +291,7 @@
 
         async function loadResults() {
             try {
-                const response = await fetch(`/api/job/${jobId}/results`);
+                const response = await Auth.fetchWithAuth(`/api/job/${jobId}/results`);
                 const data = await response.json();
 
                 if (!response.ok) {

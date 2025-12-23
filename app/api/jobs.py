@@ -1,10 +1,11 @@
 """Job management API endpoints."""
 import json
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional
 
 from app.database import get_db
 from app.models.job import JobStatus, JobStatusResponse
+from app.api.auth import get_current_user_id
 
 router = APIRouter()
 
@@ -30,7 +31,10 @@ def estimate_time_remaining(status: str, progress: int) -> Optional[str]:
 
 
 @router.get("/job/{job_id}/status", response_model=JobStatusResponse)
-async def get_job_status(job_id: str):
+async def get_job_status(
+    job_id: str,
+    user_id: int = Depends(get_current_user_id),
+):
     """
     Get the current status of a processing job.
 
@@ -39,10 +43,10 @@ async def get_job_status(job_id: str):
     async with get_db() as db:
         cursor = await db.execute(
             """
-            SELECT id, status, current_step, progress, error_message
-            FROM jobs WHERE id = ?
+            SELECT id, user_id, status, current_step, progress, error_message
+            FROM jobs WHERE id = ? AND user_id = ?
             """,
-            (job_id,)
+            (job_id, user_id)
         )
         row = await cursor.fetchone()
 
@@ -60,22 +64,25 @@ async def get_job_status(job_id: str):
 
 
 @router.get("/job/{job_id}/results")
-async def get_job_results(job_id: str):
+async def get_job_results(
+    job_id: str,
+    user_id: int = Depends(get_current_user_id),
+):
     """
     Get the results of a completed job.
 
     Returns all generated outputs, extracted atoms, and cost information.
     """
     async with get_db() as db:
-        # Get job details
+        # Get job details (scoped to user)
         cursor = await db.execute(
             """
-            SELECT id, status, original_filename, target_persona,
+            SELECT id, user_id, status, original_filename, target_persona,
                    asset_types, asset_quantities, cost_incurred,
                    created_at, completed_at, error_message
-            FROM jobs WHERE id = ?
+            FROM jobs WHERE id = ? AND user_id = ?
             """,
-            (job_id,)
+            (job_id, user_id)
         )
         job = await cursor.fetchone()
 
@@ -154,9 +161,10 @@ async def list_jobs(
     status: Optional[str] = None,
     limit: int = 20,
     offset: int = 0,
+    user_id: int = Depends(get_current_user_id),
 ):
     """
-    List all jobs with optional status filter.
+    List all jobs for the current user with optional status filter.
     """
     async with get_db() as db:
         query = """
@@ -164,11 +172,12 @@ async def list_jobs(
                    current_step, progress, cost_incurred,
                    created_at, completed_at
             FROM jobs
+            WHERE user_id = ?
         """
-        params = []
+        params = [user_id]
 
         if status:
-            query += " WHERE status = ?"
+            query += " AND status = ?"
             params.append(status)
 
         query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
@@ -191,14 +200,15 @@ async def list_jobs(
                 "completed_at": row["completed_at"],
             })
 
-        # Get total count
-        count_query = "SELECT COUNT(*) FROM jobs"
-        if status:
-            count_query += " WHERE status = ?"
-            cursor = await db.execute(count_query, (status,))
-        else:
-            cursor = await db.execute(count_query)
+        # Get total count for this user
+        count_query = "SELECT COUNT(*) FROM jobs WHERE user_id = ?"
+        count_params = [user_id]
 
+        if status:
+            count_query += " AND status = ?"
+            count_params.append(status)
+
+        cursor = await db.execute(count_query, count_params)
         total = (await cursor.fetchone())[0]
 
         return {
@@ -206,4 +216,87 @@ async def list_jobs(
             "total": total,
             "limit": limit,
             "offset": offset,
+        }
+
+
+@router.get("/usage")
+async def get_usage_stats(user_id: int = Depends(get_current_user_id)):
+    """
+    Get usage statistics and costs for the current user.
+    """
+    async with get_db() as db:
+        # Get user's total cost
+        cursor = await db.execute(
+            "SELECT total_cost_incurred FROM users WHERE id = ?",
+            (user_id,)
+        )
+        user_row = await cursor.fetchone()
+        total_cost = user_row["total_cost_incurred"] if user_row else 0.0
+
+        # Get job counts by status
+        cursor = await db.execute(
+            """
+            SELECT status, COUNT(*) as count
+            FROM jobs
+            WHERE user_id = ?
+            GROUP BY status
+            """,
+            (user_id,)
+        )
+        status_counts = {row["status"]: row["count"] for row in await cursor.fetchall()}
+
+        # Get total jobs
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM jobs WHERE user_id = ?",
+            (user_id,)
+        )
+        total_jobs = (await cursor.fetchone())[0]
+
+        # Get cost breakdown by month (last 6 months)
+        cursor = await db.execute(
+            """
+            SELECT
+                strftime('%Y-%m', created_at) as month,
+                SUM(cost_incurred) as cost,
+                COUNT(*) as job_count
+            FROM jobs
+            WHERE user_id = ?
+                AND created_at >= date('now', '-6 months')
+            GROUP BY strftime('%Y-%m', created_at)
+            ORDER BY month DESC
+            """,
+            (user_id,)
+        )
+        monthly_costs = [
+            {"month": row["month"], "cost": row["cost"], "jobs": row["job_count"]}
+            for row in await cursor.fetchall()
+        ]
+
+        # Get content type breakdown
+        cursor = await db.execute(
+            """
+            SELECT content_type, COUNT(*) as count
+            FROM outputs o
+            JOIN jobs j ON o.job_id = j.id
+            WHERE j.user_id = ?
+            GROUP BY content_type
+            """,
+            (user_id,)
+        )
+        content_counts = {row["content_type"]: row["count"] for row in await cursor.fetchall()}
+
+        # Get library size
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM content_library WHERE user_id = ?",
+            (user_id,)
+        )
+        library_size = (await cursor.fetchone())[0]
+
+        return {
+            "total_cost": round(total_cost, 4),
+            "total_jobs": total_jobs,
+            "jobs_by_status": status_counts,
+            "monthly_costs": monthly_costs,
+            "content_created": content_counts,
+            "library_size": library_size,
         }
