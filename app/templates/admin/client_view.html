@@ -50,7 +50,7 @@
 <script>
 async function loadClients() {
     try {
-        const response = await fetch('/admin/clients');
+        const response = await fetch('/api/admin/clients');
         const data = await response.json();
 
         const tbody = document.getElementById('client-list');

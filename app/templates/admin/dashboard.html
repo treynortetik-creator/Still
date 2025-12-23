@@ -77,7 +77,7 @@
 <script>
 async function loadDashboard() {
     try {
-        const response = await fetch('/admin/dashboard');
+        const response = await fetch('/api/admin/dashboard');
         const data = await response.json();
 
         document.getElementById('active-jobs').textContent = data.active_jobs;

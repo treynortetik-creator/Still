@@ -84,8 +84,9 @@ app.include_router(upload.router, prefix="/api", tags=["upload"])
 app.include_router(jobs.router, prefix="/api", tags=["jobs"])
 app.include_router(library.router, prefix="/api", tags=["library"])
 app.include_router(personas.router, prefix="/api", tags=["personas"])
-app.include_router(admin.router, prefix="/admin", tags=["admin-api"])
+# Register admin views FIRST so HTML pages take priority over API responses
 app.include_router(admin_views.router, prefix="/admin", tags=["admin-views"])
+app.include_router(admin.router, prefix="/api/admin", tags=["admin-api"])
 
 # Frontend path
 frontend_path = Path(__file__).parent.parent / "frontend"
