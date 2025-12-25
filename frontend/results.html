@@ -1,24 +1,103 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark" class="no-transitions">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Results - ContentMultiplier</title>
+    <link rel="icon" type="image/png" href="/static/images/Icon only.png">
+    <title>Results - Still</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="/static/theme.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        still: {
+                            bg: 'var(--still-bg)',
+                            card: 'var(--still-card)',
+                            border: 'var(--still-border)',
+                            text: 'var(--still-text)',
+                            muted: 'var(--still-muted)',
+                            disabled: 'var(--still-disabled)',
+                            copper: 'var(--still-copper)',
+                            amber: 'var(--still-amber)',
+                            green: 'var(--still-green)',
+                            error: 'var(--still-error)',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
     <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/utils.js"></script>
     <script src="/static/auth.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Device Preview Styles */
+        .mobile-preview {
+            max-width: 375px;
+            margin: 0 auto;
+            border: 2px solid var(--still-border);
+            border-radius: 24px;
+            padding: 16px;
+            background: var(--still-card);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
+        .mobile-preview .content-preview { font-size: 14px; line-height: 1.5; }
+        .desktop-preview {
+            max-width: 100%;
+            border: 1px solid var(--still-border);
+            border-radius: 8px;
+            padding: 24px;
+            background: var(--still-card);
+        }
+        .desktop-preview .content-preview { font-size: 16px; line-height: 1.6; }
+        .linkedin-style { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .linkedin-style .content-preview { color: var(--still-text); }
+        .edit-panel { transition: all 0.3s ease; }
+    </style>
+    <script>
+        window.addEventListener('load', () => {
+            document.documentElement.classList.remove('no-transitions');
+        });
+    </script>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-still-bg min-h-screen">
     <!-- Navigation -->
-    <nav class="bg-white shadow-sm border-b">
+    <nav class="bg-still-card shadow-sm border-b border-still-border">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <a href="/" class="text-xl font-bold text-indigo-600">ContentMultiplier</a>
+                <div class="flex items-center space-x-8">
+                    <a href="/" class="flex items-center">
+                        <img src="/static/images/Still Logo.svg" alt="Still" class="h-12">
+                    </a>
+                    <div class="hidden md:flex space-x-4">
+                        <a href="/upload.html" class="text-still-muted hover:text-still-text px-3 py-2">Upload</a>
+                        <a href="/reserve.html" class="text-still-muted hover:text-still-text px-3 py-2">Reserve</a>
+                        <a href="/workshop.html" class="text-still-muted hover:text-still-text px-3 py-2">Workshop</a>
+                        <a href="/calendar.html" class="text-still-muted hover:text-still-text px-3 py-2">Calendar</a>
+                        <a href="/autopilot.html" class="text-still-muted hover:text-still-text px-3 py-2">Autopilot</a>
+                        <a href="/analytics.html" class="text-still-muted hover:text-still-text px-3 py-2">Analytics</a>
+                        <a href="/settings.html" class="text-still-muted hover:text-still-text px-3 py-2">Settings</a>
+                    </div>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <a href="/upload.html" class="text-gray-600 hover:text-gray-900">Upload</a>
-                    <a href="/library.html" class="text-gray-600 hover:text-gray-900">Library</a>
+                <div class="flex items-center space-x-3">
+                    <!-- Theme Toggle -->
+                    <button onclick="ThemeManager.toggle()" class="theme-toggle" title="Toggle light/dark mode">
+                        <svg class="theme-icon-sun" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                        </svg>
+                        <svg class="theme-icon-moon hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                        </svg>
+                    </button>
                     <div id="navbar-user" class="flex items-center"></div>
                 </div>
             </div>
@@ -29,24 +108,47 @@
         <!-- Header -->
         <div class="flex justify-between items-center mb-8">
             <div>
-                <h1 class="text-3xl font-bold" id="job-title">Results</h1>
-                <p class="text-gray-600 mt-1" id="job-meta">Loading...</p>
+                <h1 class="text-3xl font-bold text-still-text" id="job-title">Results</h1>
+                <p class="text-still-muted mt-1" id="job-meta">Loading...</p>
             </div>
-            <div class="flex gap-4">
-                <a href="/library.html" class="text-indigo-600 hover:underline">View in Library</a>
-                <a href="/upload.html" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
+            <div class="flex gap-4 items-center">
+                <!-- Export Dropdown -->
+                <div class="relative" id="export-dropdown">
+                    <button onclick="toggleExportMenu()" class="flex items-center gap-2 px-4 py-2 border border-still-border rounded-lg hover:bg-still-card text-still-text transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        Export
+                    </button>
+                    <div id="export-menu" class="hidden absolute right-0 mt-2 w-48 bg-still-card rounded-lg shadow-lg border border-still-border z-10">
+                        <a href="#" onclick="exportAs('markdown')" class="block px-4 py-2 text-still-muted hover:bg-still-border hover:text-still-text">
+                            Download as Markdown
+                        </a>
+                        <a href="#" onclick="exportAs('json')" class="block px-4 py-2 text-still-muted hover:bg-still-border hover:text-still-text">
+                            Download as JSON
+                        </a>
+                        <a href="#" onclick="exportAs('docx')" class="block px-4 py-2 text-still-muted hover:bg-still-border hover:text-still-text">
+                            Download as Word
+                        </a>
+                        <a href="#" onclick="exportAs('zip')" class="block px-4 py-2 text-still-muted hover:bg-still-border hover:text-still-text border-t border-still-border">
+                            Download All (ZIP)
+                        </a>
+                    </div>
+                </div>
+                <a href="/reserve.html" class="text-still-copper hover:underline">View in Reserve</a>
+                <a href="/upload.html" class="copper-gradient text-white px-4 py-2 rounded-lg hover:opacity-90 transition">
                     New Upload
                 </a>
             </div>
         </div>
 
         <!-- Tabs -->
-        <div class="mb-6 border-b">
+        <div class="mb-6 border-b border-still-border">
             <div class="flex space-x-8">
-                <button class="tab-btn px-1 pb-4 border-b-2 border-indigo-600 text-indigo-600 font-medium" data-tab="outputs">
+                <button class="tab-btn px-1 pb-4 border-b-2 border-still-copper text-still-copper font-medium" data-tab="outputs">
                     Generated Content
                 </button>
-                <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="atoms">
+                <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-still-muted hover:text-still-text" data-tab="atoms">
                     Extracted Atoms
                 </button>
             </div>
@@ -54,8 +156,8 @@
 
         <!-- Loading State -->
         <div id="loading" class="text-center py-12">
-            <div class="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto"></div>
-            <p class="mt-4 text-gray-600">Loading results...</p>
+            <div class="animate-spin h-8 w-8 border-4 border-still-copper border-t-transparent rounded-full mx-auto"></div>
+            <p class="mt-4 text-still-muted">Loading results...</p>
         </div>
 
         <!-- Outputs Tab -->
@@ -65,36 +167,35 @@
 
         <!-- Atoms Tab -->
         <div id="atoms-tab" class="hidden">
-            <div class="mb-4 flex gap-2">
-                <button class="atom-filter px-3 py-1 rounded-full bg-gray-200 text-gray-700 text-sm" data-type="all">All</button>
-                <button class="atom-filter px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-sm" data-type="data">Data</button>
-                <button class="atom-filter px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm" data-type="story">Stories</button>
-                <button class="atom-filter px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-sm" data-type="insight">Insights</button>
-                <button class="atom-filter px-3 py-1 rounded-full bg-red-100 text-red-700 text-sm" data-type="problem">Problems</button>
-                <button class="atom-filter px-3 py-1 rounded-full bg-yellow-100 text-yellow-700 text-sm" data-type="solution">Solutions</button>
+            <div class="mb-4 flex flex-wrap gap-2">
+                <button class="atom-filter px-3 py-1 rounded-full bg-still-border text-still-muted text-sm" data-type="all">All</button>
+                <button class="atom-filter px-3 py-1 rounded-full atom-data text-sm" data-type="data">Data</button>
+                <button class="atom-filter px-3 py-1 rounded-full bg-still-green/30 text-still-green text-sm" data-type="story">Stories</button>
+                <button class="atom-filter px-3 py-1 rounded-full atom-insight text-sm" data-type="insight">Insights</button>
+                <button class="atom-filter px-3 py-1 rounded-full bg-still-error/30 text-still-error text-sm" data-type="problem">Problems</button>
+                <button class="atom-filter px-3 py-1 rounded-full bg-still-amber/30 text-still-amber text-sm" data-type="solution">Solutions</button>
+                <button class="atom-filter px-3 py-1 rounded-full bg-still-copper/30 text-still-copper text-sm" data-type="quote">Quotes</button>
             </div>
             <div id="atoms-container" class="grid md:grid-cols-2 gap-4"></div>
         </div>
 
         <!-- Cost Info -->
-        <div class="mt-8 p-4 bg-gray-100 rounded-lg">
+        <div class="mt-8 p-4 bg-still-card rounded-lg border border-still-border">
             <div class="flex justify-between items-center">
-                <span class="text-gray-600">Processing Cost:</span>
-                <span class="font-semibold" id="total-cost">$0.00</span>
+                <span class="text-still-muted">Processing Cost:</span>
+                <span class="font-semibold text-still-text" id="total-cost">$0.00</span>
             </div>
         </div>
     </div>
 
     <!-- Copy Toast -->
-    <div id="copy-toast" class="fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg hidden">
+    <div id="copy-toast" class="fixed bottom-4 right-4 bg-still-card border border-still-border text-still-text px-4 py-2 rounded-lg shadow-lg hidden">
         Copied to clipboard!
     </div>
 
     <script>
         // Require authentication
-        if (!Auth.requireAuth()) {
-            // Will redirect to login
-        }
+        Auth.requireAuth();
 
         const jobId = new URLSearchParams(window.location.search).get('job_id');
 
@@ -104,6 +205,262 @@
 
         let currentTab = 'outputs';
         let allAtoms = [];
+        let tonePresets = [];
+        let feedbackData = {};
+
+        // Load tone presets on startup
+        async function loadTonePresets() {
+            try {
+                const response = await Auth.fetchWithAuth('/api/edit/tone-presets');
+                const data = await response.json();
+                tonePresets = data.presets || [];
+            } catch (err) {
+                console.error('Failed to load tone presets:', err);
+            }
+        }
+        loadTonePresets();
+
+        // Feedback functions
+        async function submitFeedback(outputId, feedbackType) {
+            try {
+                const response = await Auth.fetchWithAuth('/api/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ output_id: outputId, feedback: feedbackType })
+                });
+
+                if (response.ok) {
+                    feedbackData[outputId] = feedbackType;
+                    updateFeedbackUI(outputId, feedbackType);
+                    showToast(`Feedback recorded: ${feedbackType === 'thumbs_up' ? '👍' : '👎'}`);
+                }
+            } catch (err) {
+                showToast('Failed to submit feedback');
+            }
+        }
+
+        function updateFeedbackUI(outputId, feedbackType) {
+            const upBtn = document.getElementById(`feedback-up-${outputId}`);
+            const downBtn = document.getElementById(`feedback-down-${outputId}`);
+
+            if (upBtn && downBtn) {
+                upBtn.classList.toggle('bg-still-green/20', feedbackType === 'thumbs_up');
+                upBtn.classList.toggle('text-still-green', feedbackType === 'thumbs_up');
+                downBtn.classList.toggle('bg-still-error/20', feedbackType === 'thumbs_down');
+                downBtn.classList.toggle('text-still-error', feedbackType === 'thumbs_down');
+            }
+        }
+
+        // Device preview toggle
+        function toggleDevicePreview(outputId, device) {
+            const container = document.getElementById(`preview-container-${outputId}`);
+            if (!container) return;
+
+            container.classList.remove('mobile-preview', 'desktop-preview');
+            container.classList.add(`${device}-preview`);
+
+            // Update button states
+            document.querySelectorAll(`[data-preview-output="${outputId}"]`).forEach(btn => {
+                btn.classList.remove('bg-still-copper/20', 'text-still-copper');
+                btn.classList.add('bg-still-border', 'text-still-muted');
+            });
+            const activeBtn = document.querySelector(`[data-preview-output="${outputId}"][data-device="${device}"]`);
+            if (activeBtn) {
+                activeBtn.classList.remove('bg-still-border', 'text-still-muted');
+                activeBtn.classList.add('bg-still-copper/20', 'text-still-copper');
+            }
+        }
+
+        // Tone adjustment
+        async function adjustTone(outputId) {
+            const toneSelect = document.getElementById(`tone-select-${outputId}`);
+            const tone = toneSelect.value;
+            if (!tone) return;
+
+            const btn = document.getElementById(`tone-btn-${outputId}`);
+            btn.disabled = true;
+            btn.textContent = 'Adjusting...';
+
+            try {
+                const response = await Auth.fetchWithAuth('/api/edit/adjust-tone', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ output_id: outputId, tone_preset: tone })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    showEditPreview(outputId, data.original_content, data.adjusted_content, `Tone: ${tone}`);
+                    showToast(`Tone adjusted! Cost: $${data.cost.toFixed(4)}`);
+                } else {
+                    throw new Error(data.detail || 'Failed to adjust tone');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Apply';
+            }
+        }
+
+        // Custom edit/regenerate
+        async function applyCustomEdit(outputId) {
+            const input = document.getElementById(`edit-input-${outputId}`);
+            const instructions = input.value.trim();
+            if (!instructions) {
+                showToast('Please enter edit instructions');
+                return;
+            }
+
+            const btn = document.getElementById(`edit-btn-${outputId}`);
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+
+            try {
+                const response = await Auth.fetchWithAuth('/api/edit/apply-changes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ output_id: outputId, instructions })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    showEditPreview(outputId, data.original_content, data.edited_content, data.change_summary);
+                    showToast(`Edit applied! Cost: $${data.cost.toFixed(4)}`);
+                    input.value = '';
+                } else {
+                    throw new Error(data.detail || 'Failed to apply edit');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Regenerate';
+            }
+        }
+
+        // Show edit preview with accept/reject
+        function showEditPreview(outputId, originalContent, newContent, summary) {
+            const previewDiv = document.getElementById(`edit-preview-${outputId}`);
+            if (!previewDiv) return;
+
+            previewDiv.innerHTML = `
+                <div class="mt-4 p-4 bg-still-green/10 border border-still-green/30 rounded-lg">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <h5 class="font-semibold text-still-green">Edit Preview</h5>
+                            <p class="text-sm text-still-green/80">${escapeHtml(summary)}</p>
+                        </div>
+                        <button onclick="hideEditPreview(${outputId})" class="text-still-muted hover:text-still-text">&times;</button>
+                    </div>
+                    <div class="bg-still-card p-3 rounded border border-still-border mb-3">
+                        <div class="whitespace-pre-wrap text-still-muted text-sm">${escapeHtml(newContent)}</div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="acceptEdit(${outputId}, \`${newContent.replace(/`/g, '\\`').replace(/\\/g, '\\\\')}\`)"
+                            class="px-4 py-2 bg-still-green text-white rounded hover:opacity-90 text-sm">
+                            Accept & Save
+                        </button>
+                        <button onclick="hideEditPreview(${outputId})"
+                            class="px-4 py-2 bg-still-border text-still-muted rounded hover:bg-still-card text-sm">
+                            Reject
+                        </button>
+                        <button onclick="copyToClipboard(\`${newContent.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)"
+                            class="px-4 py-2 border border-still-border rounded hover:bg-still-card text-still-muted text-sm">
+                            Copy
+                        </button>
+                    </div>
+                </div>
+            `;
+            previewDiv.classList.remove('hidden');
+        }
+
+        function hideEditPreview(outputId) {
+            const previewDiv = document.getElementById(`edit-preview-${outputId}`);
+            if (previewDiv) {
+                previewDiv.classList.add('hidden');
+                previewDiv.innerHTML = '';
+            }
+        }
+
+        async function acceptEdit(outputId, newContent) {
+            try {
+                const response = await Auth.fetchWithAuth(`/api/edit/${outputId}/save`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ output_id: outputId, edited_content: newContent, edit_note: 'User accepted edit' })
+                });
+
+                if (response.ok) {
+                    showToast('Edit saved!');
+                    hideEditPreview(outputId);
+                    // Update the displayed content
+                    const contentDiv = document.getElementById(`content-${outputId}`);
+                    if (contentDiv) {
+                        contentDiv.textContent = newContent;
+                    }
+                } else {
+                    throw new Error('Failed to save edit');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message);
+            }
+        }
+
+        // Export functions
+        function toggleExportMenu() {
+            document.getElementById('export-menu').classList.toggle('hidden');
+        }
+
+        // Close export menu when clicking outside
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById('export-dropdown');
+            if (!dropdown.contains(e.target)) {
+                document.getElementById('export-menu').classList.add('hidden');
+            }
+        });
+
+        async function exportAs(format) {
+            document.getElementById('export-menu').classList.add('hidden');
+            const token = localStorage.getItem('auth_token');
+            const url = `/api/export/${jobId}/${format}`;
+
+            try {
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Export failed');
+                }
+
+                // Get filename from content-disposition header or generate one
+                const contentDisposition = response.headers.get('content-disposition');
+                let filename = `export.${format}`;
+                if (contentDisposition) {
+                    const match = contentDisposition.match(/filename="(.+)"/);
+                    if (match) filename = match[1];
+                }
+
+                // Download the file
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(downloadUrl);
+
+                showToast('Export downloaded!');
+            } catch (err) {
+                console.error('Export failed:', err);
+                showToast('Export failed: ' + err.message);
+            }
+        }
+
+        // showToast is now provided by utils.js
 
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -112,11 +469,11 @@
                 currentTab = tab;
 
                 document.querySelectorAll('.tab-btn').forEach(b => {
-                    b.classList.remove('border-indigo-600', 'text-indigo-600');
-                    b.classList.add('border-transparent', 'text-gray-500');
+                    b.classList.remove('border-still-copper', 'text-still-copper');
+                    b.classList.add('border-transparent', 'text-still-muted');
                 });
-                btn.classList.remove('border-transparent', 'text-gray-500');
-                btn.classList.add('border-indigo-600', 'text-indigo-600');
+                btn.classList.remove('border-transparent', 'text-still-muted');
+                btn.classList.add('border-still-copper', 'text-still-copper');
 
                 document.getElementById('outputs-tab').classList.toggle('hidden', tab !== 'outputs');
                 document.getElementById('atoms-tab').classList.toggle('hidden', tab !== 'atoms');
@@ -130,9 +487,9 @@
                 filterAtoms(type);
 
                 document.querySelectorAll('.atom-filter').forEach(b => {
-                    b.classList.remove('ring-2', 'ring-offset-2', 'ring-indigo-500');
+                    b.classList.remove('ring-2', 'ring-offset-2', 'ring-still-copper', 'ring-offset-still-bg');
                 });
-                btn.classList.add('ring-2', 'ring-offset-2', 'ring-indigo-500');
+                btn.classList.add('ring-2', 'ring-offset-2', 'ring-still-copper', 'ring-offset-still-bg');
             });
         });
 
@@ -142,29 +499,25 @@
             renderAtoms(atoms);
         }
 
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text);
-            const toast = document.getElementById('copy-toast');
-            toast.classList.remove('hidden');
-            setTimeout(() => toast.classList.add('hidden'), 2000);
-        }
+        // copyToClipboard is now provided by utils.js
 
         function getTypeColor(type) {
             const colors = {
                 'data': 'blue',
-                'story': 'green',
+                'story': 'still-green',
                 'insight': 'purple',
-                'problem': 'red',
-                'solution': 'yellow'
+                'problem': 'still-error',
+                'solution': 'still-amber',
+                'quote': 'still-copper'
             };
-            return colors[type] || 'gray';
+            return colors[type] || 'still-muted';
         }
 
         function getScoreColor(score) {
-            if (score >= 85) return { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-500' };
-            if (score >= 70) return { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-500' };
-            if (score >= 50) return { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-500' };
-            return { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-500' };
+            if (score >= 85) return { bg: 'bg-still-green/20', text: 'text-still-green', border: 'border-still-green' };
+            if (score >= 70) return { bg: 'score-high', text: '', border: '' };
+            if (score >= 50) return { bg: 'bg-still-amber/20', text: 'text-still-amber', border: 'border-still-amber' };
+            return { bg: 'bg-still-error/20', text: 'text-still-error', border: 'border-still-error' };
         }
 
         function renderScoreBadge(scores) {
@@ -178,31 +531,162 @@
                     <span class="px-2 py-1 rounded text-sm font-medium ${colors.bg} ${colors.text}">
                         Quality: ${overall}/100
                     </span>
-                    <div class="absolute z-10 invisible group-hover:visible bg-white border shadow-lg rounded-lg p-4 w-64 -left-20 top-8">
-                        <div class="text-sm font-semibold mb-2 text-gray-800">Quality Breakdown</div>
+                    <div class="absolute z-10 invisible group-hover:visible bg-still-card border border-still-border shadow-lg rounded-lg p-4 w-64 -left-20 top-8">
+                        <div class="text-sm font-semibold mb-2 text-still-text">Quality Breakdown</div>
                         <div class="space-y-2 text-sm">
                             <div class="flex justify-between">
-                                <span class="text-gray-600">Hook Quality</span>
-                                <span class="font-medium">${scores.hook_quality?.score || 'N/A'}</span>
+                                <span class="text-still-muted">Hook Quality</span>
+                                <span class="font-medium text-still-text">${scores.hook_quality?.score || 'N/A'}</span>
                             </div>
-                            <div class="text-xs text-gray-500 -mt-1">${scores.hook_quality?.reason || ''}</div>
+                            <div class="text-xs text-still-disabled -mt-1">${scores.hook_quality?.reason || ''}</div>
                             <div class="flex justify-between">
-                                <span class="text-gray-600">Brand Alignment</span>
-                                <span class="font-medium">${scores.brand_alignment?.score || 'N/A'}</span>
+                                <span class="text-still-muted">Brand Alignment</span>
+                                <span class="font-medium text-still-text">${scores.brand_alignment?.score || 'N/A'}</span>
                             </div>
-                            <div class="text-xs text-gray-500 -mt-1">${scores.brand_alignment?.reason || ''}</div>
+                            <div class="text-xs text-still-disabled -mt-1">${scores.brand_alignment?.reason || ''}</div>
                             <div class="flex justify-between">
-                                <span class="text-gray-600">Clarity</span>
-                                <span class="font-medium">${scores.clarity?.score || 'N/A'}</span>
+                                <span class="text-still-muted">Clarity</span>
+                                <span class="font-medium text-still-text">${scores.clarity?.score || 'N/A'}</span>
                             </div>
-                            <div class="text-xs text-gray-500 -mt-1">${scores.clarity?.reason || ''}</div>
+                            <div class="text-xs text-still-disabled -mt-1">${scores.clarity?.reason || ''}</div>
                             <div class="flex justify-between">
-                                <span class="text-gray-600">Engagement</span>
-                                <span class="font-medium">${scores.engagement_potential?.score || 'N/A'}</span>
+                                <span class="text-still-muted">Engagement</span>
+                                <span class="font-medium text-still-text">${scores.engagement_potential?.score || 'N/A'}</span>
                             </div>
-                            <div class="text-xs text-gray-500 -mt-1">${scores.engagement_potential?.reason || ''}</div>
+                            <div class="text-xs text-still-disabled -mt-1">${scores.engagement_potential?.reason || ''}</div>
                         </div>
                     </div>
+                </div>
+            `;
+        }
+
+        function getContentTypeTitle(type) {
+            const titles = {
+                'linkedin': 'LinkedIn Posts',
+                'blog': 'Blog Post',
+                'email': 'Email',
+                'email_sequence': 'Email Sequence'
+            };
+            return titles[type] || type.charAt(0).toUpperCase() + type.slice(1);
+        }
+
+        function getOutputLabel(type, output, index) {
+            if (type === 'email_sequence') {
+                return `Day ${output.email_day ?? index} – ${output.email_purpose || 'Email'}`;
+            }
+            if (type === 'linkedin') return `LinkedIn Post ${output.variation_number || index + 1}`;
+            if (type === 'blog') return 'Blog Post';
+            if (type === 'email') return 'Email';
+            return `${type} – Variation ${output.variation_number || index + 1}`;
+        }
+
+        function renderImagePrompts(prompts, outputId) {
+            if (!prompts || prompts.length === 0) return '';
+
+            const platformColors = {
+                'midjourney': 'platform-midjourney',
+                'dalle': 'bg-still-green/30 text-still-green',
+                'stable_diffusion': 'platform-stable-diffusion'
+            };
+
+            return `
+                <details class="mt-4 bg-still-copper/10 rounded-lg">
+                    <summary class="p-4 cursor-pointer font-medium text-still-copper hover:bg-still-copper/20 rounded-lg transition">
+                        <span class="inline-flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                            Image Prompts (${prompts.length})
+                        </span>
+                    </summary>
+                    <div class="p-4 pt-2 space-y-4">
+                        <p class="text-sm text-still-copper mb-3">Use these prompts with Midjourney, DALL-E, or other AI image generators:</p>
+                        ${prompts.map((prompt, i) => {
+                            const platformClass = platformColors[prompt.platform] || 'bg-still-border text-still-muted';
+                            return `
+                                <div class="bg-still-card p-4 rounded-lg border border-still-border">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <span class="text-xs font-medium px-2 py-1 rounded ${platformClass}">
+                                            ${prompt.platform ? prompt.platform.toUpperCase() : 'AI'}
+                                        </span>
+                                        <span class="text-xs text-still-disabled">${prompt.dimensions || '1200x630'}</span>
+                                    </div>
+                                    <p class="text-sm text-still-muted mb-2">${escapeHtml(prompt.prompt_text)}</p>
+                                    ${prompt.style_modifiers ? `
+                                        <p class="text-xs text-still-disabled mb-3">
+                                            <strong>Style:</strong> ${escapeHtml(prompt.style_modifiers)}
+                                        </p>
+                                    ` : ''}
+                                    <button onclick="copyToClipboard(\`${prompt.prompt_text.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)"
+                                        class="text-sm text-still-copper hover:text-still-amber font-medium flex items-center gap-1">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                        </svg>
+                                        Copy Prompt
+                                    </button>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </details>
+            `;
+        }
+
+        function renderHookVariations(hooks, outputId) {
+            if (!hooks || hooks.length === 0) return '';
+
+            const hookTypeLabels = {
+                'question': 'Question Hook',
+                'stat': 'Statistic Hook',
+                'story': 'Story Hook',
+                'bold_claim': 'Bold Claim',
+                'problem': 'Problem Hook'
+            };
+
+            let html = `
+                <div class="mt-4 p-4 bg-still-copper/10 rounded-lg">
+                    <h4 class="font-semibold text-still-copper mb-3">Hook Variations</h4>
+                    <p class="text-sm text-still-amber mb-3">Choose your favorite opening hook:</p>
+                    <div class="space-y-3">
+            `;
+
+            hooks.forEach((hook, i) => {
+                const label = hookTypeLabels[hook.hook_type] || hook.hook_type;
+                const isFirst = i === 0;
+                html += `
+                    <label class="flex items-start p-3 bg-still-card rounded border cursor-pointer hover:border-still-copper ${isFirst ? 'border-still-copper' : 'border-still-border'}">
+                        <input type="radio" name="hook-${outputId}" value="${i}" class="mt-1" ${isFirst ? 'checked' : ''}>
+                        <div class="ml-3 flex-1">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-sm font-medium text-still-copper">${escapeHtml(label)}</span>
+                            </div>
+                            <p class="text-sm text-still-muted">${escapeHtml(hook.hook_text)}</p>
+                            <p class="text-xs text-still-disabled mt-1 italic">${escapeHtml(hook.explanation || '')}</p>
+                            <button onclick="copyToClipboard(\`${(hook.full_post || hook.hook_text).replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)"
+                                class="text-xs text-still-copper hover:underline mt-2">
+                                Copy full post with this hook
+                            </button>
+                        </div>
+                    </label>
+                `;
+            });
+
+            html += `
+                    </div>
+                </div>
+            `;
+
+            return html;
+        }
+
+        function renderEmailSequenceHeader(output) {
+            if (output.content_type !== 'email_sequence') return '';
+
+            return `
+                <div class="mb-3 p-3 email-header rounded border">
+                    ${output.subject ? `<p class="text-sm text-still-text"><strong>Subject:</strong> ${escapeHtml(output.subject)}</p>` : ''}
+                    ${output.preview_text ? `<p class="text-sm text-still-muted"><strong>Preview:</strong> ${escapeHtml(output.preview_text)}</p>` : ''}
+                    ${output.sequence_name ? `<p class="text-xs text-still-disabled mt-1">Sequence: ${escapeHtml(output.sequence_name)}</p>` : ''}
                 </div>
             `;
         }
@@ -211,8 +695,11 @@
             const container = document.getElementById('outputs-container');
             container.innerHTML = '';
 
-            // Sort outputs by quality score (highest first)
+            // Sort outputs: email_sequence by day, others by quality score
             outputs.sort((a, b) => {
+                if (a.content_type === 'email_sequence' && b.content_type === 'email_sequence') {
+                    return (a.email_day ?? 0) - (b.email_day ?? 0);
+                }
                 const scoreA = a.quality_scores?.overall_score || 0;
                 const scoreB = b.quality_scores?.overall_score || 0;
                 return scoreB - scoreA;
@@ -228,15 +715,15 @@
 
             for (const [type, items] of Object.entries(grouped)) {
                 const section = document.createElement('div');
-                section.className = 'bg-white rounded-lg shadow-sm overflow-hidden';
+                section.className = 'bg-still-card rounded-lg shadow-sm overflow-hidden mb-6 border border-still-border';
 
-                const typeTitle = type.charAt(0).toUpperCase() + type.slice(1);
+                const typeTitle = getContentTypeTitle(type);
 
                 section.innerHTML = `
-                    <div class="bg-gray-50 px-6 py-4 border-b">
-                        <h2 class="text-lg font-semibold">${typeTitle} (${items.length})</h2>
+                    <div class="bg-still-border/50 px-6 py-4 border-b border-still-border">
+                        <h2 class="text-lg font-semibold text-still-text">${typeTitle} (${items.length})</h2>
                     </div>
-                    <div class="divide-y" id="outputs-${type}"></div>
+                    <div class="divide-y divide-still-border" id="outputs-${type}"></div>
                 `;
 
                 container.appendChild(section);
@@ -249,47 +736,136 @@
 
                     const content = output.step3_final || output.step2_edited || output.step1_draft || '';
                     const hasWarnings = output.warnings && output.warnings.length > 0;
+                    const hasHooks = output.hook_variations && output.hook_variations.length > 0;
+                    const outputLabel = getOutputLabel(type, output, index + 1);
+                    const isLinkedIn = type === 'linkedin';
+                    const isEmail = type === 'email' || type === 'email_sequence';
+
+                    // Generate tone options HTML
+                    const toneOptionsHtml = tonePresets.map(p =>
+                        `<option value="${p.id}">${p.label}</option>`
+                    ).join('');
 
                     item.innerHTML = `
                         <div class="flex justify-between items-start mb-4">
-                            <div class="flex items-center gap-2">
-                                <span class="text-sm font-medium text-gray-500">Variation ${output.variation_number || index + 1}</span>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-sm font-medium text-still-muted">${outputLabel}</span>
                                 ${renderScoreBadge(output.quality_scores)}
-                                ${hasWarnings ? '<span class="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 rounded">Has Warnings</span>' : ''}
+                                ${hasWarnings ? '<span class="text-xs px-2 py-1 bg-still-amber/20 text-still-amber rounded">Has Warnings</span>' : ''}
+                                ${hasHooks ? '<span class="text-xs px-2 py-1 bg-still-copper/20 text-still-copper rounded">5 Hook Options</span>' : ''}
                             </div>
-                            <button onclick="copyToClipboard(\`${content.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)"
-                                class="text-indigo-600 hover:underline text-sm">
-                                Copy
-                            </button>
+                            <div class="flex items-center gap-3">
+                                <!-- Feedback Buttons -->
+                                <div class="flex gap-1">
+                                    <button id="feedback-up-${output.id}" onclick="submitFeedback(${output.id}, 'thumbs_up')"
+                                        class="p-1.5 rounded hover:bg-still-green/20 text-still-disabled hover:text-still-green transition"
+                                        title="Thumbs up">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/>
+                                        </svg>
+                                    </button>
+                                    <button id="feedback-down-${output.id}" onclick="submitFeedback(${output.id}, 'thumbs_down')"
+                                        class="p-1.5 rounded hover:bg-still-error/20 text-still-disabled hover:text-still-error transition"
+                                        title="Thumbs down">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                                <button onclick="copyToClipboard(\`${content.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)"
+                                    class="text-still-copper hover:underline text-sm">
+                                    Copy
+                                </button>
+                                <a href="/workshop.html?id=${output.id}"
+                                    class="text-still-amber hover:underline text-sm">
+                                    Edit in Workshop
+                                </a>
+                            </div>
                         </div>
-                        <div class="prose max-w-none">
-                            <div class="whitespace-pre-wrap text-gray-700">${escapeHtml(content)}</div>
+
+                        ${renderEmailSequenceHeader(output)}
+
+                        <!-- Device Preview Toggle (for LinkedIn/Email) -->
+                        ${isLinkedIn || isEmail ? `
+                            <div class="mb-3 flex gap-2">
+                                <button data-preview-output="${output.id}" data-device="desktop"
+                                    onclick="toggleDevicePreview(${output.id}, 'desktop')"
+                                    class="px-3 py-1 text-xs rounded bg-still-copper/20 text-still-copper">
+                                    Desktop
+                                </button>
+                                <button data-preview-output="${output.id}" data-device="mobile"
+                                    onclick="toggleDevicePreview(${output.id}, 'mobile')"
+                                    class="px-3 py-1 text-xs rounded bg-still-border text-still-muted">
+                                    Mobile
+                                </button>
+                            </div>
+                        ` : ''}
+
+                        <!-- Content Preview -->
+                        <div id="preview-container-${output.id}" class="${isLinkedIn ? 'desktop-preview linkedin-style' : 'prose max-w-none'}">
+                            <div id="content-${output.id}" class="whitespace-pre-wrap text-still-muted content-preview">${escapeHtml(content)}</div>
                         </div>
+
+                        ${hasHooks ? renderHookVariations(output.hook_variations, output.id) : ''}
+
                         ${hasWarnings ? `
-                            <div class="mt-4 p-3 bg-yellow-50 rounded text-sm">
-                                <strong class="text-yellow-700">Warnings:</strong>
-                                <ul class="mt-1 list-disc list-inside text-yellow-600">
+                            <div class="mt-4 p-3 bg-still-amber/10 rounded text-sm border border-still-amber/20">
+                                <strong class="text-still-amber">Warnings:</strong>
+                                <ul class="mt-1 list-disc list-inside text-still-amber/80">
                                     ${output.warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}
                                 </ul>
                             </div>
                         ` : ''}
 
+                        ${renderImagePrompts(output.image_prompts, output.id)}
+
+                        <!-- Edit Controls -->
+                        <div class="mt-4 p-4 bg-still-border/30 rounded-lg edit-panel border border-still-border">
+                            <h5 class="font-medium text-still-muted mb-3">Edit & Adjust</h5>
+
+                            <!-- Tone Adjustment -->
+                            <div class="flex gap-2 mb-3">
+                                <select id="tone-select-${output.id}" class="flex-1 bg-still-card border border-still-border rounded px-3 py-2 text-sm text-still-text">
+                                    <option value="">Select tone...</option>
+                                    ${toneOptionsHtml}
+                                </select>
+                                <button id="tone-btn-${output.id}" onclick="adjustTone(${output.id})"
+                                    class="px-4 py-2 copper-gradient text-white rounded text-sm hover:opacity-90">
+                                    Apply
+                                </button>
+                            </div>
+
+                            <!-- Custom Edit Instructions -->
+                            <div class="flex gap-2">
+                                <input id="edit-input-${output.id}" type="text"
+                                    placeholder="e.g., make shorter, add statistics, be more conversational..."
+                                    class="flex-1 bg-still-card border border-still-border rounded px-3 py-2 text-sm text-still-text placeholder-still-disabled">
+                                <button id="edit-btn-${output.id}" onclick="applyCustomEdit(${output.id})"
+                                    class="px-4 py-2 bg-purple-600 text-white rounded text-sm hover:bg-purple-700">
+                                    Regenerate
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Edit Preview (hidden by default) -->
+                        <div id="edit-preview-${output.id}" class="hidden"></div>
+
                         <!-- Version Toggle -->
                         <details class="mt-4">
-                            <summary class="text-sm text-gray-500 cursor-pointer hover:text-gray-700">
+                            <summary class="text-sm text-still-muted cursor-pointer hover:text-still-text">
                                 View all versions
                             </summary>
                             <div class="mt-2 space-y-2 text-sm">
                                 ${output.step1_draft ? `
-                                    <div class="p-3 bg-gray-50 rounded">
-                                        <strong>Step 1 (Draft):</strong>
-                                        <p class="mt-1 whitespace-pre-wrap">${escapeHtml(output.step1_draft.substring(0, 300))}...</p>
+                                    <div class="p-3 bg-still-border/30 rounded border border-still-border">
+                                        <strong style="color: var(--platform-linkedin-text);">Step 1 (Draft):</strong>
+                                        <p class="mt-1 whitespace-pre-wrap text-blue-300/80">${escapeHtml(output.step1_draft)}</p>
                                     </div>
                                 ` : ''}
                                 ${output.step2_edited ? `
-                                    <div class="p-3 bg-gray-50 rounded">
-                                        <strong>Step 2 (Edited):</strong>
-                                        <p class="mt-1 whitespace-pre-wrap">${escapeHtml(output.step2_edited.substring(0, 300))}...</p>
+                                    <div class="p-3 bg-still-border/30 rounded border border-still-border">
+                                        <strong style="color: var(--platform-linkedin-text);">Step 2 (Edited):</strong>
+                                        <p class="mt-1 whitespace-pre-wrap text-blue-300/80">${escapeHtml(output.step2_edited)}</p>
                                     </div>
                                 ` : ''}
                             </div>
@@ -308,24 +884,37 @@
             atoms.forEach(atom => {
                 const color = getTypeColor(atom.type);
                 const card = document.createElement('div');
-                card.className = `bg-white p-4 rounded-lg shadow-sm border-l-4 border-${color}-500`;
+                card.className = `bg-still-card p-4 rounded-lg shadow-sm border-l-4 border-${color}`;
 
                 const relevance = atom.persona_relevance ? Object.values(atom.persona_relevance)[0] : null;
+                const isQuote = atom.type === 'quote';
+                const attribution = atom.quote_attribution;
+
+                // Format content differently for quotes
+                let contentHtml;
+                if (isQuote) {
+                    contentHtml = `<p class="text-still-muted text-sm italic">"${escapeHtml(atom.content)}"</p>`;
+                    if (attribution) {
+                        contentHtml += `<p class="text-sm text-still-disabled mt-1 font-medium">— ${escapeHtml(attribution)}</p>`;
+                    }
+                } else {
+                    contentHtml = `<p class="text-still-muted text-sm">${escapeHtml(atom.content)}</p>`;
+                }
 
                 card.innerHTML = `
                     <div class="flex justify-between items-start mb-2">
-                        <span class="text-xs font-semibold text-${color}-600 uppercase">${atom.type}</span>
-                        ${relevance ? `<span class="text-xs text-gray-500">Relevance: ${relevance}/5</span>` : ''}
+                        <span class="text-xs font-semibold text-${color} uppercase">${atom.type}</span>
+                        ${relevance ? `<span class="text-xs text-still-disabled">Relevance: ${relevance}/5</span>` : ''}
                     </div>
-                    <p class="text-gray-700 text-sm">${escapeHtml(atom.content)}</p>
-                    ${atom.source_location ? `<p class="text-xs text-gray-400 mt-2">Source: ${escapeHtml(atom.source_location)}</p>` : ''}
+                    ${contentHtml}
+                    ${atom.source_location ? `<p class="text-xs text-still-disabled mt-2">Source: ${escapeHtml(atom.source_location)}</p>` : ''}
                     <div class="mt-3 flex gap-2">
                         ${atom.tags && atom.tags.length ? atom.tags.map(tag =>
-                            `<span class="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">${escapeHtml(tag)}</span>`
+                            `<span class="text-xs px-2 py-0.5 bg-still-border text-still-muted rounded">${escapeHtml(tag)}</span>`
                         ).join('') : ''}
                     </div>
                     <button onclick="copyToClipboard(\`${atom.content.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)"
-                        class="mt-3 text-xs text-indigo-600 hover:underline">
+                        class="mt-3 text-xs text-still-copper hover:underline">
                         Copy
                     </button>
                 `;
@@ -334,15 +923,11 @@
             });
 
             if (atoms.length === 0) {
-                container.innerHTML = '<p class="text-gray-500 col-span-2 text-center py-8">No atoms found</p>';
+                container.innerHTML = '<p class="text-still-muted col-span-2 text-center py-8">No atoms found</p>';
             }
         }
 
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
+        // escapeHtml is now provided by utils.js
 
         async function loadResults() {
             try {
@@ -372,8 +957,8 @@
             } catch (err) {
                 console.error('Failed to load results:', err);
                 document.getElementById('loading').innerHTML = `
-                    <p class="text-red-600">Failed to load results: ${err.message}</p>
-                    <a href="/upload.html" class="text-indigo-600 hover:underline mt-4 inline-block">Upload New Content</a>
+                    <p class="text-still-error">Failed to load results: ${escapeHtml(err.message)}</p>
+                    <a href="/upload.html" class="text-still-copper hover:underline mt-4 inline-block">Upload New Content</a>
                 `;
             }
         }

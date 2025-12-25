@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" class="no-transitions">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/static/images/Icon only.png">
+    <title>Swipe Files - Still</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="/static/theme.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        still: {
+                            bg: 'var(--still-bg)',
+                            card: 'var(--still-card)',
+                            border: 'var(--still-border)',
+                            text: 'var(--still-text)',
+                            muted: 'var(--still-muted)',
+                            disabled: 'var(--still-disabled)',
+                            copper: 'var(--still-copper)',
+                            amber: 'var(--still-amber)',
+                            green: 'var(--still-green)',
+                            error: 'var(--still-error)',
+                        }
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .style-dna-gradient { background: linear-gradient(135deg, var(--still-copper) 0%, var(--still-amber) 100%); }
+    </style>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/utils.js"></script>
+    <script src="/static/auth.js"></script>
+    <script>
+        window.addEventListener('load', () => {
+            document.documentElement.classList.remove('no-transitions');
+        });
+    </script>
+</head>
+<body class="bg-still-bg min-h-screen font-inter">
+    <!-- Navigation -->
+    <nav class="bg-still-card shadow-sm border-b border-still-border">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="flex items-center">
+                        <img src="/static/images/Still Logo.svg" alt="Still" class="h-12">
+                    </a>
+                </div>
+                <div class="hidden md:flex items-center space-x-4">
+                    <a href="/upload.html" class="text-still-muted hover:text-still-text px-3 py-2">Upload</a>
+                    <a href="/reserve.html" class="text-still-muted hover:text-still-text px-3 py-2">Reserve</a>
+                    <a href="/workshop.html" class="text-still-muted hover:text-still-text px-3 py-2">Workshop</a>
+                    <a href="/calendar.html" class="text-still-muted hover:text-still-text px-3 py-2">Calendar</a>
+                    <a href="/autopilot.html" class="text-still-muted hover:text-still-text px-3 py-2">Autopilot</a>
+                    <a href="/analytics.html" class="text-still-muted hover:text-still-text px-3 py-2">Analytics</a>
+                    <a href="/settings.html" class="text-still-muted hover:text-still-text px-3 py-2">Settings</a>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <!-- Theme Toggle -->
+                    <button onclick="ThemeManager.toggle()" class="theme-toggle" title="Toggle light/dark mode">
+                        <svg class="theme-icon-sun" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                        </svg>
+                        <svg class="theme-icon-moon hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                        </svg>
+                    </button>
+                    <div id="navbar-user" class="flex items-center"></div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-3xl font-bold text-still-text">Swipe Files</h1>
+                <p class="text-still-muted mt-1">Collect content examples you love to learn from</p>
+            </div>
+            <button onclick="showAddModal()" class="copper-gradient text-white px-4 py-2 rounded-lg hover:opacity-90 transition flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Add Swipe
+            </button>
+        </div>
+
+        <!-- Style DNA Summary (populated by analysis) -->
+        <div id="style-dna" class="hidden mb-8">
+            <div class="style-dna-gradient rounded-lg p-6 text-white">
+                <div class="flex items-center gap-3 mb-4">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                    </svg>
+                    <h2 class="text-xl font-bold">Your Style DNA</h2>
+                </div>
+                <div id="style-dna-content" class="grid md:grid-cols-3 gap-4">
+                    <!-- Populated by JavaScript -->
+                </div>
+                <div class="mt-4 pt-4 border-t border-white/20">
+                    <button onclick="analyzeSwipes()" class="text-white/80 hover:text-white text-sm flex items-center gap-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        Refresh Analysis
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters and Stats -->
+        <div class="flex flex-wrap gap-4 mb-6">
+            <div class="flex gap-2">
+                <button class="filter-btn px-3 py-1.5 rounded-lg bg-still-copper/20 text-still-copper text-sm font-medium" data-type="all">
+                    All
+                </button>
+                <button class="filter-btn px-3 py-1.5 rounded-lg bg-still-card text-still-muted text-sm border border-still-border" data-type="linkedin">
+                    LinkedIn
+                </button>
+                <button class="filter-btn px-3 py-1.5 rounded-lg bg-still-card text-still-muted text-sm border border-still-border" data-type="twitter">
+                    Twitter/X
+                </button>
+                <button class="filter-btn px-3 py-1.5 rounded-lg bg-still-card text-still-muted text-sm border border-still-border" data-type="email">
+                    Email
+                </button>
+                <button class="filter-btn px-3 py-1.5 rounded-lg bg-still-card text-still-muted text-sm border border-still-border" data-type="blog">
+                    Blog
+                </button>
+            </div>
+            <div class="ml-auto text-sm text-still-disabled">
+                <span id="swipe-count">0</span> swipes collected
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="text-center py-12">
+            <div class="animate-spin h-8 w-8 border-4 border-still-copper border-t-transparent rounded-full mx-auto"></div>
+            <p class="mt-4 text-still-muted">Loading swipes...</p>
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden text-center py-16 bg-still-card rounded-lg border-2 border-dashed border-still-border">
+            <svg class="mx-auto h-12 w-12 text-still-disabled" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+            </svg>
+            <h3 class="mt-2 text-lg font-medium text-still-text">No swipes yet</h3>
+            <p class="mt-1 text-still-disabled">Start collecting content examples you love!</p>
+            <button onclick="showAddModal()" class="mt-4 text-still-copper hover:underline">
+                Add your first swipe
+            </button>
+        </div>
+
+        <!-- Swipes Grid -->
+        <div id="swipes-grid" class="hidden grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Populated by JavaScript -->
+        </div>
+
+        <!-- Analyze Button (shown when enough swipes) -->
+        <div id="analyze-prompt" class="hidden mt-8 p-6 bg-still-copper/10 rounded-lg text-center border border-still-copper/30">
+            <h3 class="font-semibold text-still-amber mb-2">Ready to discover your Style DNA?</h3>
+            <p class="text-still-muted text-sm mb-4">
+                You have enough swipes to analyze patterns in your favorite content.
+            </p>
+            <button onclick="analyzeSwipes()" class="copper-gradient text-white px-6 py-2 rounded-lg hover:opacity-90 transition">
+                Analyze My Swipes
+            </button>
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div id="swipe-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+        <div class="bg-still-card rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-still-border">
+            <div class="p-6 border-b border-still-border">
+                <div class="flex justify-between items-center">
+                    <h2 id="modal-title" class="text-xl font-semibold text-still-text">Add Swipe</h2>
+                    <button onclick="hideModal()" class="text-still-disabled hover:text-still-muted">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <form id="swipe-form" class="p-6 space-y-4">
+                <input type="hidden" id="edit-swipe-id">
+
+                <!-- Content -->
+                <div>
+                    <label class="block text-sm font-medium text-still-muted mb-1">Content *</label>
+                    <textarea id="swipe-content" rows="6" required
+                        class="w-full bg-still-bg border border-still-border rounded-lg p-3 text-still-text focus:ring-2 focus:ring-still-copper focus:border-still-copper"
+                        placeholder="Paste the LinkedIn post, tweet, email, or content you want to save..."></textarea>
+                </div>
+
+                <!-- Source Type -->
+                <div>
+                    <label class="block text-sm font-medium text-still-muted mb-1">Source Type</label>
+                    <select id="swipe-source-type" class="w-full bg-still-bg border border-still-border rounded-lg p-3 text-still-text focus:ring-2 focus:ring-still-copper">
+                        <option value="general">General</option>
+                        <option value="linkedin">LinkedIn</option>
+                        <option value="twitter">Twitter/X</option>
+                        <option value="email">Email</option>
+                        <option value="blog">Blog</option>
+                        <option value="newsletter">Newsletter</option>
+                    </select>
+                </div>
+
+                <!-- Title (optional) -->
+                <div>
+                    <label class="block text-sm font-medium text-still-muted mb-1">Title (optional)</label>
+                    <input type="text" id="swipe-title"
+                        class="w-full bg-still-bg border border-still-border rounded-lg p-3 text-still-text focus:ring-2 focus:ring-still-copper"
+                        placeholder="e.g., 'Great hook example' or 'Perfect CTA'">
+                </div>
+
+                <!-- Source URL (optional) -->
+                <div>
+                    <label class="block text-sm font-medium text-still-muted mb-1">Source URL (optional)</label>
+                    <input type="url" id="swipe-url"
+                        class="w-full bg-still-bg border border-still-border rounded-lg p-3 text-still-text focus:ring-2 focus:ring-still-copper"
+                        placeholder="https://...">
+                </div>
+
+                <!-- Tags -->
+                <div>
+                    <label class="block text-sm font-medium text-still-muted mb-1">Tags (comma-separated)</label>
+                    <input type="text" id="swipe-tags"
+                        class="w-full bg-still-bg border border-still-border rounded-lg p-3 text-still-text focus:ring-2 focus:ring-still-copper"
+                        placeholder="hook, storytelling, cta, engaging">
+                </div>
+
+                <!-- Notes -->
+                <div>
+                    <label class="block text-sm font-medium text-still-muted mb-1">Notes (optional)</label>
+                    <textarea id="swipe-notes" rows="2"
+                        class="w-full bg-still-bg border border-still-border rounded-lg p-3 text-still-text focus:ring-2 focus:ring-still-copper"
+                        placeholder="Why do you like this? What makes it effective?"></textarea>
+                </div>
+
+                <div class="flex gap-3 pt-4">
+                    <button type="submit" class="flex-1 copper-gradient text-white py-3 rounded-lg font-semibold hover:opacity-90 transition">
+                        Save Swipe
+                    </button>
+                    <button type="button" onclick="hideModal()" class="px-6 py-3 border border-still-border rounded-lg text-still-muted hover:bg-still-border/50 transition">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-still-card text-still-text px-4 py-2 rounded-lg shadow-lg border border-still-border hidden">
+        Action completed
+    </div>
+
+    <script>
+        // Require authentication
+        Auth.requireAuth();
+
+        let allSwipes = [];
+        let currentFilter = 'all';
+        let styleDNA = null;
+
+        // Load swipes on page load
+        async function loadSwipes() {
+            try {
+                const response = await Auth.fetchWithAuth('/api/swipes?limit=100');
+                const data = await response.json();
+
+                document.getElementById('loading').classList.add('hidden');
+
+                allSwipes = data.swipes || [];
+                document.getElementById('swipe-count').textContent = data.total;
+
+                if (allSwipes.length === 0) {
+                    document.getElementById('empty-state').classList.remove('hidden');
+                } else {
+                    document.getElementById('swipes-grid').classList.remove('hidden');
+                    renderSwipes();
+
+                    // Show analyze prompt if 5+ swipes
+                    if (allSwipes.length >= 5 && !styleDNA) {
+                        document.getElementById('analyze-prompt').classList.remove('hidden');
+                    }
+                }
+
+                // Load style DNA if exists
+                loadStyleDNA();
+
+            } catch (err) {
+                console.error('Failed to load swipes:', err);
+                document.getElementById('loading').innerHTML = `
+                    <p class="text-still-error">Failed to load swipes: ${err.message}</p>
+                `;
+            }
+        }
+
+        function renderSwipes() {
+            const container = document.getElementById('swipes-grid');
+            container.innerHTML = '';
+
+            const filtered = currentFilter === 'all'
+                ? allSwipes
+                : allSwipes.filter(s => s.source_type === currentFilter);
+
+            filtered.forEach(swipe => {
+                const card = document.createElement('div');
+                card.className = 'bg-still-card rounded-lg shadow-sm border border-still-border hover:border-still-copper/50 transition';
+
+                const typeColors = {
+                    linkedin: 'platform-linkedin',
+                    twitter: 'bg-sky-900/30 text-sky-400',
+                    email: 'bg-still-green/20 text-still-green',
+                    blog: 'bg-orange-900/30 text-orange-400',
+                    newsletter: 'platform-email',
+                    general: 'bg-still-border text-still-muted',
+                };
+
+                const typeColor = typeColors[swipe.source_type] || typeColors.general;
+                const truncatedContent = swipe.content.length > 200
+                    ? swipe.content.substring(0, 200) + '...'
+                    : swipe.content;
+
+                card.innerHTML = `
+                    <div class="p-4">
+                        <div class="flex justify-between items-start mb-3">
+                            <span class="px-2 py-1 rounded text-xs font-medium ${typeColor}">${swipe.source_type}</span>
+                            <div class="flex gap-1">
+                                <button onclick="editSwipe(${swipe.id})" class="p-1 text-still-disabled hover:text-still-muted">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                    </svg>
+                                </button>
+                                <button onclick="deleteSwipe(${swipe.id})" class="p-1 text-still-disabled hover:text-still-error">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        ${swipe.title ? `<h3 class="font-medium text-still-text mb-2">${escapeHtml(swipe.title)}</h3>` : ''}
+
+                        <p class="text-still-muted text-sm whitespace-pre-wrap mb-3">${escapeHtml(truncatedContent)}</p>
+
+                        ${swipe.tags && swipe.tags.length ? `
+                            <div class="flex flex-wrap gap-1 mb-3">
+                                ${swipe.tags.map(tag => `<span class="px-2 py-0.5 bg-still-border text-still-muted rounded text-xs">${escapeHtml(tag)}</span>`).join('')}
+                            </div>
+                        ` : ''}
+
+                        ${swipe.notes ? `
+                            <div class="text-xs text-still-disabled italic border-t border-still-border pt-2 mt-2">
+                                "${escapeHtml(swipe.notes)}"
+                            </div>
+                        ` : ''}
+
+                        <div class="flex justify-between items-center mt-3 pt-3 border-t border-still-border text-xs text-still-disabled">
+                            <span>${new Date(swipe.created_at).toLocaleDateString()}</span>
+                            ${swipe.source_url ? `<a href="${swipe.source_url}" target="_blank" class="text-still-copper hover:underline">View source</a>` : ''}
+                        </div>
+                    </div>
+                `;
+
+                container.appendChild(card);
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<p class="col-span-3 text-center text-still-disabled py-8">No swipes match this filter</p>';
+            }
+        }
+
+        // Filter buttons
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                currentFilter = btn.dataset.type;
+
+                document.querySelectorAll('.filter-btn').forEach(b => {
+                    b.classList.remove('bg-still-copper/20', 'text-still-copper');
+                    b.classList.add('bg-still-card', 'text-still-muted', 'border', 'border-still-border');
+                });
+                btn.classList.remove('bg-still-card', 'text-still-muted', 'border', 'border-still-border');
+                btn.classList.add('bg-still-copper/20', 'text-still-copper');
+
+                renderSwipes();
+            });
+        });
+
+        // Modal functions
+        function showAddModal() {
+            document.getElementById('modal-title').textContent = 'Add Swipe';
+            document.getElementById('edit-swipe-id').value = '';
+            document.getElementById('swipe-form').reset();
+            document.getElementById('swipe-modal').classList.remove('hidden');
+        }
+
+        function hideModal() {
+            document.getElementById('swipe-modal').classList.add('hidden');
+        }
+
+        async function editSwipe(id) {
+            const swipe = allSwipes.find(s => s.id === id);
+            if (!swipe) return;
+
+            document.getElementById('modal-title').textContent = 'Edit Swipe';
+            document.getElementById('edit-swipe-id').value = id;
+            document.getElementById('swipe-content').value = swipe.content;
+            document.getElementById('swipe-source-type').value = swipe.source_type;
+            document.getElementById('swipe-title').value = swipe.title || '';
+            document.getElementById('swipe-url').value = swipe.source_url || '';
+            document.getElementById('swipe-tags').value = (swipe.tags || []).join(', ');
+            document.getElementById('swipe-notes').value = swipe.notes || '';
+            document.getElementById('swipe-modal').classList.remove('hidden');
+        }
+
+        async function deleteSwipe(id) {
+            if (!confirm('Delete this swipe?')) return;
+
+            try {
+                const response = await Auth.fetchWithAuth(`/api/swipes/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    showToast('Swipe deleted');
+                    loadSwipes();
+                } else {
+                    throw new Error('Failed to delete');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message);
+            }
+        }
+
+        // Form submission
+        document.getElementById('swipe-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const id = document.getElementById('edit-swipe-id').value;
+            const isEdit = !!id;
+
+            const tagsInput = document.getElementById('swipe-tags').value;
+            const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(t => t) : [];
+
+            const data = {
+                content: document.getElementById('swipe-content').value,
+                source_type: document.getElementById('swipe-source-type').value,
+                title: document.getElementById('swipe-title').value || null,
+                source_url: document.getElementById('swipe-url').value || null,
+                tags: tags.length ? tags : null,
+                notes: document.getElementById('swipe-notes').value || null,
+            };
+
+            try {
+                const url = isEdit ? `/api/swipes/${id}` : '/api/swipes';
+                const method = isEdit ? 'PUT' : 'POST';
+
+                const response = await Auth.fetchWithAuth(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    hideModal();
+                    showToast(isEdit ? 'Swipe updated' : 'Swipe added');
+                    loadSwipes();
+                } else {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'Failed to save');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message);
+            }
+        });
+
+        // Style DNA
+        async function loadStyleDNA() {
+            try {
+                const response = await Auth.fetchWithAuth('/api/swipes/analysis');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.analysis) {
+                        styleDNA = data.analysis;
+                        renderStyleDNA();
+                    }
+                }
+            } catch (err) {
+                console.log('No style DNA yet');
+            }
+        }
+
+        function renderStyleDNA() {
+            if (!styleDNA || !styleDNA.patterns) return;
+
+            const container = document.getElementById('style-dna-content');
+            const patterns = styleDNA.patterns;
+
+            container.innerHTML = `
+                <div>
+                    <h4 class="font-medium mb-2">Hook Styles</h4>
+                    <ul class="text-sm text-white/80 space-y-1">
+                        ${(patterns.hook_styles || []).slice(0, 3).map(h => `<li>- ${escapeHtml(h)}</li>`).join('')}
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-medium mb-2">Common CTAs</h4>
+                    <ul class="text-sm text-white/80 space-y-1">
+                        ${(patterns.cta_patterns || []).slice(0, 3).map(c => `<li>- ${escapeHtml(c)}</li>`).join('')}
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-medium mb-2">Tone Patterns</h4>
+                    <ul class="text-sm text-white/80 space-y-1">
+                        ${(patterns.tone_patterns || []).slice(0, 3).map(t => `<li>- ${escapeHtml(t)}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+
+            document.getElementById('style-dna').classList.remove('hidden');
+            document.getElementById('analyze-prompt').classList.add('hidden');
+        }
+
+        async function analyzeSwipes() {
+            showToast('Analyzing your swipes...');
+
+            try {
+                const response = await Auth.fetchWithAuth('/api/swipes/analyze', {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    styleDNA = data.analysis;
+                    renderStyleDNA();
+                    showToast('Style DNA updated!');
+                } else {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'Analysis failed');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message);
+            }
+        }
+
+        // escapeHtml and showToast are now provided by utils.js
+
+        // Initialize
+        loadSwipes();
+    </script>
+</body>
+</html>

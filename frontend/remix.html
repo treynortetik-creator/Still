@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" class="no-transitions">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/static/images/Icon only.png">
+    <title>Content Remix - Still</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="/static/theme.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        still: {
+                            bg: 'var(--still-bg)',
+                            card: 'var(--still-card)',
+                            border: 'var(--still-border)',
+                            text: 'var(--still-text)',
+                            muted: 'var(--still-muted)',
+                            disabled: 'var(--still-disabled)',
+                            copper: 'var(--still-copper)',
+                            amber: 'var(--still-amber)',
+                            green: 'var(--still-green)',
+                            error: 'var(--still-error)',
+                        }
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/utils.js"></script>
+    <script src="/static/auth.js"></script>
+    <script>
+        window.addEventListener('load', () => {
+            document.documentElement.classList.remove('no-transitions');
+        });
+    </script>
+</head>
+<body class="bg-still-bg min-h-screen font-inter">
+    <!-- Navigation -->
+    <nav class="bg-still-card shadow-sm border-b border-still-border">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="flex items-center">
+                        <img src="/static/images/Still Logo.svg" alt="Still" class="h-12">
+                    </a>
+                </div>
+                <div class="hidden md:flex items-center space-x-4">
+                    <a href="/upload.html" class="text-still-muted hover:text-still-text px-3 py-2">Upload</a>
+                    <a href="/reserve.html" class="text-still-muted hover:text-still-text px-3 py-2">Reserve</a>
+                    <a href="/workshop.html" class="text-still-muted hover:text-still-text px-3 py-2">Workshop</a>
+                    <a href="/calendar.html" class="text-still-muted hover:text-still-text px-3 py-2">Calendar</a>
+                    <a href="/autopilot.html" class="text-still-muted hover:text-still-text px-3 py-2">Autopilot</a>
+                    <a href="/analytics.html" class="text-still-muted hover:text-still-text px-3 py-2">Analytics</a>
+                    <a href="/settings.html" class="text-still-muted hover:text-still-text px-3 py-2">Settings</a>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <!-- Theme Toggle -->
+                    <button onclick="ThemeManager.toggle()" class="theme-toggle" title="Toggle light/dark mode">
+                        <svg class="theme-icon-sun" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                        </svg>
+                        <svg class="theme-icon-moon hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                        </svg>
+                    </button>
+                    <div id="navbar-user" class="flex items-center"></div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-3xl font-bold text-still-text">Content Remix</h1>
+                <p class="text-still-muted mt-1">Surface new content ideas from your existing library</p>
+            </div>
+            <button onclick="analyzeSuggestions()" id="analyze-btn"
+                class="copper-gradient text-white px-4 py-2 rounded-lg hover:opacity-90 transition flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                </svg>
+                Analyze Library
+            </button>
+        </div>
+
+        <!-- Library Stats -->
+        <div id="library-stats" class="grid md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-still-card rounded-lg shadow-sm p-4 text-center border border-still-border">
+                <p class="text-3xl font-bold text-still-copper" id="total-atoms">-</p>
+                <p class="text-sm text-still-muted">Total Atoms</p>
+            </div>
+            <div class="bg-still-card rounded-lg shadow-sm p-4 border border-still-border">
+                <p class="font-medium text-still-muted mb-2">By Type</p>
+                <div id="atoms-by-type" class="text-sm text-still-muted space-y-1">
+                    <p>Loading...</p>
+                </div>
+            </div>
+            <div class="bg-still-card rounded-lg shadow-sm p-4 col-span-2 border border-still-border">
+                <p class="font-medium text-still-muted mb-2">Top Topics</p>
+                <div id="top-tags" class="flex flex-wrap gap-1">
+                    <span class="text-still-disabled text-sm">Loading...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search -->
+        <div class="bg-still-card rounded-lg shadow-sm p-4 mb-8 border border-still-border">
+            <div class="flex gap-3">
+                <input type="text" id="search-input" placeholder="Search atoms by topic..."
+                    class="flex-1 bg-still-bg border border-still-border rounded-lg px-4 py-2 text-still-text focus:ring-2 focus:ring-still-copper focus:border-still-copper">
+                <button onclick="searchAtoms()" class="bg-still-border text-still-text px-6 py-2 rounded-lg hover:bg-still-disabled/30 transition">
+                    Search
+                </button>
+            </div>
+            <div id="search-results" class="mt-4 hidden">
+                <!-- Search results -->
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="hidden text-center py-12">
+            <div class="animate-spin h-8 w-8 border-4 border-still-copper border-t-transparent rounded-full mx-auto"></div>
+            <p class="mt-4 text-still-muted">Analyzing your library...</p>
+        </div>
+
+        <!-- Suggestions -->
+        <div id="suggestions" class="hidden space-y-8">
+            <!-- Roundup Posts -->
+            <div id="roundup-section" class="hidden">
+                <h2 class="text-xl font-semibold text-still-text mb-4 flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-full bg-still-green/20 text-still-green flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                        </svg>
+                    </span>
+                    Roundup Posts
+                </h2>
+                <div id="roundup-list" class="grid md:grid-cols-2 gap-4"></div>
+            </div>
+
+            <!-- Topic Clusters -->
+            <div id="clusters-section" class="hidden">
+                <h2 class="text-xl font-semibold text-still-text mb-4 flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-full platform-linkedin flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
+                        </svg>
+                    </span>
+                    Topic Clusters
+                </h2>
+                <div id="clusters-list" class="grid md:grid-cols-2 gap-4"></div>
+            </div>
+
+            <!-- Comparison Opportunities -->
+            <div id="comparisons-section" class="hidden">
+                <h2 class="text-xl font-semibold text-still-text mb-4 flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-full platform-email flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                        </svg>
+                    </span>
+                    Comparison Posts
+                </h2>
+                <div id="comparisons-list" class="grid md:grid-cols-2 gap-4"></div>
+            </div>
+
+            <!-- Contrarian Takes -->
+            <div id="contrarian-section" class="hidden">
+                <h2 class="text-xl font-semibold text-still-text mb-4 flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-full bg-orange-900/30 text-orange-400 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                    </span>
+                    Contrarian Takes
+                </h2>
+                <div id="contrarian-list" class="grid md:grid-cols-2 gap-4"></div>
+            </div>
+
+            <!-- Quick Wins -->
+            <div id="quickwins-section" class="hidden">
+                <h2 class="text-xl font-semibold text-still-text mb-4 flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-full bg-still-amber/20 text-still-amber flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
+                        </svg>
+                    </span>
+                    Quick Wins
+                </h2>
+                <div id="quickwins-list" class="space-y-2"></div>
+            </div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden text-center py-16 bg-still-card rounded-lg border border-still-border">
+            <svg class="mx-auto h-12 w-12 text-still-disabled" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+            </svg>
+            <h3 class="mt-2 text-lg font-medium text-still-text">Not enough atoms</h3>
+            <p class="mt-1 text-still-disabled">Upload some content to build your atom library first.</p>
+            <a href="/upload.html" class="mt-4 inline-block text-still-copper hover:underline">
+                Upload Content
+            </a>
+        </div>
+    </div>
+
+    <!-- Generate Modal -->
+    <div id="generate-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+        <div class="bg-still-card rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-still-border">
+            <div class="p-6 border-b border-still-border">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-still-text">Generate Content</h3>
+                    <button onclick="hideGenerateModal()" class="text-still-disabled hover:text-still-muted">&times;</button>
+                </div>
+            </div>
+            <div class="p-6">
+                <div id="generate-preview" class="mb-4 p-4 bg-still-bg rounded-lg border border-still-border">
+                    <p class="text-sm text-still-muted">Loading...</p>
+                </div>
+                <div id="generate-result" class="hidden">
+                    <textarea id="generated-content" rows="10"
+                        class="w-full bg-still-bg border border-still-border rounded-lg p-3 text-still-text focus:ring-2 focus:ring-still-copper"></textarea>
+                    <div class="mt-4 flex gap-3">
+                        <button onclick="copyGenerated()" class="flex-1 copper-gradient text-white py-2 rounded-lg hover:opacity-90">
+                            Copy to Clipboard
+                        </button>
+                        <button onclick="hideGenerateModal()" class="px-6 py-2 border border-still-border text-still-muted rounded-lg hover:bg-still-border/50">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-still-card text-still-text px-4 py-2 rounded-lg shadow-lg border border-still-border hidden">
+        Action completed
+    </div>
+
+    <script>
+        // Require authentication
+        Auth.requireAuth();
+
+        let suggestions = null;
+
+        // Load stats on page load
+        async function loadStats() {
+            try {
+                const response = await Auth.fetchWithAuth('/api/remix/stats');
+                const data = await response.json();
+
+                document.getElementById('total-atoms').textContent = data.total_atoms || 0;
+
+                // By type
+                const byTypeDiv = document.getElementById('atoms-by-type');
+                const types = data.by_type || {};
+                if (Object.keys(types).length > 0) {
+                    byTypeDiv.innerHTML = Object.entries(types)
+                        .map(([type, count]) => `<p>${type}: <span class="font-medium text-still-text">${count}</span></p>`)
+                        .join('');
+                } else {
+                    byTypeDiv.innerHTML = '<p class="text-still-disabled">No atoms yet</p>';
+                }
+
+                // Top tags
+                const tagsDiv = document.getElementById('top-tags');
+                const tags = data.top_tags || [];
+                if (tags.length > 0) {
+                    tagsDiv.innerHTML = tags
+                        .map(t => `<span class="px-2 py-1 bg-still-border text-still-muted rounded text-xs">${escapeHtml(t.tag)} (${t.count})</span>`)
+                        .join('');
+                } else {
+                    tagsDiv.innerHTML = '<span class="text-still-disabled text-sm">No tags yet</span>';
+                }
+
+                if (data.total_atoms < 5) {
+                    document.getElementById('empty-state').classList.remove('hidden');
+                }
+
+            } catch (err) {
+                console.error('Failed to load stats:', err);
+            }
+        }
+
+        async function analyzeSuggestions() {
+            const btn = document.getElementById('analyze-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="animate-spin">...</span> Analyzing';
+
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('suggestions').classList.add('hidden');
+
+            try {
+                const response = await Auth.fetchWithAuth('/api/remix/suggestions');
+                const data = await response.json();
+
+                document.getElementById('loading').classList.add('hidden');
+
+                if (data.suggestions) {
+                    suggestions = data.suggestions;
+                    renderSuggestions();
+                    document.getElementById('suggestions').classList.remove('hidden');
+                    showToast(`Analysis complete! Cost: $${data.cost.toFixed(4)}`);
+                }
+
+            } catch (err) {
+                document.getElementById('loading').classList.add('hidden');
+                showToast('Analysis failed: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                </svg> Analyze Library`;
+            }
+        }
+
+        function renderSuggestions() {
+            // Roundup Posts
+            const roundups = suggestions.roundup_posts || [];
+            if (roundups.length > 0) {
+                document.getElementById('roundup-section').classList.remove('hidden');
+                document.getElementById('roundup-list').innerHTML = roundups.map(r => `
+                    <div class="bg-still-card rounded-lg shadow-sm p-4 border-l-4 border-still-green border border-still-border">
+                        <h4 class="font-medium text-still-text mb-2">${escapeHtml(r.post_title || r.theme)}</h4>
+                        <p class="text-sm text-still-muted mb-3">Uses ${r.atom_ids?.length || 0} atoms about "${escapeHtml(r.theme)}"</p>
+                        <span class="text-xs bg-still-green/20 text-still-green px-2 py-1 rounded">${r.format || 'linkedin'}</span>
+                    </div>
+                `).join('');
+            }
+
+            // Topic Clusters
+            const clusters = suggestions.topic_clusters || [];
+            if (clusters.length > 0) {
+                document.getElementById('clusters-section').classList.remove('hidden');
+                document.getElementById('clusters-list').innerHTML = clusters.map(c => `
+                    <div class="bg-still-card rounded-lg shadow-sm p-4 border-l-4 border border-still-border" style="border-left-color: var(--platform-linkedin-border);">
+                        <h4 class="font-medium text-still-text mb-2">${escapeHtml(c.post_idea || c.theme)}</h4>
+                        <p class="text-sm text-still-muted mb-2">${escapeHtml(c.why_it_works || '')}</p>
+                        <p class="text-xs text-still-disabled">Combines ${c.atom_ids?.length || 0} atoms</p>
+                    </div>
+                `).join('');
+            }
+
+            // Comparisons
+            const comparisons = suggestions.comparison_opportunities || [];
+            if (comparisons.length > 0) {
+                document.getElementById('comparisons-section').classList.remove('hidden');
+                document.getElementById('comparisons-list').innerHTML = comparisons.map(c => `
+                    <div class="bg-still-card rounded-lg shadow-sm p-4 border-l-4 border border-still-border" style="border-left-color: var(--platform-email-border);">
+                        <h4 class="font-medium text-still-text mb-2">${escapeHtml(c.post_idea || c.topic)}</h4>
+                        <p class="text-sm text-still-muted">${escapeHtml(c.angle || '')}</p>
+                    </div>
+                `).join('');
+            }
+
+            // Contrarian
+            const contrarian = suggestions.contrarian_takes || [];
+            if (contrarian.length > 0) {
+                document.getElementById('contrarian-section').classList.remove('hidden');
+                document.getElementById('contrarian-list').innerHTML = contrarian.map(c => `
+                    <div class="bg-still-card rounded-lg shadow-sm p-4 border-l-4 border-orange-500 border border-still-border">
+                        <h4 class="font-medium text-still-text mb-2">${escapeHtml(c.post_idea || 'Contrarian Take')}</h4>
+                        <p class="text-sm text-still-muted">${escapeHtml(c.contrarian_angle || '')}</p>
+                    </div>
+                `).join('');
+            }
+
+            // Quick Wins
+            const quickWins = suggestions.quick_wins || [];
+            if (quickWins.length > 0) {
+                document.getElementById('quickwins-section').classList.remove('hidden');
+                document.getElementById('quickwins-list').innerHTML = quickWins.map(w => `
+                    <div class="bg-still-card rounded-lg shadow-sm p-3 flex items-center gap-3 border border-still-border">
+                        <span class="w-6 h-6 rounded-full bg-still-amber/20 text-still-amber flex items-center justify-center text-xs">!</span>
+                        <span class="text-still-muted">${escapeHtml(w)}</span>
+                    </div>
+                `).join('');
+            }
+        }
+
+        async function searchAtoms() {
+            const query = document.getElementById('search-input').value.trim();
+            if (!query) return;
+
+            const resultsDiv = document.getElementById('search-results');
+            resultsDiv.innerHTML = '<p class="text-still-disabled">Searching...</p>';
+            resultsDiv.classList.remove('hidden');
+
+            try {
+                const response = await Auth.fetchWithAuth(`/api/remix/search?topic=${encodeURIComponent(query)}`);
+                const data = await response.json();
+
+                if (data.results.length === 0) {
+                    resultsDiv.innerHTML = '<p class="text-still-disabled">No atoms found for "' + escapeHtml(query) + '"</p>';
+                } else {
+                    resultsDiv.innerHTML = `
+                        <p class="text-sm text-still-muted mb-3">Found ${data.count} atoms for "${escapeHtml(query)}"</p>
+                        <div class="space-y-2">
+                            ${data.results.map(a => `
+                                <div class="p-3 bg-still-bg rounded border border-still-border">
+                                    <span class="text-xs bg-still-border text-still-muted px-2 py-0.5 rounded">${a.atom_type}</span>
+                                    <p class="text-sm text-still-muted mt-1">${escapeHtml(a.content.substring(0, 150))}...</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                resultsDiv.innerHTML = '<p class="text-still-error">Search failed</p>';
+            }
+        }
+
+        // Enter key for search
+        document.getElementById('search-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') searchAtoms();
+        });
+
+        function hideGenerateModal() {
+            document.getElementById('generate-modal').classList.add('hidden');
+        }
+
+        function copyGenerated() {
+            const content = document.getElementById('generated-content').value;
+            navigator.clipboard.writeText(content);
+            showToast('Copied to clipboard!');
+        }
+
+        // escapeHtml and showToast are now provided by utils.js
+
+        // Initialize
+        loadStats();
+    </script>
+</body>
+</html>
