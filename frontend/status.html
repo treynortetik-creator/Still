@@ -1,24 +1,81 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark" class="no-transitions">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Processing Status - ContentMultiplier</title>
+    <link rel="icon" type="image/png" href="/static/images/Icon only.png">
+    <title>Processing Status - Still</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="/static/theme.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        still: {
+                            bg: 'var(--still-bg)',
+                            card: 'var(--still-card)',
+                            border: 'var(--still-border)',
+                            text: 'var(--still-text)',
+                            muted: 'var(--still-muted)',
+                            disabled: 'var(--still-disabled)',
+                            copper: 'var(--still-copper)',
+                            amber: 'var(--still-amber)',
+                            green: 'var(--still-green)',
+                            error: 'var(--still-error)',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
     <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/utils.js"></script>
     <script src="/static/auth.js"></script>
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; }
+    </style>
+    <script>
+        window.addEventListener('load', () => {
+            document.documentElement.classList.remove('no-transitions');
+        });
+    </script>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-still-bg min-h-screen text-still-text">
     <!-- Navigation -->
-    <nav class="bg-white shadow-sm border-b">
+    <nav class="bg-still-card border-b border-still-border">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
-                    <a href="/" class="text-xl font-bold text-indigo-600">ContentMultiplier</a>
+                    <a href="/" class="flex items-center">
+                        <img src="/static/images/Still Logo.svg" alt="Still" class="h-12">
+                    </a>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <a href="/upload.html" class="text-gray-600 hover:text-gray-900">Upload</a>
-                    <a href="/library.html" class="text-gray-600 hover:text-gray-900">Library</a>
+                <div class="hidden md:flex items-center space-x-4">
+                    <a href="/upload.html" class="text-still-muted hover:text-still-text px-3 py-2">Upload</a>
+                    <a href="/reserve.html" class="text-still-muted hover:text-still-text px-3 py-2">Reserve</a>
+                    <a href="/workshop.html" class="text-still-muted hover:text-still-text px-3 py-2">Workshop</a>
+                    <a href="/calendar.html" class="text-still-muted hover:text-still-text px-3 py-2">Calendar</a>
+                    <a href="/autopilot.html" class="text-still-muted hover:text-still-text px-3 py-2">Autopilot</a>
+                    <a href="/analytics.html" class="text-still-muted hover:text-still-text px-3 py-2">Analytics</a>
+                    <a href="/settings.html" class="text-still-muted hover:text-still-text px-3 py-2">Settings</a>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <!-- Theme Toggle -->
+                    <button onclick="ThemeManager.toggle()" class="theme-toggle" title="Toggle light/dark mode">
+                        <svg class="theme-icon-sun" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                        </svg>
+                        <svg class="theme-icon-moon hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                        </svg>
+                    </button>
                     <div id="navbar-user" class="flex items-center"></div>
                 </div>
             </div>
@@ -26,102 +83,102 @@
     </nav>
 
     <div class="max-w-2xl mx-auto px-4 py-16">
-        <div class="bg-white rounded-lg shadow-sm p-8">
+        <div class="bg-still-card rounded-lg border border-still-border p-8">
             <!-- Status Header -->
             <div class="text-center mb-8">
-                <div id="status-icon" class="w-20 h-20 mx-auto mb-4 rounded-full bg-indigo-100 flex items-center justify-center">
-                    <svg class="animate-spin h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <div id="status-icon" class="w-20 h-20 mx-auto mb-4 rounded-full bg-still-copper/20 flex items-center justify-center">
+                    <svg class="animate-spin h-10 w-10 text-still-copper" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                 </div>
-                <h1 class="text-2xl font-bold" id="status-title">Processing Your Content</h1>
-                <p class="text-gray-600 mt-2" id="status-message">This may take a few minutes...</p>
+                <h1 class="text-2xl font-bold text-still-text" id="status-title">Processing Your Content</h1>
+                <p class="text-still-muted mt-2" id="status-message">This may take a few minutes...</p>
             </div>
 
             <!-- Progress Bar -->
             <div class="mb-8">
-                <div class="flex justify-between text-sm text-gray-600 mb-2">
+                <div class="flex justify-between text-sm text-still-muted mb-2">
                     <span id="current-step">Initializing...</span>
                     <span id="progress-percent">0%</span>
                 </div>
-                <div class="w-full bg-gray-200 rounded-full h-3">
-                    <div id="progress-bar" class="bg-indigo-600 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+                <div class="w-full bg-still-border rounded-full h-3" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Processing progress" id="progress-container">
+                    <div id="progress-bar" class="bg-gradient-to-r from-still-copper to-still-amber h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
                 </div>
             </div>
 
             <!-- Pipeline Steps -->
-            <div class="space-y-4 mb-8">
-                <div class="flex items-center" id="step-transcribe">
-                    <div class="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center mr-3 step-circle">
-                        <span class="text-sm">1</span>
+            <div class="space-y-4 mb-8" role="list" aria-label="Processing pipeline steps">
+                <div class="flex items-center" id="step-transcribe" role="listitem" aria-current="false">
+                    <div class="w-8 h-8 rounded-full border-2 border-still-border flex items-center justify-center mr-3 step-circle" aria-hidden="true">
+                        <span class="text-sm text-still-muted">1</span>
                     </div>
-                    <span class="text-gray-500">Transcribing & Cleaning</span>
+                    <span class="text-still-muted">Transcribing & Cleaning</span>
                 </div>
-                <div class="flex items-center" id="step-atomize">
-                    <div class="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center mr-3 step-circle">
-                        <span class="text-sm">2</span>
+                <div class="flex items-center" id="step-distill" role="listitem" aria-current="false">
+                    <div class="w-8 h-8 rounded-full border-2 border-still-border flex items-center justify-center mr-3 step-circle" aria-hidden="true">
+                        <span class="text-sm text-still-muted">2</span>
                     </div>
-                    <span class="text-gray-500">Extracting Content Atoms</span>
+                    <span class="text-still-muted">Distilling Content Stills</span>
                 </div>
-                <div class="flex items-center" id="step-draft">
-                    <div class="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center mr-3 step-circle">
-                        <span class="text-sm">3</span>
+                <div class="flex items-center" id="step-draft" role="listitem" aria-current="false">
+                    <div class="w-8 h-8 rounded-full border-2 border-still-border flex items-center justify-center mr-3 step-circle" aria-hidden="true">
+                        <span class="text-sm text-still-muted">3</span>
                     </div>
-                    <span class="text-gray-500">Drafting Content</span>
+                    <span class="text-still-muted">Drafting Content</span>
                 </div>
-                <div class="flex items-center" id="step-edit">
-                    <div class="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center mr-3 step-circle">
-                        <span class="text-sm">4</span>
+                <div class="flex items-center" id="step-edit" role="listitem" aria-current="false">
+                    <div class="w-8 h-8 rounded-full border-2 border-still-border flex items-center justify-center mr-3 step-circle" aria-hidden="true">
+                        <span class="text-sm text-still-muted">4</span>
                     </div>
-                    <span class="text-gray-500">Editing for Audience</span>
+                    <span class="text-still-muted">Editing for Audience</span>
                 </div>
-                <div class="flex items-center" id="step-factcheck">
-                    <div class="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center mr-3 step-circle">
-                        <span class="text-sm">5</span>
+                <div class="flex items-center" id="step-factcheck" role="listitem" aria-current="false">
+                    <div class="w-8 h-8 rounded-full border-2 border-still-border flex items-center justify-center mr-3 step-circle" aria-hidden="true">
+                        <span class="text-sm text-still-muted">5</span>
                     </div>
-                    <span class="text-gray-500">Fact-Checking</span>
+                    <span class="text-still-muted">Fact-Checking</span>
                 </div>
             </div>
 
             <!-- Estimated Time -->
-            <div class="text-center text-gray-500 text-sm" id="time-remaining">
+            <div class="text-center text-still-muted text-sm" id="time-remaining">
                 Estimated time remaining: calculating...
             </div>
 
             <!-- Pro Tips Section -->
-            <div id="pro-tip-section" class="mt-6 p-4 bg-indigo-50 border border-indigo-100 rounded-lg">
+            <div id="pro-tip-section" class="mt-6 p-4 bg-still-copper/10 border border-still-copper/30 rounded-lg">
                 <div class="flex items-start">
-                    <span class="text-indigo-500 mr-2 text-lg">Pro Tip</span>
-                    <p id="pro-tip-text" class="text-indigo-700 text-sm transition-opacity duration-500">
-                        Your content library grows automatically with every upload
+                    <span class="text-still-amber mr-2 text-lg font-medium">Pro Tip</span>
+                    <p id="pro-tip-text" class="text-still-muted text-sm transition-opacity duration-500">
+                        Your Reserve grows automatically with every upload
                     </p>
                 </div>
             </div>
 
             <!-- Transcript Preview (hidden until available) -->
             <div id="transcript-preview-section" class="hidden mt-6">
-                <h3 class="text-sm font-semibold text-gray-700 mb-2">Transcript Preview</h3>
-                <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-40 overflow-y-auto">
-                    <p id="transcript-preview" class="text-sm text-gray-600 whitespace-pre-wrap"></p>
+                <h3 class="text-sm font-semibold text-still-text mb-2">Transcript Preview</h3>
+                <div class="bg-still-bg border border-still-border rounded-lg p-4 max-h-40 overflow-y-auto">
+                    <p id="transcript-preview" class="text-sm text-still-muted whitespace-pre-wrap"></p>
                 </div>
             </div>
 
             <!-- Error Message (hidden by default) -->
             <div id="error-section" class="hidden mt-6">
-                <div class="bg-red-50 border border-red-200 rounded-lg overflow-hidden">
-                    <div class="bg-red-100 px-4 py-3 border-b border-red-200">
-                        <h3 class="text-red-800 font-semibold" id="error-title">Processing Failed</h3>
+                <div class="bg-still-error/10 border border-still-error/30 rounded-lg overflow-hidden">
+                    <div class="bg-still-error/20 px-4 py-3 border-b border-still-error/30">
+                        <h3 class="text-still-error font-semibold" id="error-title">Processing Failed</h3>
                     </div>
                     <div class="p-4">
-                        <p class="text-red-700" id="error-message"></p>
-                        <div class="mt-4 p-3 bg-white border border-red-100 rounded">
-                            <p class="text-sm font-medium text-gray-700">What you can do:</p>
-                            <p class="text-sm text-gray-600 mt-1" id="error-action"></p>
+                        <p class="text-still-error" id="error-message"></p>
+                        <div class="mt-4 p-3 bg-still-bg border border-still-border rounded">
+                            <p class="text-sm font-medium text-still-text">What you can do:</p>
+                            <p class="text-sm text-still-muted mt-1" id="error-action"></p>
                         </div>
                         <div class="mt-4 flex gap-4">
-                            <a href="/upload.html" class="text-indigo-600 hover:underline font-medium">Try Again</a>
-                            <button onclick="retryJob()" id="retry-btn" class="hidden text-indigo-600 hover:underline font-medium">
+                            <a href="/upload.html" class="text-still-copper hover:text-still-amber font-medium">Try Again</a>
+                            <button onclick="retryJob()" id="retry-btn" class="hidden text-still-copper hover:text-still-amber font-medium">
                                 Retry This Job
                             </button>
                         </div>
@@ -132,7 +189,7 @@
             <!-- Success Actions (hidden by default) -->
             <div id="success-section" class="hidden mt-6 text-center">
                 <a href="#" id="view-results-btn"
-                    class="inline-block bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-indigo-700 transition">
+                    class="inline-block copper-gradient text-still-bg px-6 py-3 rounded-lg font-semibold transition">
                     View Results
                 </a>
             </div>
@@ -141,29 +198,45 @@
 
     <script>
         // Require authentication
-        if (!Auth.requireAuth()) {
-            // Will redirect to login
-        }
+        Auth.requireAuth();
 
-        const jobId = new URLSearchParams(window.location.search).get('job_id');
+        const urlParams = new URLSearchParams(window.location.search);
+        const jobId = urlParams.get('job_id');
+        const processingMode = urlParams.get('mode');
+        const isQuickDistill = processingMode === 'quick_distill';
 
         if (!jobId) {
             window.location.href = '/upload.html';
         }
 
-        // Pro tips rotation
-        const PROCESSING_TIPS = [
-            "Your content library grows automatically with every upload",
-            "The atomization step extracts reusable quotes, stats, and stories",
+        // Pro tips rotation - different tips for Quick Distill
+        const PROCESSING_TIPS = isQuickDistill ? [
+            "Quick Distill extracts reusable stills without generating content",
+            "Your stills will be saved directly to your Reserve",
+            "Use the Sommelier to find the perfect stills for your next piece",
+            "Blend stills from your Reserve to create new content anytime",
+            "Each document adds 10-20 stills to your permanent Reserve"
+        ] : [
+            "Your Reserve grows automatically with every upload",
+            "The distillation step extracts reusable quotes, stats, and stories",
             "Fact-checking runs against your source material to prevent hallucinations",
-            "Persona targeting prioritizes atoms by audience relevance",
-            "Generate new content from your library without uploading source material",
+            "Persona targeting prioritizes stills by audience relevance",
+            "Generate new content from your Reserve without uploading source material",
             "The 4-step pipeline ensures publication-ready quality",
-            "Each job adds 10-20 atoms to your permanent library",
+            "Each job adds 10-20 stills to your permanent Reserve",
             "Brand voice is analyzed from your actual content, not questionnaires",
-            "Track which atoms you use most to refine future content",
+            "Track which stills you use most to refine future content",
             "Save hours of editing with multi-pass quality control"
         ];
+
+        // Update initial tip for Quick Distill
+        if (isQuickDistill) {
+            document.getElementById('pro-tip-text').textContent = PROCESSING_TIPS[0];
+            // Hide steps 3-5 for Quick Distill (only transcribe and distill)
+            document.getElementById('step-draft').style.display = 'none';
+            document.getElementById('step-edit').style.display = 'none';
+            document.getElementById('step-factcheck').style.display = 'none';
+        }
 
         let currentTipIndex = 0;
         function rotateTip() {
@@ -183,7 +256,7 @@
             'uploading': { step: 0, text: 'Uploading file...' },
             'transcribing': { step: 1, text: 'Transcribing content...' },
             'cleaning': { step: 1, text: 'Cleaning transcript...' },
-            'atomizing': { step: 2, text: 'Extracting content atoms...' },
+            'distilling': { step: 2, text: 'Distilling content stills...' },
             'drafting': { step: 3, text: 'Drafting content...' },
             'editing': { step: 4, text: 'Editing for audience...' },
             'factchecking': { step: 5, text: 'Fact-checking...' },
@@ -192,7 +265,7 @@
         };
 
         function updateStepUI(currentStep) {
-            const steps = ['step-transcribe', 'step-atomize', 'step-draft', 'step-edit', 'step-factcheck'];
+            const steps = ['step-transcribe', 'step-distill', 'step-draft', 'step-edit', 'step-factcheck'];
 
             steps.forEach((stepId, index) => {
                 const stepEl = document.getElementById(stepId);
@@ -201,24 +274,27 @@
 
                 if (index + 1 < currentStep) {
                     // Completed
-                    circle.classList.remove('border-gray-300', 'border-indigo-600');
-                    circle.classList.add('bg-green-500', 'border-green-500', 'text-white');
-                    circle.innerHTML = '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>';
-                    text.classList.remove('text-gray-500', 'text-indigo-600', 'font-semibold');
-                    text.classList.add('text-green-600');
+                    stepEl.setAttribute('aria-current', 'false');
+                    circle.classList.remove('border-still-border', 'border-still-copper');
+                    circle.classList.add('bg-still-green', 'border-still-green', 'text-still-text');
+                    circle.innerHTML = '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>';
+                    text.classList.remove('text-still-muted', 'text-still-copper', 'font-semibold');
+                    text.classList.add('text-still-green');
                 } else if (index + 1 === currentStep) {
                     // Current
-                    circle.classList.remove('border-gray-300', 'bg-green-500', 'border-green-500');
-                    circle.classList.add('border-indigo-600', 'text-indigo-600');
-                    text.classList.remove('text-gray-500', 'text-green-600');
-                    text.classList.add('text-indigo-600', 'font-semibold');
+                    stepEl.setAttribute('aria-current', 'step');
+                    circle.classList.remove('border-still-border', 'bg-still-green', 'border-still-green');
+                    circle.classList.add('border-still-copper', 'text-still-copper');
+                    text.classList.remove('text-still-muted', 'text-still-green');
+                    text.classList.add('text-still-copper', 'font-semibold');
                 } else {
                     // Pending
-                    circle.classList.remove('border-indigo-600', 'bg-green-500', 'border-green-500', 'text-indigo-600', 'text-white');
-                    circle.classList.add('border-gray-300');
-                    circle.innerHTML = `<span class="text-sm">${index + 1}</span>`;
-                    text.classList.remove('text-indigo-600', 'text-green-600', 'font-semibold');
-                    text.classList.add('text-gray-500');
+                    stepEl.setAttribute('aria-current', 'false');
+                    circle.classList.remove('border-still-copper', 'bg-still-green', 'border-still-green', 'text-still-copper', 'text-still-text');
+                    circle.classList.add('border-still-border');
+                    circle.innerHTML = `<span class="text-sm text-still-muted">${index + 1}</span>`;
+                    text.classList.remove('text-still-copper', 'text-still-green', 'font-semibold');
+                    text.classList.add('text-still-muted');
                 }
             });
         }
@@ -237,6 +313,7 @@
                 document.getElementById('current-step').textContent = data.current_step || statusInfo.text;
                 document.getElementById('progress-percent').textContent = `${data.progress}%`;
                 document.getElementById('progress-bar').style.width = `${data.progress}%`;
+                document.getElementById('progress-container').setAttribute('aria-valuenow', data.progress);
 
                 if (data.estimated_time_remaining) {
                     document.getElementById('time-remaining').textContent =
@@ -258,14 +335,23 @@
                     document.getElementById('transcript-preview-section').classList.add('hidden');
 
                     document.getElementById('status-icon').innerHTML =
-                        '<svg class="h-10 w-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
-                    document.getElementById('status-icon').classList.remove('bg-indigo-100');
-                    document.getElementById('status-icon').classList.add('bg-green-100');
-                    document.getElementById('status-title').textContent = 'Content Generated!';
-                    document.getElementById('status-message').textContent = 'Your content is ready to view.';
+                        '<svg class="h-10 w-10 text-still-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+                    document.getElementById('status-icon').classList.remove('bg-still-copper/20');
+                    document.getElementById('status-icon').classList.add('bg-still-green/20');
                     document.getElementById('time-remaining').classList.add('hidden');
                     document.getElementById('success-section').classList.remove('hidden');
-                    document.getElementById('view-results-btn').href = `/results.html?job_id=${jobId}`;
+
+                    // Different messaging and redirect for Quick Distill vs regular
+                    if (isQuickDistill) {
+                        document.getElementById('status-title').textContent = 'Stills Saved!';
+                        document.getElementById('status-message').textContent = 'Your stills have been added to the Reserve.';
+                        document.getElementById('view-results-btn').textContent = 'View in Reserve';
+                        document.getElementById('view-results-btn').href = `/reserve.html?job_id=${jobId}`;
+                    } else {
+                        document.getElementById('status-title').textContent = 'Content Generated!';
+                        document.getElementById('status-message').textContent = 'Your content is ready to view.';
+                        document.getElementById('view-results-btn').href = `/results.html?job_id=${jobId}`;
+                    }
                     return; // Stop polling
                 }
 
@@ -276,9 +362,9 @@
                     document.getElementById('transcript-preview-section').classList.add('hidden');
 
                     document.getElementById('status-icon').innerHTML =
-                        '<svg class="h-10 w-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
-                    document.getElementById('status-icon').classList.remove('bg-indigo-100');
-                    document.getElementById('status-icon').classList.add('bg-red-100');
+                        '<svg class="h-10 w-10 text-still-error" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+                    document.getElementById('status-icon').classList.remove('bg-still-copper/20');
+                    document.getElementById('status-icon').classList.add('bg-still-error/20');
                     document.getElementById('status-title').textContent = 'Processing Failed';
                     document.getElementById('status-message').textContent = 'Something went wrong.';
                     document.getElementById('time-remaining').classList.add('hidden');

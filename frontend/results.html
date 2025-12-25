@@ -114,23 +114,23 @@
             <div class="flex gap-4 items-center">
                 <!-- Export Dropdown -->
                 <div class="relative" id="export-dropdown">
-                    <button onclick="toggleExportMenu()" class="flex items-center gap-2 px-4 py-2 border border-still-border rounded-lg hover:bg-still-card text-still-text transition">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <button onclick="toggleExportMenu()" class="flex items-center gap-2 px-4 py-2 border border-still-border rounded-lg hover:bg-still-card text-still-text transition" aria-haspopup="true" aria-expanded="false" aria-controls="export-menu">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                         </svg>
                         Export
                     </button>
-                    <div id="export-menu" class="hidden absolute right-0 mt-2 w-48 bg-still-card rounded-lg shadow-lg border border-still-border z-10">
-                        <a href="#" onclick="exportAs('markdown')" class="block px-4 py-2 text-still-muted hover:bg-still-border hover:text-still-text">
+                    <div id="export-menu" class="hidden absolute right-0 mt-2 w-48 bg-still-card rounded-lg shadow-lg border border-still-border z-10" role="menu" aria-label="Export options">
+                        <a href="#" onclick="exportAs('markdown')" class="block px-4 py-2 text-still-muted hover:bg-still-border hover:text-still-text" role="menuitem">
                             Download as Markdown
                         </a>
-                        <a href="#" onclick="exportAs('json')" class="block px-4 py-2 text-still-muted hover:bg-still-border hover:text-still-text">
+                        <a href="#" onclick="exportAs('json')" class="block px-4 py-2 text-still-muted hover:bg-still-border hover:text-still-text" role="menuitem">
                             Download as JSON
                         </a>
-                        <a href="#" onclick="exportAs('docx')" class="block px-4 py-2 text-still-muted hover:bg-still-border hover:text-still-text">
+                        <a href="#" onclick="exportAs('docx')" class="block px-4 py-2 text-still-muted hover:bg-still-border hover:text-still-text" role="menuitem">
                             Download as Word
                         </a>
-                        <a href="#" onclick="exportAs('zip')" class="block px-4 py-2 text-still-muted hover:bg-still-border hover:text-still-text border-t border-still-border">
+                        <a href="#" onclick="exportAs('zip')" class="block px-4 py-2 text-still-muted hover:bg-still-border hover:text-still-text border-t border-still-border" role="menuitem">
                             Download All (ZIP)
                         </a>
                     </div>
@@ -143,12 +143,12 @@
         </div>
 
         <!-- Tabs -->
-        <div class="mb-6 border-b border-still-border">
+        <div class="mb-6 border-b border-still-border" role="tablist" aria-label="Results view">
             <div class="flex space-x-8">
-                <button class="tab-btn px-1 pb-4 border-b-2 border-still-copper text-still-copper font-medium" data-tab="outputs">
+                <button class="tab-btn px-1 pb-4 border-b-2 border-still-copper text-still-copper font-medium" data-tab="outputs" role="tab" aria-selected="true" aria-controls="outputs-tab" id="tab-outputs">
                     Generated Content
                 </button>
-                <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-still-muted hover:text-still-text" data-tab="atoms">
+                <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-still-muted hover:text-still-text" data-tab="atoms" role="tab" aria-selected="false" aria-controls="atoms-tab" id="tab-atoms">
                     Extracted Atoms
                 </button>
             </div>
@@ -161,20 +161,20 @@
         </div>
 
         <!-- Outputs Tab -->
-        <div id="outputs-tab" class="hidden">
+        <div id="outputs-tab" class="hidden" role="tabpanel" aria-labelledby="tab-outputs">
             <div id="outputs-container" class="space-y-6"></div>
         </div>
 
         <!-- Atoms Tab -->
-        <div id="atoms-tab" class="hidden">
-            <div class="mb-4 flex flex-wrap gap-2">
-                <button class="atom-filter px-3 py-1 rounded-full bg-still-border text-still-muted text-sm" data-type="all">All</button>
-                <button class="atom-filter px-3 py-1 rounded-full atom-data text-sm" data-type="data">Data</button>
-                <button class="atom-filter px-3 py-1 rounded-full bg-still-green/30 text-still-green text-sm" data-type="story">Stories</button>
-                <button class="atom-filter px-3 py-1 rounded-full atom-insight text-sm" data-type="insight">Insights</button>
-                <button class="atom-filter px-3 py-1 rounded-full bg-still-error/30 text-still-error text-sm" data-type="problem">Problems</button>
-                <button class="atom-filter px-3 py-1 rounded-full bg-still-amber/30 text-still-amber text-sm" data-type="solution">Solutions</button>
-                <button class="atom-filter px-3 py-1 rounded-full bg-still-copper/30 text-still-copper text-sm" data-type="quote">Quotes</button>
+        <div id="atoms-tab" class="hidden" role="tabpanel" aria-labelledby="tab-atoms">
+            <div class="mb-4 flex flex-wrap gap-2" role="group" aria-label="Filter atoms by type">
+                <button class="atom-filter px-3 py-1 rounded-full bg-still-border text-still-muted text-sm" data-type="all" aria-pressed="true">All</button>
+                <button class="atom-filter px-3 py-1 rounded-full atom-data text-sm" data-type="data" aria-pressed="false">Data</button>
+                <button class="atom-filter px-3 py-1 rounded-full bg-still-green/30 text-still-green text-sm" data-type="story" aria-pressed="false">Stories</button>
+                <button class="atom-filter px-3 py-1 rounded-full atom-insight text-sm" data-type="insight" aria-pressed="false">Insights</button>
+                <button class="atom-filter px-3 py-1 rounded-full bg-still-error/30 text-still-error text-sm" data-type="problem" aria-pressed="false">Problems</button>
+                <button class="atom-filter px-3 py-1 rounded-full bg-still-amber/30 text-still-amber text-sm" data-type="solution" aria-pressed="false">Solutions</button>
+                <button class="atom-filter px-3 py-1 rounded-full bg-still-copper/30 text-still-copper text-sm" data-type="quote" aria-pressed="false">Quotes</button>
             </div>
             <div id="atoms-container" class="grid md:grid-cols-2 gap-4"></div>
         </div>
@@ -409,7 +409,10 @@
 
         // Export functions
         function toggleExportMenu() {
-            document.getElementById('export-menu').classList.toggle('hidden');
+            const menu = document.getElementById('export-menu');
+            const btn = document.querySelector('[aria-controls="export-menu"]');
+            const isHidden = menu.classList.toggle('hidden');
+            btn.setAttribute('aria-expanded', !isHidden);
         }
 
         // Close export menu when clicking outside
@@ -417,6 +420,8 @@
             const dropdown = document.getElementById('export-dropdown');
             if (!dropdown.contains(e.target)) {
                 document.getElementById('export-menu').classList.add('hidden');
+                const btn = document.querySelector('[aria-controls="export-menu"]');
+                if (btn) btn.setAttribute('aria-expanded', 'false');
             }
         });
 
@@ -471,9 +476,11 @@
                 document.querySelectorAll('.tab-btn').forEach(b => {
                     b.classList.remove('border-still-copper', 'text-still-copper');
                     b.classList.add('border-transparent', 'text-still-muted');
+                    b.setAttribute('aria-selected', 'false');
                 });
                 btn.classList.remove('border-transparent', 'text-still-muted');
                 btn.classList.add('border-still-copper', 'text-still-copper');
+                btn.setAttribute('aria-selected', 'true');
 
                 document.getElementById('outputs-tab').classList.toggle('hidden', tab !== 'outputs');
                 document.getElementById('atoms-tab').classList.toggle('hidden', tab !== 'atoms');
@@ -488,8 +495,10 @@
 
                 document.querySelectorAll('.atom-filter').forEach(b => {
                     b.classList.remove('ring-2', 'ring-offset-2', 'ring-still-copper', 'ring-offset-still-bg');
+                    b.setAttribute('aria-pressed', 'false');
                 });
                 btn.classList.add('ring-2', 'ring-offset-2', 'ring-still-copper', 'ring-offset-still-bg');
+                btn.setAttribute('aria-pressed', 'true');
             });
         });
 
