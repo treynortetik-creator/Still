@@ -1,6 +1,216 @@
 /* ContentMultiplier Custom Styles */
 
-/* Tailwind utilities that need CSS */
+/* ============================================
+   CSS VARIABLES - THEME COLORS
+   ============================================ */
+
+:root {
+    /* Dark theme (default) */
+    --still-bg: #0D0D0D;
+    --still-card: #1A1A1A;
+    --still-border: #2A2A2A;
+    --still-text: #F5F5F5;
+    --still-muted: #A3A3A3;
+    --still-disabled: #737373;
+
+    /* Accent colors (same for both themes) */
+    --still-copper: #B87333;
+    --still-copper-hover: #A66329;
+    --still-amber: #D4A574;
+    --still-green: #4A7C59;
+    --still-error: #C45C4A;
+
+    /* Gradient colors */
+    --still-gradient-start: #B87333;
+    --still-gradient-end: #D4A574;
+    --still-gradient-hover-start: #A66329;
+    --still-gradient-hover-end: #C49464;
+
+    /* Scrollbar */
+    --scrollbar-track: #2A2A2A;
+    --scrollbar-thumb: #4A4A4A;
+    --scrollbar-thumb-hover: #5A5A5A;
+
+    /* Focus ring */
+    --focus-ring: #6366f1;
+
+    /* Skeleton loading */
+    --skeleton-base: #2A2A2A;
+    --skeleton-highlight: #3A3A3A;
+
+    /* Modal backdrop */
+    --backdrop-color: rgba(0, 0, 0, 0.7);
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3);
+
+    /* Hover lift shadow */
+    --hover-lift-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+
+    /* Platform colors - dark theme */
+    --platform-linkedin-bg: rgba(59, 130, 246, 0.2);
+    --platform-linkedin-text: #60A5FA;
+    --platform-linkedin-border: #3B82F6;
+    --platform-twitter-bg: rgba(99, 102, 241, 0.2);
+    --platform-twitter-text: #818CF8;
+    --platform-twitter-border: #6366F1;
+    --platform-email-bg: rgba(168, 85, 247, 0.2);
+    --platform-email-text: #C084FC;
+    --platform-email-border: #A855F7;
+    --platform-midjourney-bg: rgba(59, 130, 246, 0.2);
+    --platform-midjourney-text: #60A5FA;
+    --platform-midjourney-border: #3B82F6;
+    --platform-dalle-bg: rgba(34, 197, 94, 0.2);
+    --platform-dalle-text: #4ADE80;
+    --platform-dalle-border: #22C55E;
+    --platform-stable-diffusion-bg: rgba(168, 85, 247, 0.2);
+    --platform-stable-diffusion-text: #C084FC;
+    --platform-stable-diffusion-border: #A855F7;
+
+    /* Content type colors */
+    --atom-data-bg: rgba(59, 130, 246, 0.2);
+    --atom-data-text: #60A5FA;
+    --atom-insight-bg: rgba(168, 85, 247, 0.2);
+    --atom-insight-text: #C084FC;
+    --atom-quote-bg: rgba(168, 85, 247, 0.2);
+    --atom-quote-text: #C084FC;
+    --atom-stat-bg: rgba(34, 197, 94, 0.2);
+    --atom-stat-text: #4ADE80;
+
+    /* Score colors */
+    --score-high-bg: rgba(59, 130, 246, 0.15);
+    --score-high-text: #60A5FA;
+    --score-high-border: #3B82F6;
+}
+
+/* Light theme overrides */
+[data-theme="light"] {
+    --still-bg: #FFFFFF;
+    --still-card: #F8F9FA;
+    --still-border: #E2E8F0;
+    --still-text: #1F2937;
+    --still-muted: #6B7280;
+    --still-disabled: #9CA3AF;
+
+    /* Slightly adjusted accents for better contrast on light */
+    --still-copper: #B87333;
+    --still-copper-hover: #9A5F2A;
+    --still-amber: #C49464;
+    --still-green: #3D6B4A;
+    --still-error: #B54A3A;
+
+    /* Scrollbar */
+    --scrollbar-track: #F1F5F9;
+    --scrollbar-thumb: #CBD5E1;
+    --scrollbar-thumb-hover: #94A3B8;
+
+    /* Focus ring */
+    --focus-ring: #3B82F6;
+
+    /* Skeleton loading */
+    --skeleton-base: #E2E8F0;
+    --skeleton-highlight: #F1F5F9;
+
+    /* Modal backdrop */
+    --backdrop-color: rgba(0, 0, 0, 0.5);
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+
+    /* Hover lift shadow */
+    --hover-lift-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+
+    /* Platform colors - light theme */
+    --platform-linkedin-bg: rgba(59, 130, 246, 0.1);
+    --platform-linkedin-text: #2563EB;
+    --platform-linkedin-border: #3B82F6;
+    --platform-twitter-bg: rgba(99, 102, 241, 0.1);
+    --platform-twitter-text: #4F46E5;
+    --platform-twitter-border: #6366F1;
+    --platform-email-bg: rgba(168, 85, 247, 0.1);
+    --platform-email-text: #7C3AED;
+    --platform-email-border: #A855F7;
+    --platform-midjourney-bg: rgba(59, 130, 246, 0.1);
+    --platform-midjourney-text: #2563EB;
+    --platform-midjourney-border: #3B82F6;
+    --platform-dalle-bg: rgba(34, 197, 94, 0.1);
+    --platform-dalle-text: #16A34A;
+    --platform-dalle-border: #22C55E;
+    --platform-stable-diffusion-bg: rgba(168, 85, 247, 0.1);
+    --platform-stable-diffusion-text: #7C3AED;
+    --platform-stable-diffusion-border: #A855F7;
+
+    /* Content type colors - light theme */
+    --atom-data-bg: rgba(59, 130, 246, 0.1);
+    --atom-data-text: #2563EB;
+    --atom-insight-bg: rgba(168, 85, 247, 0.1);
+    --atom-insight-text: #7C3AED;
+    --atom-quote-bg: rgba(168, 85, 247, 0.1);
+    --atom-quote-text: #7C3AED;
+    --atom-stat-bg: rgba(34, 197, 94, 0.1);
+    --atom-stat-text: #16A34A;
+
+    /* Score colors - light theme */
+    --score-high-bg: rgba(59, 130, 246, 0.1);
+    --score-high-text: #2563EB;
+    --score-high-border: #3B82F6;
+}
+
+/* ============================================
+   STILL BRAND COLORS - COPPER GRADIENT
+   ============================================ */
+
+.copper-gradient {
+    background: linear-gradient(135deg, var(--still-gradient-start) 0%, var(--still-gradient-end) 100%);
+}
+
+.copper-gradient:hover {
+    background: linear-gradient(135deg, var(--still-gradient-hover-start) 0%, var(--still-gradient-hover-end) 100%);
+}
+
+.copper-gradient-text {
+    background: linear-gradient(135deg, var(--still-gradient-start) 0%, var(--still-gradient-end) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* ============================================
+   THEME TOGGLE BUTTON
+   ============================================ */
+
+.theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: transparent;
+    border: 1px solid var(--still-border);
+    color: var(--still-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.theme-toggle:hover {
+    background: var(--still-border);
+    color: var(--still-text);
+}
+
+.theme-toggle svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* ============================================
+   TAILWIND UTILITIES THAT NEED CSS
+   ============================================ */
+
 .line-clamp-3 {
     display: -webkit-box;
     -webkit-line-clamp: 3;
@@ -8,9 +218,13 @@
     overflow: hidden;
 }
 
-/* Prose styling for rendered content */
+/* ============================================
+   PROSE STYLING FOR RENDERED CONTENT
+   ============================================ */
+
 .prose {
     max-width: 65ch;
+    color: var(--still-text);
 }
 
 .prose h2 {
@@ -18,6 +232,7 @@
     font-weight: 600;
     margin-top: 1.5rem;
     margin-bottom: 0.75rem;
+    color: var(--still-text);
 }
 
 .prose p {
@@ -34,7 +249,10 @@
     margin-bottom: 0.25rem;
 }
 
-/* Animation utilities */
+/* ============================================
+   ANIMATION UTILITIES
+   ============================================ */
+
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
@@ -44,48 +262,75 @@
     animation: fadeIn 0.3s ease-out;
 }
 
-/* Custom scrollbar */
+/* Theme transition animation */
+html {
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+html * {
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+/* Disable transitions on page load to prevent flash */
+html.no-transitions,
+html.no-transitions * {
+    transition: none !important;
+}
+
+/* ============================================
+   CUSTOM SCROLLBAR
+   ============================================ */
+
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-    background: #f1f1f1;
+    background: var(--scrollbar-track);
     border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
+    background: var(--scrollbar-thumb);
     border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #a1a1a1;
+    background: var(--scrollbar-thumb-hover);
 }
 
-/* Focus states */
+/* ============================================
+   FOCUS STATES
+   ============================================ */
+
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-    outline: 2px solid #6366f1;
+    outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
 }
 
-/* Card hover effects */
+/* ============================================
+   CARD HOVER EFFECTS
+   ============================================ */
+
 .hover-lift {
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .hover-lift:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--hover-lift-shadow);
 }
 
-/* Loading skeleton */
+/* ============================================
+   LOADING SKELETON
+   ============================================ */
+
 .skeleton {
-    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background: linear-gradient(90deg, var(--skeleton-base) 25%, var(--skeleton-highlight) 50%, var(--skeleton-base) 75%);
     background-size: 200% 100%;
     animation: skeleton-loading 1.5s infinite;
 }
@@ -95,7 +340,10 @@ textarea:focus-visible {
     100% { background-position: -200% 0; }
 }
 
-/* Toast notification */
+/* ============================================
+   TOAST NOTIFICATION
+   ============================================ */
+
 .toast {
     animation: slideIn 0.3s ease;
 }
@@ -105,18 +353,55 @@ textarea:focus-visible {
     to { transform: translateX(0); opacity: 1; }
 }
 
-/* Modal backdrop */
+/* ============================================
+   MODAL BACKDROP
+   ============================================ */
+
 .modal-backdrop {
     backdrop-filter: blur(4px);
+    background: var(--backdrop-color);
 }
 
-/* Print styles */
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+
 @media print {
-    nav, button, .no-print {
+    nav, button, .no-print, .theme-toggle {
         display: none !important;
     }
 
     .prose {
         max-width: none;
     }
+
+    /* Force light colors for printing */
+    * {
+        background: white !important;
+        color: black !important;
+    }
+}
+
+/* ============================================
+   PLATFORM COLOR UTILITIES
+   ============================================ */
+
+.platform-linkedin { background: var(--platform-linkedin-bg); color: var(--platform-linkedin-text); }
+.platform-twitter { background: var(--platform-twitter-bg); color: var(--platform-twitter-text); }
+.platform-email { background: var(--platform-email-bg); color: var(--platform-email-text); }
+.platform-midjourney { background: var(--platform-midjourney-bg); color: var(--platform-midjourney-text); }
+.platform-dalle { background: var(--platform-dalle-bg); color: var(--platform-dalle-text); }
+.platform-stable-diffusion { background: var(--platform-stable-diffusion-bg); color: var(--platform-stable-diffusion-text); }
+
+.atom-data { background: var(--atom-data-bg); color: var(--atom-data-text); }
+.atom-insight { background: var(--atom-insight-bg); color: var(--atom-insight-text); }
+.atom-quote { background: var(--atom-quote-bg); color: var(--atom-quote-text); }
+.atom-stat { background: var(--atom-stat-bg); color: var(--atom-stat-text); }
+
+.score-high { background: var(--score-high-bg); color: var(--score-high-text); border-color: var(--score-high-border); }
+
+/* Email header styling */
+.email-header {
+    background: var(--platform-email-bg);
+    border-color: var(--platform-email-border);
 }
