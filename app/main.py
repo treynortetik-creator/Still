@@ -7,14 +7,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from pathlib import Path
 
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from datetime import datetime
 
 from app.config import get_settings
 from app.database import init_db
-from app.api import upload, jobs, library, admin, auth, personas
-from app.api import admin_views
+from app.api import upload, jobs, library, admin, auth, personas, export, feedback, edit
+from app.api import admin_views, swipes, memory, brand_voice, remix, custom_personas, batch, analytics
+from app.api import webhooks, calendar, autopilot, sommelier, workshop
 
 settings = get_settings()
 
@@ -29,6 +31,30 @@ def get_user_id_or_ip(request: Request) -> str:
     return get_remote_address(request)
 
 limiter = Limiter(key_func=get_user_id_or_ip)
+
+
+def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    """Custom handler for rate limit exceeded errors with clear reset time."""
+    # Parse the retry-after header if available
+    retry_after = getattr(exc, 'retry_after', 60)
+
+    # Calculate reset time
+    reset_time = datetime.utcnow().timestamp() + retry_after
+
+    return JSONResponse(
+        status_code=429,
+        content={
+            "error": "rate_limit_exceeded",
+            "message": f"Rate limit exceeded: {exc.detail}",
+            "retry_after_seconds": retry_after,
+            "reset_at": datetime.utcfromtimestamp(reset_time).isoformat() + "Z",
+            "limits": {
+                "uploads": "10 per hour",
+                "api_calls": "100 per hour"
+            }
+        },
+        headers={"Retry-After": str(retry_after)}
+    )
 
 
 @asynccontextmanager
@@ -52,10 +78,17 @@ async def lifespan(app: FastAPI):
     await init_prompts_from_files()
     print("Prompt templates loaded")
 
+    # Start autopilot scheduler
+    from app.services.scheduler import start_scheduler, stop_scheduler
+    await start_scheduler()
+
     yield
 
     # Shutdown
     print("Shutting down ContentMultiplier...")
+
+    # Stop autopilot scheduler
+    await stop_scheduler()
 
 
 app = FastAPI(
@@ -67,14 +100,16 @@ app = FastAPI(
 
 # Add rate limiter to app state
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
-# CORS middleware
+# CORS middleware - use allowed_origins from settings
+# In production, set ALLOWED_ORIGINS env var to comma-separated list of domains
+cors_origins = [origin.strip() for origin in settings.allowed_origins.split(",") if origin.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -87,6 +122,21 @@ app.include_router(personas.router, prefix="/api", tags=["personas"])
 # Register admin views FIRST so HTML pages take priority over API responses
 app.include_router(admin_views.router, prefix="/admin", tags=["admin-views"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin-api"])
+app.include_router(export.router, prefix="/api", tags=["export"])
+app.include_router(feedback.router, prefix="/api", tags=["feedback"])
+app.include_router(edit.router, prefix="/api", tags=["edit"])
+app.include_router(swipes.router, prefix="/api", tags=["swipes"])
+app.include_router(memory.router, prefix="/api", tags=["memory"])
+app.include_router(brand_voice.router, prefix="/api", tags=["brand-voice"])
+app.include_router(remix.router, prefix="/api", tags=["remix"])
+app.include_router(custom_personas.router, prefix="/api", tags=["custom-personas"])
+app.include_router(batch.router, prefix="/api", tags=["batch"])
+app.include_router(analytics.router, prefix="/api", tags=["analytics"])
+app.include_router(webhooks.router, prefix="/api", tags=["webhooks"])
+app.include_router(calendar.router, prefix="/api", tags=["calendar"])
+app.include_router(autopilot.router, prefix="/api", tags=["autopilot"])
+app.include_router(sommelier.router, prefix="/api", tags=["sommelier"])
+app.include_router(workshop.router, prefix="/api", tags=["workshop"])
 
 # Frontend path
 frontend_path = Path(__file__).parent.parent / "frontend"
@@ -129,14 +179,74 @@ async def serve_results():
 
 @app.get("/library.html")
 async def serve_library():
-    """Serve library page."""
-    return FileResponse(frontend_path / "library.html")
+    """Serve library page (legacy redirect to Reserve)."""
+    return FileResponse(frontend_path / "reserve.html")
+
+
+@app.get("/reserve.html")
+async def serve_reserve():
+    """Serve the Reserve page."""
+    return FileResponse(frontend_path / "reserve.html")
 
 
 @app.get("/settings.html")
 async def serve_settings():
     """Serve settings page."""
     return FileResponse(frontend_path / "settings.html")
+
+
+@app.get("/swipes.html")
+async def serve_swipes():
+    """Serve swipe files page."""
+    return FileResponse(frontend_path / "swipes.html")
+
+
+@app.get("/remix.html")
+async def serve_remix():
+    """Serve content remix page."""
+    return FileResponse(frontend_path / "remix.html")
+
+
+@app.get("/personas.html")
+async def serve_personas():
+    """Serve personas management page."""
+    return FileResponse(frontend_path / "personas.html")
+
+
+@app.get("/analytics.html")
+async def serve_analytics():
+    """Serve analytics dashboard page."""
+    return FileResponse(frontend_path / "analytics.html")
+
+
+@app.get("/batch-status.html")
+async def serve_batch_status():
+    """Serve batch status page."""
+    return FileResponse(frontend_path / "batch-status.html")
+
+
+@app.get("/calendar.html")
+async def serve_calendar():
+    """Serve content calendar page."""
+    return FileResponse(frontend_path / "calendar.html")
+
+
+@app.get("/autopilot.html")
+async def serve_autopilot():
+    """Serve autopilot monitors page."""
+    return FileResponse(frontend_path / "autopilot.html")
+
+
+@app.get("/brand-voice.html")
+async def serve_brand_voice():
+    """Serve brand voice configuration page."""
+    return FileResponse(frontend_path / "brand-voice.html")
+
+
+@app.get("/workshop.html")
+async def serve_workshop():
+    """Serve the Workshop content editing page."""
+    return FileResponse(frontend_path / "workshop.html")
 
 
 @app.get("/")

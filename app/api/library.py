@@ -1,4 +1,4 @@
-"""Content library API endpoints."""
+"""The Reserve (content library) API endpoints."""
 import json
 import uuid
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends
@@ -16,9 +16,9 @@ async def get_library(
     entry_type: Optional[str] = Query(None, description="Filter by entry type"),
     persona: Optional[str] = Query(None, description="Filter by persona relevance"),
     min_relevance: int = Query(1, description="Minimum relevance score (1-5)"),
-    search: Optional[str] = Query(None, description="Search in content"),
-    limit: int = Query(50, description="Number of results"),
-    offset: int = Query(0, description="Offset for pagination"),
+    search: Optional[str] = Query(None, description="Search in content", max_length=200),
+    limit: int = Query(50, description="Number of results", ge=1, le=100),
+    offset: int = Query(0, description="Offset for pagination", ge=0),
     user_id: int = Depends(get_current_user_id),
 ):
     """
@@ -141,47 +141,50 @@ async def get_library_stats(user_id: int = Depends(get_current_user_id)):
 @router.post("/generate-from-library", response_model=JobResponse)
 async def generate_from_library(
     background_tasks: BackgroundTasks,
-    atom_ids: list[int],
-    target_persona: str,
+    still_ids: list[int] = None,
+    atom_ids: list[int] = None,  # Keep for backwards compatibility
+    target_persona: str = None,
     asset_types: list[str] = ["linkedin"],
     asset_quantities: dict[str, int] = {"linkedin": 2},
     user_id: int = Depends(get_current_user_id),
 ):
     """
-    Generate new content using existing library entries.
+    Generate new content using existing Reserve stills.
 
-    Select atoms from the library and generate content without uploading new source material.
+    Select stills from the Reserve and generate content without uploading new source material.
     """
-    if not atom_ids:
-        raise HTTPException(status_code=400, detail="Must provide at least one atom ID")
+    # Support both still_ids and atom_ids for backwards compatibility
+    ids_to_use = still_ids or atom_ids
+    if not ids_to_use:
+        raise HTTPException(status_code=400, detail="Must provide at least one still ID")
 
     async with get_db() as db:
-        # Verify atoms exist and get their content
-        placeholders = ",".join("?" * len(atom_ids))
+        # Verify stills exist and get their content
+        placeholders = ",".join("?" * len(ids_to_use))
         cursor = await db.execute(
             f"""
             SELECT id, entry_type, content, persona_relevance
             FROM content_library
             WHERE id IN ({placeholders}) AND user_id = ?
             """,
-            (*atom_ids, user_id)
+            (*ids_to_use, user_id)
         )
-        atoms = await cursor.fetchall()
+        stills = await cursor.fetchall()
 
-        if len(atoms) != len(atom_ids):
-            raise HTTPException(status_code=404, detail="Some atoms not found")
+        if len(stills) != len(ids_to_use):
+            raise HTTPException(status_code=404, detail="Some stills not found")
 
-        # Create a new job for library generation
+        # Create a new job for Reserve generation
         job_id = str(uuid.uuid4())
 
-        # Prepare atom content for the job
-        atom_content = []
-        for atom in atoms:
-            atom_content.append({
-                "id": atom["id"],
-                "type": atom["entry_type"],
-                "content": atom["content"],
-                "persona_relevance": json.loads(atom["persona_relevance"]) if atom["persona_relevance"] else {},
+        # Prepare still content for the job
+        still_content = []
+        for still in stills:
+            still_content.append({
+                "id": still["id"],
+                "type": still["entry_type"],
+                "content": still["content"],
+                "persona_relevance": json.loads(still["persona_relevance"]) if still["persona_relevance"] else {},
             })
 
         await db.execute(
@@ -196,39 +199,39 @@ async def generate_from_library(
                 job_id,
                 user_id,
                 JobStatus.DRAFTING.value,
-                "library_generation",
+                "reserve_generation",
                 "library",
                 target_persona,
                 json.dumps(asset_types),
                 json.dumps(asset_quantities),
                 "autopilot",
-                "Generating from library atoms",
+                "Generating from Reserve stills",
                 40,
-                json.dumps(atom_content),  # Store atom content as transcript
+                json.dumps(still_content),  # Store still content as transcript
             )
         )
         await db.commit()
 
-        # Update usage stats for the atoms
-        for atom_id in atom_ids:
+        # Update usage stats for the stills
+        for still_id in ids_to_use:
             await db.execute(
                 """
                 UPDATE content_library
                 SET times_used = times_used + 1, last_used = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
-                (atom_id,)
+                (still_id,)
             )
         await db.commit()
 
-    # Start background processing (skip transcription and atomization)
+    # Start background processing (skip transcription and distillation)
     from app.services.pipeline import process_job_from_library
-    background_tasks.add_task(process_job_from_library, job_id, atom_content)
+    background_tasks.add_task(process_job_from_library, job_id, still_content)
 
     return JobResponse(
         job_id=job_id,
         status=JobStatus.DRAFTING,
-        message="Generating content from library atoms."
+        message="Generating content from Reserve stills."
     )
 
 

@@ -14,6 +14,7 @@ from app.services.auth import (
     verify_password,
     create_access_token,
     decode_access_token,
+    decode_access_token_async,
     blacklist_token,
     validate_email,
     validate_password,
@@ -158,7 +159,7 @@ async def logout(authorization: Optional[str] = Header(None)):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
 
     token = parts[1]
-    blacklist_token(token)
+    await blacklist_token(token)
 
     return {"message": "Logged out successfully"}
 
@@ -176,7 +177,8 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
 
     token = parts[1]
-    payload = decode_access_token(token)
+    # Use async version that checks blacklist
+    payload = await decode_access_token_async(token)
 
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
@@ -225,3 +227,73 @@ async def get_current_user_id(authorization: Optional[str] = Header(None)) -> in
         raise HTTPException(status_code=401, detail="Invalid token payload")
 
     return int(user_id)
+
+
+# Admin authentication dependency
+from app.config import get_settings
+
+async def verify_admin(authorization: Optional[str] = Header(None)) -> bool:
+    """
+    Dependency to verify admin credentials via Basic Auth or Bearer token with admin role.
+    Use in route functions: _: bool = Depends(verify_admin)
+
+    Supports two authentication methods:
+    1. Basic Auth: Authorization: Basic base64(username:password)
+    2. Bearer token with admin claim
+    """
+    settings = get_settings()
+
+    # Check if admin credentials are configured
+    if not settings.admin_username or not settings.admin_password:
+        raise HTTPException(
+            status_code=503,
+            detail="Admin panel is not configured. Set ADMIN_USERNAME and ADMIN_PASSWORD environment variables."
+        )
+
+    if not authorization:
+        raise HTTPException(
+            status_code=401,
+            detail="Admin authentication required",
+            headers={"WWW-Authenticate": "Basic realm='Admin Panel'"}
+        )
+
+    parts = authorization.split()
+    if len(parts) != 2:
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    auth_type = parts[0].lower()
+    credentials = parts[1]
+
+    # Handle Basic Auth
+    if auth_type == "basic":
+        import base64
+        try:
+            decoded = base64.b64decode(credentials).decode("utf-8")
+            username, password = decoded.split(":", 1)
+
+            # Use constant-time comparison to prevent timing attacks
+            import hmac
+            username_match = hmac.compare_digest(username, settings.admin_username)
+            password_match = hmac.compare_digest(password, settings.admin_password)
+
+            if username_match and password_match:
+                return True
+            else:
+                raise HTTPException(status_code=403, detail="Invalid admin credentials")
+        except (ValueError, UnicodeDecodeError):
+            raise HTTPException(status_code=401, detail="Invalid Basic Auth credentials")
+
+    # Handle Bearer token (check for admin role in token)
+    elif auth_type == "bearer":
+        payload = decode_access_token(credentials)
+        if not payload:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        # Check if user has admin role (you can extend this to check database)
+        if payload.get("role") == "admin" or payload.get("is_admin") == True:
+            return True
+        else:
+            raise HTTPException(status_code=403, detail="Admin access required")
+
+    else:
+        raise HTTPException(status_code=401, detail="Unsupported authentication type")
