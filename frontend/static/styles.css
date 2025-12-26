@@ -550,3 +550,133 @@ textarea:focus-visible {
 .glow-border:hover::after {
     opacity: 0.4;
 }
+
+/* ============================================
+   MICRO-ANIMATIONS
+   ============================================ */
+
+/* Fade in with slide */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Subtle pulse for loading/attention */
+@keyframes subtlePulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* Glow pulse for accents */
+@keyframes glowPulse {
+    0%, 100% {
+        box-shadow: var(--glow-copper);
+    }
+    50% {
+        box-shadow: var(--glow-copper-intense);
+    }
+}
+
+/* Shimmer effect for skeletons */
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+/* Gradient shift for hero backgrounds */
+@keyframes gradientShift {
+    0%, 100% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+}
+
+/* Animation utilities */
+.animate-fade-in-up {
+    animation: fadeInUp var(--transition-slow) var(--ease-out) forwards;
+}
+
+.animate-fade-in-down {
+    animation: fadeInDown var(--transition-slow) var(--ease-out) forwards;
+}
+
+.animate-fade-in-scale {
+    animation: fadeInScale var(--transition-slow) var(--ease-out) forwards;
+}
+
+.animate-pulse-subtle {
+    animation: subtlePulse 2s var(--ease-in-out) infinite;
+}
+
+.animate-glow-pulse {
+    animation: glowPulse 2s var(--ease-in-out) infinite;
+}
+
+/* Staggered animation delays */
+.animate-delay-1 { animation-delay: 50ms; }
+.animate-delay-2 { animation-delay: 100ms; }
+.animate-delay-3 { animation-delay: 150ms; }
+.animate-delay-4 { animation-delay: 200ms; }
+.animate-delay-5 { animation-delay: 250ms; }
+
+/* Hover scale effect */
+.hover-scale {
+    transition: transform var(--transition-fast) var(--ease-out);
+}
+
+.hover-scale:hover {
+    transform: scale(1.02);
+}
+
+.hover-scale:active {
+    transform: scale(0.98);
+}
+
+/* Enhanced hover lift */
+.hover-lift-premium {
+    transition: transform var(--transition-base) var(--ease-out),
+                box-shadow var(--transition-base) var(--ease-out);
+}
+
+.hover-lift-premium:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+}
