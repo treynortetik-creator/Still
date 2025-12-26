@@ -461,3 +461,92 @@ textarea:focus-visible {
     background: var(--platform-email-bg);
     border-color: var(--platform-email-border);
 }
+
+/* ============================================
+   GLASSMORPHISM COMPONENTS
+   ============================================ */
+
+.glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur, 12px));
+    -webkit-backdrop-filter: blur(var(--glass-blur, 12px));
+    border: 1px solid var(--glass-border);
+}
+
+.glass-solid {
+    background: var(--glass-bg-solid);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+}
+
+.glass:hover,
+.glass-solid:hover {
+    border-color: var(--glass-border-hover);
+}
+
+/* Premium card with gradient border on hover */
+.card-premium {
+    background: var(--still-card);
+    border: 1px solid var(--still-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    transition: all var(--transition-base) var(--ease-out);
+    position: relative;
+}
+
+.card-premium::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, transparent, transparent);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity var(--transition-base) var(--ease-out);
+    pointer-events: none;
+}
+
+.card-premium:hover {
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
+    border-color: var(--still-border-subtle);
+}
+
+.card-premium:hover::before {
+    background: linear-gradient(135deg, var(--still-copper), var(--still-amber));
+    opacity: 0.6;
+}
+
+/* Elevated card variant */
+.card-elevated {
+    background: var(--still-card-elevated);
+    border: 1px solid var(--still-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+}
+
+/* Glowing border effect */
+.glow-border {
+    position: relative;
+}
+
+.glow-border::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    background: linear-gradient(135deg, var(--still-copper), var(--still-amber));
+    opacity: 0;
+    z-index: -1;
+    filter: blur(8px);
+    transition: opacity var(--transition-base) var(--ease-out);
+}
+
+.glow-border:hover::after {
+    opacity: 0.4;
+}
