@@ -222,10 +222,12 @@
 
 .copper-gradient {
     background: linear-gradient(135deg, var(--still-gradient-start) 0%, var(--still-gradient-end) 100%);
+    transition: all var(--transition-base) var(--ease-out);
 }
 
 .copper-gradient:hover {
     background: linear-gradient(135deg, var(--still-gradient-hover-start) 0%, var(--still-gradient-hover-end) 100%);
+    box-shadow: var(--glow-copper);
 }
 
 .copper-gradient-text {
@@ -233,6 +235,13 @@
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+}
+
+/* Animated gradient background */
+.copper-gradient-animated {
+    background: linear-gradient(135deg, var(--still-gradient-start) 0%, var(--still-gradient-end) 50%, var(--still-copper-hover) 100%);
+    background-size: 200% 200%;
+    animation: gradientShift 6s ease infinite;
 }
 
 /* ============================================
@@ -679,4 +688,595 @@ textarea:focus-visible {
 .hover-lift-premium:hover {
     transform: translateY(-4px);
     box-shadow: var(--shadow-lg);
+}
+
+/* ============================================
+   PREMIUM BUTTONS
+   ============================================ */
+
+/* Base button reset */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all var(--transition-fast) var(--ease-out);
+    outline: none;
+}
+
+.btn:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Primary button - copper gradient with glow */
+.btn-primary {
+    background: linear-gradient(135deg, var(--still-gradient-start), var(--still-gradient-end));
+    color: #FFFFFF;
+    border: none;
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, var(--still-gradient-hover-start), var(--still-gradient-hover-end));
+    box-shadow: var(--glow-copper), var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+    box-shadow: var(--shadow-xs);
+}
+
+/* Secondary button - ghost with border */
+.btn-secondary {
+    background: transparent;
+    color: var(--still-text);
+    border-color: var(--still-border);
+}
+
+.btn-secondary:hover {
+    background: var(--still-card);
+    border-color: var(--still-muted);
+}
+
+/* Ghost button - no border */
+.btn-ghost {
+    background: transparent;
+    color: var(--still-muted);
+    border: none;
+}
+
+.btn-ghost:hover {
+    background: var(--still-card);
+    color: var(--still-text);
+}
+
+/* Copper text button */
+.btn-copper {
+    background: transparent;
+    color: var(--still-copper);
+    border: 1px solid var(--still-copper);
+}
+
+.btn-copper:hover {
+    background: rgba(184, 115, 51, 0.1);
+    box-shadow: var(--glow-copper);
+}
+
+/* Danger button */
+.btn-danger {
+    background: var(--still-error);
+    color: #FFFFFF;
+    border: none;
+}
+
+.btn-danger:hover {
+    background: var(--still-error-muted);
+    box-shadow: var(--glow-error);
+}
+
+/* Icon button */
+.btn-icon {
+    padding: 0.5rem;
+    border-radius: var(--radius-md);
+    color: var(--still-muted);
+    background: transparent;
+    border: none;
+}
+
+.btn-icon:hover {
+    background: var(--still-card);
+    color: var(--still-text);
+}
+
+/* Button sizes */
+.btn-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+}
+
+.btn-lg {
+    padding: 0.875rem 1.75rem;
+    font-size: 1rem;
+}
+
+/* ============================================
+   PREMIUM FORM INPUTS
+   ============================================ */
+
+.input-premium {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: var(--still-card);
+    border: 1px solid var(--still-border);
+    border-radius: var(--radius-md);
+    color: var(--still-text);
+    font-size: 0.875rem;
+    transition: all var(--transition-fast) var(--ease-out);
+}
+
+.input-premium::placeholder {
+    color: var(--still-disabled);
+}
+
+.input-premium:hover {
+    border-color: var(--still-muted);
+}
+
+.input-premium:focus {
+    outline: none;
+    border-color: var(--still-copper);
+    box-shadow: 0 0 0 3px var(--still-copper-glow);
+}
+
+/* Select dropdown */
+.select-premium {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23A1A1AA'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1rem;
+    padding-right: 2.5rem;
+}
+
+/* Checkbox and radio - copper accent */
+.checkbox-premium,
+.radio-premium {
+    width: 1.125rem;
+    height: 1.125rem;
+    accent-color: var(--still-copper);
+    cursor: pointer;
+}
+
+/* ============================================
+   PREMIUM NAVIGATION
+   ============================================ */
+
+.nav-premium {
+    background: var(--glass-bg-solid);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--glass-border);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+}
+
+.nav-link {
+    position: relative;
+    padding: 0.5rem 0.75rem;
+    color: var(--still-muted);
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast) var(--ease-out);
+}
+
+.nav-link:hover {
+    color: var(--still-text);
+    background: var(--still-card-elevated);
+}
+
+.nav-link.active {
+    color: var(--still-copper);
+}
+
+.nav-link.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 24px;
+    height: 2px;
+    background: var(--still-copper);
+    border-radius: var(--radius-full);
+    box-shadow: 0 0 8px var(--still-copper-glow);
+}
+
+/* Theme toggle - premium */
+.theme-toggle-premium {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    background: var(--still-card);
+    border: 1px solid var(--still-border);
+    color: var(--still-muted);
+    cursor: pointer;
+    transition: all var(--transition-fast) var(--ease-out);
+}
+
+.theme-toggle-premium:hover {
+    background: var(--still-card-elevated);
+    color: var(--still-copper);
+    border-color: var(--still-copper);
+    box-shadow: var(--glow-copper);
+}
+
+.theme-toggle-premium svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* ============================================
+   PREMIUM HERO SECTIONS
+   ============================================ */
+
+.hero-premium {
+    background: linear-gradient(135deg, var(--still-gradient-start) 0%, var(--still-gradient-end) 50%, var(--still-copper-hover) 100%);
+    background-size: 200% 200%;
+    animation: gradientShift 8s ease infinite;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-premium::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 30% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.hero-premium::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 120px;
+    background: linear-gradient(to top, var(--still-bg), transparent);
+    pointer-events: none;
+}
+
+/* ============================================
+   PREMIUM PAGE HEADER
+   ============================================ */
+
+.page-header {
+    margin-bottom: 2rem;
+}
+
+.page-title {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: var(--still-text);
+    letter-spacing: -0.025em;
+}
+
+.page-subtitle {
+    color: var(--still-muted);
+    margin-top: 0.25rem;
+}
+
+/* ============================================
+   PREMIUM LOADING STATES
+   ============================================ */
+
+/* Skeleton with shimmer */
+.skeleton-premium {
+    background: linear-gradient(
+        90deg,
+        var(--skeleton-base) 0%,
+        var(--skeleton-highlight) 20%,
+        var(--skeleton-base) 40%,
+        var(--skeleton-base) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite linear;
+    border-radius: var(--radius-md);
+}
+
+/* Premium spinner */
+.spinner-premium {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--still-border);
+    border-top-color: var(--still-copper);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    box-shadow: 0 0 12px var(--still-copper-glow);
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Progress bar */
+.progress-premium {
+    width: 100%;
+    height: 6px;
+    background: var(--still-card);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+}
+
+.progress-premium-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--still-gradient-start), var(--still-gradient-end));
+    border-radius: var(--radius-full);
+    transition: width var(--transition-slow) var(--ease-out);
+    box-shadow: 0 0 8px var(--still-copper-glow);
+}
+
+/* Toast - premium */
+.toast-premium {
+    background: var(--glass-bg-solid);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    padding: 1rem 1.5rem;
+    box-shadow: var(--shadow-lg);
+    animation: fadeInUp var(--transition-slow) var(--ease-out);
+}
+
+.toast-success {
+    border-left: 3px solid var(--still-green);
+}
+
+.toast-error {
+    border-left: 3px solid var(--still-error);
+}
+
+.toast-info {
+    border-left: 3px solid var(--still-copper);
+}
+
+/* ============================================
+   PREMIUM TABS
+   ============================================ */
+
+.tabs-premium {
+    display: flex;
+    gap: 0.5rem;
+    border-bottom: 1px solid var(--still-border);
+    padding-bottom: 0;
+}
+
+.tab-premium {
+    padding: 0.75rem 1rem;
+    color: var(--still-muted);
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all var(--transition-fast) var(--ease-out);
+    cursor: pointer;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+}
+
+.tab-premium:hover {
+    color: var(--still-text);
+}
+
+.tab-premium.active {
+    color: var(--still-copper);
+    border-bottom-color: var(--still-copper);
+}
+
+/* ============================================
+   PREMIUM BADGES & TAGS
+   ============================================ */
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: var(--radius-full);
+    white-space: nowrap;
+}
+
+.badge-copper {
+    background: rgba(184, 115, 51, 0.15);
+    color: var(--still-copper);
+}
+
+.badge-green {
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--still-green);
+}
+
+.badge-amber {
+    background: rgba(212, 165, 116, 0.15);
+    color: var(--still-amber);
+}
+
+.badge-error {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--still-error);
+}
+
+.badge-muted {
+    background: var(--still-card-elevated);
+    color: var(--still-muted);
+}
+
+/* ============================================
+   PREMIUM DROP ZONES
+   ============================================ */
+
+.dropzone-premium {
+    border: 2px dashed var(--still-border);
+    border-radius: var(--radius-lg);
+    padding: 3rem 2rem;
+    text-align: center;
+    background: var(--still-card);
+    transition: all var(--transition-base) var(--ease-out);
+    cursor: pointer;
+}
+
+.dropzone-premium:hover {
+    border-color: var(--still-muted);
+    background: var(--still-card-elevated);
+}
+
+.dropzone-premium.active,
+.dropzone-premium:focus-within {
+    border-color: var(--still-copper);
+    border-style: solid;
+    background: rgba(184, 115, 51, 0.05);
+    box-shadow: 0 0 0 4px var(--still-copper-glow);
+}
+
+.dropzone-icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 1rem;
+    color: var(--still-muted);
+    transition: all var(--transition-base) var(--ease-out);
+}
+
+.dropzone-premium:hover .dropzone-icon,
+.dropzone-premium.active .dropzone-icon {
+    color: var(--still-copper);
+    transform: scale(1.1);
+}
+
+/* ============================================
+   EMPTY STATES
+   ============================================ */
+
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+}
+
+.empty-state-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 1.5rem;
+    color: var(--still-disabled);
+}
+
+.empty-state-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--still-text);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state-text {
+    color: var(--still-muted);
+    max-width: 24rem;
+    margin: 0 auto;
+}
+
+/* ============================================
+   DIVIDERS
+   ============================================ */
+
+.divider {
+    height: 1px;
+    background: var(--still-border);
+    margin: 1.5rem 0;
+}
+
+.divider-vertical {
+    width: 1px;
+    height: 100%;
+    background: var(--still-border);
+    margin: 0 1rem;
+}
+
+/* ============================================
+   SCROLLBAR REFINEMENTS
+   ============================================ */
+
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+    border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: var(--radius-full);
+    border: 2px solid var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+}
+
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+/* ============================================
+   FOCUS VISIBLE REFINEMENTS
+   ============================================ */
+
+:focus-visible {
+    outline: 2px solid var(--still-copper);
+    outline-offset: 2px;
+}
+
+/* Remove focus for mouse users */
+:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* ============================================
+   SELECTION COLORS
+   ============================================ */
+
+::selection {
+    background: var(--still-copper);
+    color: #FFFFFF;
+}
+
+::-moz-selection {
+    background: var(--still-copper);
+    color: #FFFFFF;
 }
