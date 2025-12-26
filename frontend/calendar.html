@@ -38,6 +38,7 @@
     <link rel="stylesheet" href="/static/styles.css">
     <script src="/static/utils.js"></script>
     <script src="/static/auth.js"></script>
+    <script src="/static/components.js"></script>
     <script>
         window.addEventListener('load', () => {
             document.documentElement.classList.remove('no-transitions');
@@ -46,38 +47,7 @@
 </head>
 <body class="bg-still-bg min-h-screen font-sans">
     <!-- Navigation -->
-    <nav class="bg-still-card shadow-sm border-b border-still-border">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <a href="/" class="flex items-center">
-                        <img src="/static/images/Still Logo.svg" alt="Still" class="h-12">
-                    </a>
-                </div>
-                <div class="hidden md:flex items-center space-x-4">
-                    <a href="/upload.html" class="text-still-muted hover:text-still-text px-3 py-2">Upload</a>
-                    <a href="/reserve.html" class="text-still-muted hover:text-still-text px-3 py-2">Reserve</a>
-                    <a href="/workshop.html" class="text-still-muted hover:text-still-text px-3 py-2">Workshop</a>
-                    <a href="/calendar.html" class="text-still-copper font-medium px-3 py-2">Calendar</a>
-                    <a href="/autopilot.html" class="text-still-muted hover:text-still-text px-3 py-2">Autopilot</a>
-                    <a href="/analytics.html" class="text-still-muted hover:text-still-text px-3 py-2">Analytics</a>
-                    <a href="/settings.html" class="text-still-muted hover:text-still-text px-3 py-2">Settings</a>
-                </div>
-                <div class="flex items-center space-x-3">
-                    <!-- Theme Toggle -->
-                    <button onclick="ThemeManager.toggle()" class="theme-toggle" title="Toggle light/dark mode">
-                        <svg class="theme-icon-sun" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
-                        </svg>
-                        <svg class="theme-icon-moon hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
-                        </svg>
-                    </button>
-                    <div id="navbar-user" class="flex items-center"></div>
-                </div>
-            </div>
-        </div>
-    </nav>
+    <div id="nav-container"></div>
 
     <div class="max-w-7xl mx-auto px-4 py-8">
         <!-- Header -->
@@ -155,18 +125,18 @@
                     <div>
                         <label class="block text-sm font-medium text-still-muted mb-1">Date</label>
                         <input type="date" id="schedule-date" required
-                            class="w-full border border-still-border rounded-lg p-2 bg-still-bg text-still-text">
+              class="w-full rounded-lg p-2 input-premium" >
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-still-muted mb-1">Time</label>
                         <input type="time" id="schedule-time" value="09:00"
-                            class="w-full border border-still-border rounded-lg p-2 bg-still-bg text-still-text">
+              class="w-full rounded-lg p-2 input-premium" >
                     </div>
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-still-muted mb-1">Platform</label>
-                    <select id="schedule-platform" class="w-full border border-still-border rounded-lg p-2 bg-still-bg text-still-text">
+                    <select id="schedule-platform" class="w-full rounded-lg p-2 input-premium select-premium" >
                         <option value="linkedin">LinkedIn</option>
                         <option value="blog">Blog</option>
                         <option value="email">Email</option>
@@ -181,7 +151,7 @@
                 </div>
 
                 <div class="flex gap-3">
-                    <button type="submit" class="flex-1 copper-gradient text-white py-2 rounded-lg">
+                    <button type="submit" class="flex-1 btn btn-primary text-white py-2 rounded-lg">
                         Schedule
                     </button>
                     <button type="button" onclick="hideScheduleModal()" class="px-4 py-2 border border-still-border rounded-lg hover:bg-still-bg text-still-text">

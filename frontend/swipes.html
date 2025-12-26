@@ -42,6 +42,7 @@
     <link rel="stylesheet" href="/static/styles.css">
     <script src="/static/utils.js"></script>
     <script src="/static/auth.js"></script>
+    <script src="/static/components.js"></script>
     <script>
         window.addEventListener('load', () => {
             document.documentElement.classList.remove('no-transitions');
@@ -50,38 +51,7 @@
 </head>
 <body class="bg-still-bg min-h-screen font-inter">
     <!-- Navigation -->
-    <nav class="bg-still-card shadow-sm border-b border-still-border">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <a href="/" class="flex items-center">
-                        <img src="/static/images/Still Logo.svg" alt="Still" class="h-12">
-                    </a>
-                </div>
-                <div class="hidden md:flex items-center space-x-4">
-                    <a href="/upload.html" class="text-still-muted hover:text-still-text px-3 py-2">Upload</a>
-                    <a href="/reserve.html" class="text-still-muted hover:text-still-text px-3 py-2">Reserve</a>
-                    <a href="/workshop.html" class="text-still-muted hover:text-still-text px-3 py-2">Workshop</a>
-                    <a href="/calendar.html" class="text-still-muted hover:text-still-text px-3 py-2">Calendar</a>
-                    <a href="/autopilot.html" class="text-still-muted hover:text-still-text px-3 py-2">Autopilot</a>
-                    <a href="/analytics.html" class="text-still-muted hover:text-still-text px-3 py-2">Analytics</a>
-                    <a href="/settings.html" class="text-still-muted hover:text-still-text px-3 py-2">Settings</a>
-                </div>
-                <div class="flex items-center space-x-3">
-                    <!-- Theme Toggle -->
-                    <button onclick="ThemeManager.toggle()" class="theme-toggle" title="Toggle light/dark mode">
-                        <svg class="theme-icon-sun" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
-                        </svg>
-                        <svg class="theme-icon-moon hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
-                        </svg>
-                    </button>
-                    <div id="navbar-user" class="flex items-center"></div>
-                </div>
-            </div>
-        </div>
-    </nav>
+    <div id="nav-container"></div>
 
     <div class="max-w-6xl mx-auto px-4 py-8">
         <div class="flex justify-between items-center mb-8">
@@ -89,7 +59,7 @@
                 <h1 class="text-3xl font-bold text-still-text">Swipe Files</h1>
                 <p class="text-still-muted mt-1">Collect content examples you love to learn from</p>
             </div>
-            <button onclick="showAddModal()" class="copper-gradient text-white px-4 py-2 rounded-lg hover:opacity-90 transition flex items-center gap-2">
+            <button onclick="showAddModal()" class="btn btn-primary text-white px-4 py-2 rounded-lg hover:opacity-90 transition flex items-center gap-2">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>
@@ -173,7 +143,7 @@
             <p class="text-still-muted text-sm mb-4">
                 You have enough swipes to analyze patterns in your favorite content.
             </p>
-            <button onclick="analyzeSwipes()" class="copper-gradient text-white px-6 py-2 rounded-lg hover:opacity-90 transition">
+            <button onclick="analyzeSwipes()" class="btn btn-primary text-white px-6 py-2 rounded-lg hover:opacity-90 transition">
                 Analyze My Swipes
             </button>
         </div>
@@ -207,7 +177,7 @@
                 <!-- Source Type -->
                 <div>
                     <label class="block text-sm font-medium text-still-muted mb-1">Source Type</label>
-                    <select id="swipe-source-type" class="w-full bg-still-bg border border-still-border rounded-lg p-3 text-still-text focus:ring-2 focus:ring-still-copper">
+                    <select id="swipe-source-type" class="w-full input-premium select-premium" >
                         <option value="general">General</option>
                         <option value="linkedin">LinkedIn</option>
                         <option value="twitter">Twitter/X</option>
@@ -221,24 +191,21 @@
                 <div>
                     <label class="block text-sm font-medium text-still-muted mb-1">Title (optional)</label>
                     <input type="text" id="swipe-title"
-                        class="w-full bg-still-bg border border-still-border rounded-lg p-3 text-still-text focus:ring-2 focus:ring-still-copper"
-                        placeholder="e.g., 'Great hook example' or 'Perfect CTA'">
+            class="w-full input-premium" placeholder="e.g., 'Great hook example' or 'Perfect CTA'">
                 </div>
 
                 <!-- Source URL (optional) -->
                 <div>
                     <label class="block text-sm font-medium text-still-muted mb-1">Source URL (optional)</label>
                     <input type="url" id="swipe-url"
-                        class="w-full bg-still-bg border border-still-border rounded-lg p-3 text-still-text focus:ring-2 focus:ring-still-copper"
-                        placeholder="https://...">
+            class="w-full input-premium" placeholder="https://...">
                 </div>
 
                 <!-- Tags -->
                 <div>
                     <label class="block text-sm font-medium text-still-muted mb-1">Tags (comma-separated)</label>
                     <input type="text" id="swipe-tags"
-                        class="w-full bg-still-bg border border-still-border rounded-lg p-3 text-still-text focus:ring-2 focus:ring-still-copper"
-                        placeholder="hook, storytelling, cta, engaging">
+            class="w-full input-premium" placeholder="hook, storytelling, cta, engaging">
                 </div>
 
                 <!-- Notes -->
@@ -250,7 +217,7 @@
                 </div>
 
                 <div class="flex gap-3 pt-4">
-                    <button type="submit" class="flex-1 copper-gradient text-white py-3 rounded-lg font-semibold hover:opacity-90 transition">
+                    <button type="submit" class="flex-1 btn btn-primary text-white py-3 rounded-lg font-semibold hover:opacity-90 transition">
                         Save Swipe
                     </button>
                     <button type="button" onclick="hideModal()" class="px-6 py-3 border border-still-border rounded-lg text-still-muted hover:bg-still-border/50 transition">

@@ -1,86 +1,118 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark" class="no-transitions">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Settings - ContentMultiplier</title>
+    <link rel="icon" type="image/png" href="/static/images/Icon only.png">
+    <title>Settings - Still</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="/static/theme.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        still: {
+                            bg: 'var(--still-bg)',
+                            card: 'var(--still-card)',
+                            border: 'var(--still-border)',
+                            text: 'var(--still-text)',
+                            muted: 'var(--still-muted)',
+                            disabled: 'var(--still-disabled)',
+                            copper: 'var(--still-copper)',
+                            amber: 'var(--still-amber)',
+                            green: 'var(--still-green)',
+                            error: 'var(--still-error)',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/utils.js"></script>
     <script src="/static/auth.js"></script>
+    <script src="/static/components.js"></script>
+    <script>
+        window.addEventListener('load', () => {
+            document.documentElement.classList.remove('no-transitions');
+        });
+    </script>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-still-bg min-h-screen font-sans">
     <!-- Navigation -->
-    <nav class="bg-white shadow-sm border-b">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <a href="/" class="text-xl font-bold text-indigo-600">ContentMultiplier</a>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <a href="/upload.html" class="text-gray-600 hover:text-gray-900">Upload</a>
-                    <a href="/library.html" class="text-gray-600 hover:text-gray-900">Library</a>
-                    <a href="/settings.html" class="text-indigo-600 font-medium">Settings</a>
-                    <div id="navbar-user" class="flex items-center"></div>
-                </div>
-            </div>
-        </div>
-    </nav>
+    <div id="nav-container"></div>
 
     <div class="max-w-4xl mx-auto px-4 py-8">
-        <h1 class="text-3xl font-bold mb-8">Settings</h1>
+        <h1 class="text-3xl font-bold mb-8 text-still-text">Settings</h1>
 
         <!-- Tabs -->
-        <div class="mb-6 border-b">
+        <div class="mb-6 border-b border-still-border">
             <div class="flex space-x-8">
-                <button class="tab-btn px-1 pb-4 border-b-2 border-indigo-600 text-indigo-600 font-medium" data-tab="voice-test">
+                <button class="tab-btn px-1 pb-4 border-b-2 border-still-copper text-still-copper font-medium" data-tab="voice-test">
                     Brand Voice Testing
                 </button>
-                <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="personas">
+                <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-still-muted hover:text-still-text" data-tab="memory">
+                    Memory Rules
+                </button>
+                <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-still-muted hover:text-still-text" data-tab="brand-voice">
+                    Brand Voice
+                </button>
+                <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-still-muted hover:text-still-text" data-tab="personas">
                     Personas
+                </button>
+                <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-still-muted hover:text-still-text" data-tab="webhooks">
+                    Webhooks
                 </button>
             </div>
         </div>
 
         <!-- Brand Voice Testing Tab -->
         <div id="voice-test-tab" class="space-y-6">
-            <div class="bg-white rounded-lg shadow-sm p-6">
-                <h2 class="text-xl font-semibold mb-4">Test Brand Voice Transformation</h2>
-                <p class="text-gray-600 mb-6">
+            <div class="bg-still-card rounded-lg shadow-sm p-6 border border-still-border">
+                <h2 class="text-xl font-semibold mb-4 text-still-text">Test Brand Voice Transformation</h2>
+                <p class="text-still-muted mb-6">
                     See how your content will be transformed for different audiences. Paste sample text
                     and select a persona to preview the brand voice transformation.
                 </p>
 
                 <!-- Sample Text Input -->
                 <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Sample Text</label>
+                    <label class="block text-sm font-medium text-still-text mb-2">Sample Text</label>
                     <textarea id="sample-text" rows="6"
-                        class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        class="w-full bg-still-bg border border-still-border rounded-lg p-3 text-still-text placeholder-still-disabled focus:ring-2 focus:ring-still-copper focus:border-still-copper"
                         placeholder="Enter sample content here to test how it will be transformed for your target audience..."></textarea>
-                    <p class="text-sm text-gray-500 mt-1">10-2000 characters</p>
+                    <p class="text-sm text-still-muted mt-1">10-2000 characters</p>
                 </div>
 
                 <!-- Persona Selection -->
                 <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Target Persona</label>
+                    <label class="block text-sm font-medium text-still-text mb-2">Target Persona</label>
                     <select id="preview-persona"
-                        class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            class="w-full input-premium select-premium" >
                         <option value="">Select a persona...</option>
                     </select>
                 </div>
 
                 <!-- Preview Button -->
                 <button id="preview-btn" onclick="previewVoice()"
-                    class="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    class="w-full btn btn-primary text-white py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">
                     Preview Transformation
                 </button>
             </div>
 
             <!-- Results Section (hidden by default) -->
             <div id="preview-results" class="hidden">
-                <div class="bg-white rounded-lg shadow-sm overflow-hidden">
-                    <div class="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-4">
+                <div class="bg-still-card rounded-lg shadow-sm overflow-hidden border border-still-border">
+                    <div class="btn btn-primary px-6 py-4">
                         <h3 class="text-white font-semibold text-lg">Transformation Preview</h3>
-                        <p class="text-indigo-100 text-sm" id="persona-applied">Persona: CEO of Long-Term Care</p>
+                        <p class="text-still-amber/80 text-sm" id="persona-applied">Persona: CEO of Long-Term Care</p>
                     </div>
 
                     <div class="p-6">
@@ -89,34 +121,34 @@
                             <!-- Original -->
                             <div>
                                 <div class="flex items-center gap-2 mb-3">
-                                    <span class="px-2 py-1 bg-gray-100 text-gray-600 rounded text-sm font-medium">Original</span>
+                                    <span class="px-2 py-1 bg-still-border text-still-muted rounded text-sm font-medium">Original</span>
                                 </div>
-                                <div class="bg-gray-50 border rounded-lg p-4 min-h-[150px]">
-                                    <p id="original-text" class="text-gray-700 whitespace-pre-wrap"></p>
+                                <div class="bg-still-bg border border-still-border rounded-lg p-4 min-h-[150px]">
+                                    <p id="original-text" class="text-still-text whitespace-pre-wrap"></p>
                                 </div>
                             </div>
 
                             <!-- Transformed -->
                             <div>
                                 <div class="flex items-center gap-2 mb-3">
-                                    <span class="px-2 py-1 bg-indigo-100 text-indigo-600 rounded text-sm font-medium">Transformed</span>
+                                    <span class="px-2 py-1 bg-still-copper/20 text-still-copper rounded text-sm font-medium">Transformed</span>
                                 </div>
-                                <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4 min-h-[150px]">
-                                    <p id="transformed-text" class="text-gray-700 whitespace-pre-wrap"></p>
+                                <div class="bg-still-copper/10 border border-still-copper/30 rounded-lg p-4 min-h-[150px]">
+                                    <p id="transformed-text" class="text-still-text whitespace-pre-wrap"></p>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Changes Summary -->
-                        <div class="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                            <h4 class="font-medium text-yellow-800 mb-2">Changes Made</h4>
-                            <ul id="changes-list" class="list-disc list-inside text-sm text-yellow-700 space-y-1">
+                        <div class="mt-6 p-4 bg-still-amber/10 border border-still-amber/30 rounded-lg">
+                            <h4 class="font-medium text-still-amber mb-2">Changes Made</h4>
+                            <ul id="changes-list" class="list-disc list-inside text-sm text-still-amber/80 space-y-1">
                             </ul>
                         </div>
 
                         <!-- Copy Button -->
                         <div class="mt-4 flex justify-end">
-                            <button onclick="copyTransformed()" class="text-indigo-600 hover:underline text-sm">
+                            <button onclick="copyTransformed()" class="text-still-copper hover:underline text-sm">
                                 Copy Transformed Text
                             </button>
                         </div>
@@ -126,14 +158,96 @@
 
             <!-- Loading State -->
             <div id="preview-loading" class="hidden">
-                <div class="bg-white rounded-lg shadow-sm p-8 text-center">
-                    <div class="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto"></div>
-                    <p class="mt-4 text-gray-600">Transforming content...</p>
+                <div class="bg-still-card rounded-lg shadow-sm p-8 text-center border border-still-border">
+                    <div class="animate-spin h-8 w-8 border-4 border-still-copper border-t-transparent rounded-full mx-auto"></div>
+                    <p class="mt-4 text-still-muted">Transforming content...</p>
                 </div>
             </div>
 
             <!-- Error Message -->
-            <div id="preview-error" class="hidden mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600"></div>
+            <div id="preview-error" class="hidden mt-4 p-4 bg-still-error/10 border border-still-error/30 rounded-lg text-still-error"></div>
+        </div>
+
+        <!-- Memory Rules Tab -->
+        <div id="memory-tab" class="hidden space-y-6">
+            <div class="bg-still-card rounded-lg shadow-sm p-6 border border-still-border">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h2 class="text-xl font-semibold text-still-text">Memory Rules</h2>
+                        <p class="text-still-muted text-sm mt-1">
+                            Set persistent preferences that apply to all your content. These rules are automatically injected into every drafting prompt.
+                        </p>
+                    </div>
+                    <button onclick="showAddRuleModal()" class="btn btn-primary text-white px-4 py-2 rounded-lg transition text-sm">
+                        + Add Rule
+                    </button>
+                </div>
+
+                <!-- Example Rules -->
+                <div class="mb-6 p-4 bg-still-copper/10 rounded-lg border border-still-copper/30">
+                    <h4 class="font-medium text-still-copper mb-2">Example Rules</h4>
+                    <ul class="text-sm text-still-copper/80 space-y-1">
+                        <li><span class="font-medium">Never:</span> "Use emojis in content"</li>
+                        <li><span class="font-medium">Always:</span> "Mention ROI or business outcomes"</li>
+                        <li><span class="font-medium">Avoid:</span> "Industry jargon and buzzwords"</li>
+                        <li><span class="font-medium">Prefer:</span> "Short, punchy sentences"</li>
+                        <li><span class="font-medium">Tone:</span> "Confident but not arrogant"</li>
+                    </ul>
+                </div>
+
+                <!-- Rules List -->
+                <div id="memory-rules-list" class="space-y-3">
+                    <p class="text-still-muted text-center py-8">Loading rules...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Brand Voice Tab -->
+        <div id="brand-voice-tab" class="hidden space-y-6">
+            <div class="bg-still-card rounded-lg shadow-sm p-6 border border-still-border">
+                <h2 class="text-xl font-semibold mb-4 text-still-text">AI Brand Voice Analysis</h2>
+                <p class="text-still-muted mb-6">
+                    Upload 3-5 samples of content you've written. Our AI will analyze your writing style and extract patterns to use in future content generation.
+                </p>
+
+                <!-- Upload Samples -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-still-text mb-2">Paste a content sample</label>
+                    <textarea id="voice-sample" rows="6"
+                        class="w-full bg-still-bg border border-still-border rounded-lg p-3 text-still-text placeholder-still-disabled focus:ring-2 focus:ring-still-copper"
+                        placeholder="Paste a LinkedIn post, blog excerpt, or email you've written..."></textarea>
+                    <div class="flex gap-2 mt-2">
+                        <select id="sample-type" class="input-premium select-premium" >
+                            <option value="linkedin">LinkedIn Post</option>
+                            <option value="blog">Blog Post</option>
+                            <option value="email">Email</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <button onclick="addVoiceSample()" class="bg-still-border text-still-text px-4 py-2 rounded-lg hover:bg-still-muted/20">
+                            Add Sample
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Samples List -->
+                <div id="voice-samples-list" class="space-y-2 mb-6">
+                    <!-- Populated by JS -->
+                </div>
+
+                <!-- Analyze Button -->
+                <button id="analyze-voice-btn" onclick="analyzeVoice()" disabled
+                    class="w-full btn btn-primary text-white py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    Analyze My Voice (need 3+ samples)
+                </button>
+
+                <!-- Voice Profile -->
+                <div id="voice-profile" class="hidden mt-6 p-4 bg-still-copper/10 rounded-lg border border-still-copper/30">
+                    <h3 class="font-semibold text-still-copper mb-3">Your Brand Voice Profile</h3>
+                    <div id="voice-profile-content" class="text-sm text-still-copper/80 space-y-3">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Personas Tab -->
@@ -142,21 +256,151 @@
                 <!-- Personas will be loaded here -->
             </div>
         </div>
+
+        <!-- Webhooks Tab -->
+        <div id="webhooks-tab" class="hidden space-y-6">
+            <div class="bg-still-card rounded-lg shadow-sm p-6 border border-still-border">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h2 class="text-xl font-semibold text-still-text">Webhook Integrations</h2>
+                        <p class="text-still-muted text-sm mt-1">
+                            Connect external services like Zapier, Make, or custom endpoints to receive notifications when content is generated.
+                        </p>
+                    </div>
+                    <button onclick="showAddWebhookModal()" class="btn btn-primary text-white px-4 py-2 rounded-lg transition text-sm">
+                        + Add Webhook
+                    </button>
+                </div>
+
+                <!-- Info Box -->
+                <div class="mb-6 p-4 bg-still-copper/10 rounded-lg border border-still-copper/30">
+                    <h4 class="font-medium text-still-copper mb-2">How Webhooks Work</h4>
+                    <ul class="text-sm text-still-copper/80 space-y-1">
+                        <li><strong>Job Completed:</strong> Triggered when a single job finishes processing</li>
+                        <li><strong>Content Generated:</strong> Includes full content output with text and metadata</li>
+                        <li><strong>Batch Finished:</strong> Triggered when all files in a batch are done</li>
+                    </ul>
+                    <p class="text-sm text-still-copper/70 mt-2">
+                        Perfect for sending content to Buffer, Notion, Slack, Google Sheets, or any service with Zapier/Make integration.
+                    </p>
+                </div>
+
+                <!-- Webhooks List -->
+                <div id="webhooks-list" class="space-y-3">
+                    <p class="text-still-muted text-center py-8">Loading webhooks...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Rule Modal -->
+    <div id="rule-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+        <div class="bg-still-card rounded-lg max-w-md w-full border border-still-border">
+            <div class="p-6 border-b border-still-border">
+                <div class="flex justify-between items-center">
+                    <h3 id="rule-modal-title" class="text-lg font-semibold text-still-text">Add Memory Rule</h3>
+                    <button onclick="hideRuleModal()" class="text-still-muted hover:text-still-text">&times;</button>
+                </div>
+            </div>
+            <form id="rule-form" class="p-6 space-y-4">
+                <input type="hidden" id="edit-rule-id">
+                <div>
+                    <label class="block text-sm font-medium text-still-text mb-1">Rule Type</label>
+                    <select id="rule-type" class="w-full input-premium select-premium" required>
+                        <option value="never">Never do this</option>
+                        <option value="always">Always do this</option>
+                        <option value="prefer">Prefer this style</option>
+                        <option value="avoid">Avoid this style</option>
+                        <option value="include">Always include</option>
+                        <option value="exclude">Always exclude</option>
+                        <option value="tone">Tone preference</option>
+                        <option value="format">Format preference</option>
+                        <option value="custom">Custom rule</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-still-text mb-1">Rule</label>
+                    <input type="text" id="rule-text" required
+            class="w-full input-premium" placeholder="e.g., Use emojis in content">
+                </div>
+                <div class="flex gap-3">
+                    <button type="submit" class="flex-1 btn btn-primary text-white py-2 rounded-lg">
+                        Save Rule
+                    </button>
+                    <button type="button" onclick="hideRuleModal()" class="px-4 py-2 border border-still-border rounded-lg text-still-text hover:bg-still-border">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Webhook Modal -->
+    <div id="webhook-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+        <div class="bg-still-card rounded-lg max-w-md w-full border border-still-border">
+            <div class="p-6 border-b border-still-border">
+                <div class="flex justify-between items-center">
+                    <h3 id="webhook-modal-title" class="text-lg font-semibold text-still-text">Add Webhook</h3>
+                    <button onclick="hideWebhookModal()" class="text-still-muted hover:text-still-text">&times;</button>
+                </div>
+            </div>
+            <form id="webhook-form" class="p-6 space-y-4">
+                <input type="hidden" id="edit-webhook-id">
+                <div>
+                    <label class="block text-sm font-medium text-still-text mb-1">Webhook Name</label>
+                    <input type="text" id="webhook-name" required
+            class="w-full input-premium" placeholder="e.g., Zapier - LinkedIn Posts">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-still-text mb-1">Webhook URL</label>
+                    <input type="url" id="webhook-url" required
+            class="w-full input-premium" placeholder="https://hooks.zapier.com/hooks/catch/...">
+                    <p class="text-xs text-still-muted mt-1">Must be HTTPS</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-still-text mb-2">Trigger Events</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" name="webhook-events" value="job_completed" class="rounded input-premium" >
+                            <span class="text-sm text-still-text">Job Completed</span>
+                        </label>
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" name="webhook-events" value="content_generated" class="rounded input-premium" checked>
+                            <span class="text-sm text-still-text">Content Generated (with full text)</span>
+                        </label>
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" name="webhook-events" value="batch_finished" class="rounded input-premium" >
+                            <span class="text-sm text-still-text">Batch Finished</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="flex gap-3">
+                    <button type="submit" class="flex-1 btn btn-primary text-white py-2 rounded-lg">
+                        Save Webhook
+                    </button>
+                    <button type="button" onclick="hideWebhookModal()" class="px-4 py-2 border border-still-border rounded-lg text-still-text hover:bg-still-border">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Copy Toast -->
-    <div id="copy-toast" class="fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg hidden">
+    <div id="copy-toast" class="fixed bottom-4 right-4 bg-still-card border border-still-border text-still-text px-4 py-2 rounded-lg shadow-lg hidden">
         Copied to clipboard!
     </div>
 
     <script>
         // Require authentication
-        if (!Auth.requireAuth()) {
-            // Will redirect to login
-        }
+        Auth.requireAuth();
 
         let personas = [];
         let currentTransformed = '';
+
+        let memoryRules = [];
+        let voiceSamples = [];
+        let voiceProfile = null;
 
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -164,14 +408,22 @@
                 const tab = btn.dataset.tab;
 
                 document.querySelectorAll('.tab-btn').forEach(b => {
-                    b.classList.remove('border-indigo-600', 'text-indigo-600');
-                    b.classList.add('border-transparent', 'text-gray-500');
+                    b.classList.remove('border-still-copper', 'text-still-copper');
+                    b.classList.add('border-transparent', 'text-still-muted');
                 });
-                btn.classList.remove('border-transparent', 'text-gray-500');
-                btn.classList.add('border-indigo-600', 'text-indigo-600');
+                btn.classList.remove('border-transparent', 'text-still-muted');
+                btn.classList.add('border-still-copper', 'text-still-copper');
 
                 document.getElementById('voice-test-tab').classList.toggle('hidden', tab !== 'voice-test');
+                document.getElementById('memory-tab').classList.toggle('hidden', tab !== 'memory');
+                document.getElementById('brand-voice-tab').classList.toggle('hidden', tab !== 'brand-voice');
                 document.getElementById('personas-tab').classList.toggle('hidden', tab !== 'personas');
+                document.getElementById('webhooks-tab').classList.toggle('hidden', tab !== 'webhooks');
+
+                // Load data for tab
+                if (tab === 'memory') loadMemoryRules();
+                if (tab === 'brand-voice') loadVoiceProfile();
+                if (tab === 'webhooks') loadWebhooks();
             });
         });
 
@@ -209,7 +461,7 @@
 
             personas.forEach(persona => {
                 const card = document.createElement('div');
-                card.className = 'bg-white rounded-lg shadow-sm p-6';
+                card.className = 'bg-still-card rounded-lg shadow-sm p-6 border border-still-border';
 
                 const painPoints = persona.pain_points || [];
                 const priorities = persona.priorities || [];
@@ -218,38 +470,38 @@
                 card.innerHTML = `
                     <div class="flex justify-between items-start mb-4">
                         <div>
-                            <h3 class="text-lg font-semibold">${persona.title}</h3>
-                            <p class="text-sm text-gray-500">${persona.company_size || ''}</p>
+                            <h3 class="text-lg font-semibold text-still-text">${persona.title}</h3>
+                            <p class="text-sm text-still-muted">${persona.company_size || ''}</p>
                         </div>
-                        <span class="px-2 py-1 bg-indigo-100 text-indigo-600 rounded text-sm">${persona.id}</span>
+                        <span class="px-2 py-1 bg-still-copper/20 text-still-copper rounded text-sm">${persona.id}</span>
                     </div>
 
                     <div class="grid md:grid-cols-2 gap-4 text-sm">
                         <div>
-                            <p class="font-medium text-gray-700 mb-1">Pain Points</p>
-                            <ul class="list-disc list-inside text-gray-600 space-y-1">
+                            <p class="font-medium text-still-text mb-1">Pain Points</p>
+                            <ul class="list-disc list-inside text-still-muted space-y-1">
                                 ${painPoints.map(p => `<li>${p}</li>`).join('')}
                             </ul>
                         </div>
                         <div>
-                            <p class="font-medium text-gray-700 mb-1">Priorities</p>
-                            <ul class="list-disc list-inside text-gray-600 space-y-1">
+                            <p class="font-medium text-still-text mb-1">Priorities</p>
+                            <ul class="list-disc list-inside text-still-muted space-y-1">
                                 ${priorities.map(p => `<li>${p}</li>`).join('')}
                             </ul>
                         </div>
                     </div>
 
-                    <div class="mt-4 pt-4 border-t text-sm">
-                        <p class="text-gray-600">
-                            <span class="font-medium">Language:</span> ${persona.language_level || 'Professional'}<br>
-                            <span class="font-medium">Tone:</span> ${prefs.tone || 'Professional'}<br>
-                            <span class="font-medium">Length:</span> ${prefs.length || 'Medium'}
+                    <div class="mt-4 pt-4 border-t border-still-border text-sm">
+                        <p class="text-still-muted">
+                            <span class="font-medium text-still-text">Language:</span> ${persona.language_level || 'Professional'}<br>
+                            <span class="font-medium text-still-text">Tone:</span> ${prefs.tone || 'Professional'}<br>
+                            <span class="font-medium text-still-text">Length:</span> ${prefs.length || 'Medium'}
                         </p>
                     </div>
 
                     <div class="mt-4">
                         <button onclick="testPersona('${persona.id}')"
-                            class="text-indigo-600 hover:underline text-sm font-medium">
+                            class="text-still-copper hover:underline text-sm font-medium">
                             Test this persona
                         </button>
                     </div>
@@ -264,11 +516,11 @@
 
             // Switch to voice test tab
             document.querySelectorAll('.tab-btn').forEach(b => {
-                b.classList.remove('border-indigo-600', 'text-indigo-600');
-                b.classList.add('border-transparent', 'text-gray-500');
+                b.classList.remove('border-still-copper', 'text-still-copper');
+                b.classList.add('border-transparent', 'text-still-muted');
             });
-            document.querySelector('[data-tab="voice-test"]').classList.remove('border-transparent', 'text-gray-500');
-            document.querySelector('[data-tab="voice-test"]').classList.add('border-indigo-600', 'text-indigo-600');
+            document.querySelector('[data-tab="voice-test"]').classList.remove('border-transparent', 'text-still-muted');
+            document.querySelector('[data-tab="voice-test"]').classList.add('border-still-copper', 'text-still-copper');
 
             document.getElementById('voice-test-tab').classList.remove('hidden');
             document.getElementById('personas-tab').classList.add('hidden');
@@ -370,6 +622,422 @@
                 setTimeout(() => toast.classList.add('hidden'), 2000);
             }
         }
+
+        // ============ Memory Rules ============
+        async function loadMemoryRules() {
+            try {
+                const response = await Auth.fetchWithAuth('/api/memory/rules');
+                const data = await response.json();
+                memoryRules = data.rules || [];
+                renderMemoryRules();
+            } catch (err) {
+                console.error('Failed to load rules:', err);
+            }
+        }
+
+        function renderMemoryRules() {
+            const container = document.getElementById('memory-rules-list');
+
+            if (memoryRules.length === 0) {
+                container.innerHTML = '<p class="text-still-muted text-center py-8">No rules yet. Add your first memory rule!</p>';
+                return;
+            }
+
+            const typeLabels = {
+                never: 'Never', always: 'Always', prefer: 'Prefer', avoid: 'Avoid',
+                include: 'Include', exclude: 'Exclude', tone: 'Tone', format: 'Format', custom: 'Custom'
+            };
+
+            const typeColors = {
+                never: 'bg-still-error/20 text-still-error', always: 'bg-still-green/20 text-still-green',
+                prefer: 'bg-still-copper/20 text-still-copper', avoid: 'bg-still-amber/20 text-still-amber',
+                include: 'bg-still-green/20 text-still-green', exclude: 'bg-still-error/20 text-still-error',
+                tone: 'bg-still-copper/20 text-still-copper', format: 'bg-still-amber/20 text-still-amber',
+                custom: 'bg-still-border text-still-muted'
+            };
+
+            container.innerHTML = memoryRules.map(rule => `
+                <div class="flex items-center gap-3 p-3 bg-still-bg rounded-lg border border-still-border ${!rule.is_active ? 'opacity-50' : ''}">
+                    <button onclick="toggleRule(${rule.id})"
+                        class="w-10 h-6 rounded-full transition ${rule.is_active ? 'bg-still-copper' : 'bg-still-border'}">
+                        <div class="w-4 h-4 bg-white rounded-full mx-1 transition ${rule.is_active ? 'translate-x-4' : ''}"></div>
+                    </button>
+                    <span class="px-2 py-1 rounded text-xs font-medium ${typeColors[rule.rule_type] || typeColors.custom}">
+                        ${typeLabels[rule.rule_type] || rule.rule_type}
+                    </span>
+                    <span class="flex-1 text-still-text">${escapeHtml(rule.rule_text)}</span>
+                    <button onclick="editRule(${rule.id})" class="p-1 text-still-muted hover:text-still-text">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                        </svg>
+                    </button>
+                    <button onclick="deleteRule(${rule.id})" class="p-1 text-still-muted hover:text-still-error">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function showAddRuleModal() {
+            document.getElementById('rule-modal-title').textContent = 'Add Memory Rule';
+            document.getElementById('edit-rule-id').value = '';
+            document.getElementById('rule-form').reset();
+            document.getElementById('rule-modal').classList.remove('hidden');
+        }
+
+        function hideRuleModal() {
+            document.getElementById('rule-modal').classList.add('hidden');
+        }
+
+        function editRule(id) {
+            const rule = memoryRules.find(r => r.id === id);
+            if (!rule) return;
+
+            document.getElementById('rule-modal-title').textContent = 'Edit Memory Rule';
+            document.getElementById('edit-rule-id').value = id;
+            document.getElementById('rule-type').value = rule.rule_type;
+            document.getElementById('rule-text').value = rule.rule_text;
+            document.getElementById('rule-modal').classList.remove('hidden');
+        }
+
+        async function toggleRule(id) {
+            try {
+                await Auth.fetchWithAuth(`/api/memory/rules/${id}/toggle`, { method: 'POST' });
+                loadMemoryRules();
+            } catch (err) {
+                showToast('Error toggling rule');
+            }
+        }
+
+        async function deleteRule(id) {
+            if (!confirm('Delete this rule?')) return;
+            try {
+                await Auth.fetchWithAuth(`/api/memory/rules/${id}`, { method: 'DELETE' });
+                loadMemoryRules();
+                showToast('Rule deleted');
+            } catch (err) {
+                showToast('Error deleting rule');
+            }
+        }
+
+        document.getElementById('rule-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('edit-rule-id').value;
+            const isEdit = !!id;
+
+            const data = {
+                rule_type: document.getElementById('rule-type').value,
+                rule_text: document.getElementById('rule-text').value,
+            };
+
+            try {
+                const url = isEdit ? `/api/memory/rules/${id}` : '/api/memory/rules';
+                const method = isEdit ? 'PUT' : 'POST';
+                await Auth.fetchWithAuth(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                hideRuleModal();
+                loadMemoryRules();
+                showToast(isEdit ? 'Rule updated' : 'Rule added');
+            } catch (err) {
+                showToast('Error saving rule');
+            }
+        });
+
+        // ============ Brand Voice ============
+        async function loadVoiceProfile() {
+            try {
+                const response = await Auth.fetchWithAuth('/api/brand-voice/profile');
+                if (response.ok) {
+                    const data = await response.json();
+                    voiceProfile = data.profile;
+                    voiceSamples = data.samples || [];
+                    renderVoiceSamples();
+                    renderVoiceProfile();
+                }
+            } catch (err) {
+                console.log('No voice profile yet');
+            }
+        }
+
+        function renderVoiceSamples() {
+            const container = document.getElementById('voice-samples-list');
+            const btn = document.getElementById('analyze-voice-btn');
+
+            if (voiceSamples.length === 0) {
+                container.innerHTML = '<p class="text-still-muted text-sm">No samples added yet</p>';
+            } else {
+                container.innerHTML = voiceSamples.map((s, i) => `
+                    <div class="flex items-center gap-2 p-2 bg-still-bg rounded border border-still-border">
+                        <span class="px-2 py-0.5 bg-still-border text-still-muted rounded text-xs">${s.content_type}</span>
+                        <span class="flex-1 text-sm text-still-text truncate">${escapeHtml(s.content.substring(0, 50))}...</span>
+                        <button onclick="removeSample(${s.id})" class="text-still-muted hover:text-still-error text-sm">&times;</button>
+                    </div>
+                `).join('');
+            }
+
+            btn.disabled = voiceSamples.length < 3;
+            btn.textContent = voiceSamples.length < 3
+                ? `Analyze My Voice (need ${3 - voiceSamples.length} more samples)`
+                : 'Analyze My Voice';
+        }
+
+        function renderVoiceProfile() {
+            if (!voiceProfile) return;
+
+            const container = document.getElementById('voice-profile-content');
+            container.innerHTML = `
+                <p><strong>Summary:</strong> ${escapeHtml(voiceProfile.overall_summary || 'No summary')}</p>
+                ${voiceProfile.tone_markers ? `<p><strong>Tone:</strong> ${voiceProfile.tone_markers.join(', ')}</p>` : ''}
+                ${voiceProfile.phrases_to_use ? `<p><strong>Phrases to Use:</strong> ${voiceProfile.phrases_to_use.join(', ')}</p>` : ''}
+                ${voiceProfile.phrases_to_avoid ? `<p><strong>Phrases to Avoid:</strong> ${voiceProfile.phrases_to_avoid.join(', ')}</p>` : ''}
+            `;
+            document.getElementById('voice-profile').classList.remove('hidden');
+        }
+
+        async function addVoiceSample() {
+            const content = document.getElementById('voice-sample').value.trim();
+            const type = document.getElementById('sample-type').value;
+
+            if (content.length < 50) {
+                showToast('Sample must be at least 50 characters');
+                return;
+            }
+
+            try {
+                const response = await Auth.fetchWithAuth('/api/brand-voice/samples', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content, content_type: type })
+                });
+
+                if (response.ok) {
+                    document.getElementById('voice-sample').value = '';
+                    loadVoiceProfile();
+                    showToast('Sample added');
+                }
+            } catch (err) {
+                showToast('Error adding sample');
+            }
+        }
+
+        async function removeSample(id) {
+            try {
+                await Auth.fetchWithAuth(`/api/brand-voice/samples/${id}`, { method: 'DELETE' });
+                loadVoiceProfile();
+            } catch (err) {
+                showToast('Error removing sample');
+            }
+        }
+
+        async function analyzeVoice() {
+            const btn = document.getElementById('analyze-voice-btn');
+            btn.disabled = true;
+            btn.textContent = 'Analyzing...';
+
+            try {
+                const response = await Auth.fetchWithAuth('/api/brand-voice/analyze', { method: 'POST' });
+                if (response.ok) {
+                    const data = await response.json();
+                    voiceProfile = data.profile;
+                    renderVoiceProfile();
+                    showToast('Voice analysis complete!');
+                }
+            } catch (err) {
+                showToast('Analysis failed');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Analyze My Voice';
+            }
+        }
+
+        // escapeHtml and showToast are now provided by utils.js
+
+        // ============ Webhooks ============
+        let webhooks = [];
+
+        async function loadWebhooks() {
+            try {
+                const response = await Auth.fetchWithAuth('/api/webhooks');
+                const data = await response.json();
+                webhooks = data.webhooks || [];
+                renderWebhooks();
+            } catch (err) {
+                console.error('Failed to load webhooks:', err);
+            }
+        }
+
+        function renderWebhooks() {
+            const container = document.getElementById('webhooks-list');
+
+            if (webhooks.length === 0) {
+                container.innerHTML = '<p class="text-still-muted text-center py-8">No webhooks configured. Add your first webhook to start sending content to external services!</p>';
+                return;
+            }
+
+            container.innerHTML = webhooks.map(webhook => `
+                <div class="flex items-start gap-4 p-4 bg-still-bg rounded-lg border border-still-border ${!webhook.is_active ? 'opacity-50' : ''}">
+                    <button onclick="toggleWebhook(${webhook.id}, ${webhook.is_active})"
+                        class="mt-1 w-10 h-6 rounded-full transition flex-shrink-0 ${webhook.is_active ? 'bg-still-copper' : 'bg-still-border'}">
+                        <div class="w-4 h-4 bg-white rounded-full mx-1 transition ${webhook.is_active ? 'translate-x-4' : ''}"></div>
+                    </button>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="font-medium text-still-text">${escapeHtml(webhook.name)}</span>
+                        </div>
+                        <p class="text-sm text-still-muted truncate mb-2">${escapeHtml(webhook.url)}</p>
+                        <div class="flex flex-wrap gap-1">
+                            ${webhook.trigger_events.map(event => `
+                                <span class="px-2 py-0.5 bg-still-copper/20 text-still-copper rounded text-xs">${event}</span>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="testWebhook(${webhook.id})" class="p-2 text-still-muted hover:text-still-green" title="Test webhook">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </button>
+                        <button onclick="showSecretKey(${webhook.id}, '${webhook.secret_key}')" class="p-2 text-still-muted hover:text-still-text" title="View secret key">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                            </svg>
+                        </button>
+                        <button onclick="editWebhook(${webhook.id})" class="p-2 text-still-muted hover:text-still-text" title="Edit">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                            </svg>
+                        </button>
+                        <button onclick="deleteWebhook(${webhook.id})" class="p-2 text-still-muted hover:text-still-error" title="Delete">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showAddWebhookModal() {
+            document.getElementById('webhook-modal-title').textContent = 'Add Webhook';
+            document.getElementById('edit-webhook-id').value = '';
+            document.getElementById('webhook-form').reset();
+            // Check content_generated by default
+            document.querySelector('input[value="content_generated"]').checked = true;
+            document.getElementById('webhook-modal').classList.remove('hidden');
+        }
+
+        function hideWebhookModal() {
+            document.getElementById('webhook-modal').classList.add('hidden');
+        }
+
+        function editWebhook(id) {
+            const webhook = webhooks.find(w => w.id === id);
+            if (!webhook) return;
+
+            document.getElementById('webhook-modal-title').textContent = 'Edit Webhook';
+            document.getElementById('edit-webhook-id').value = id;
+            document.getElementById('webhook-name').value = webhook.name;
+            document.getElementById('webhook-url').value = webhook.url;
+
+            // Set checkboxes
+            document.querySelectorAll('input[name="webhook-events"]').forEach(cb => {
+                cb.checked = webhook.trigger_events.includes(cb.value);
+            });
+
+            document.getElementById('webhook-modal').classList.remove('hidden');
+        }
+
+        async function toggleWebhook(id, currentActive) {
+            try {
+                await Auth.fetchWithAuth(`/api/webhooks/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ is_active: !currentActive })
+                });
+                loadWebhooks();
+            } catch (err) {
+                showToast('Error toggling webhook');
+            }
+        }
+
+        async function deleteWebhook(id) {
+            if (!confirm('Delete this webhook?')) return;
+            try {
+                await Auth.fetchWithAuth(`/api/webhooks/${id}`, { method: 'DELETE' });
+                loadWebhooks();
+                showToast('Webhook deleted');
+            } catch (err) {
+                showToast('Error deleting webhook');
+            }
+        }
+
+        async function testWebhook(id) {
+            showToast('Sending test...');
+            try {
+                const response = await Auth.fetchWithAuth(`/api/webhooks/${id}/test`, { method: 'POST' });
+                const data = await response.json();
+                if (data.success) {
+                    showToast('Test successful!');
+                } else {
+                    showToast('Test failed: ' + data.message);
+                }
+            } catch (err) {
+                showToast('Error testing webhook');
+            }
+        }
+
+        function showSecretKey(id, secretKey) {
+            alert(`Webhook Secret Key:\n\n${secretKey}\n\nUse this to verify webhook signatures (X-Webhook-Signature header).`);
+        }
+
+        document.getElementById('webhook-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('edit-webhook-id').value;
+            const isEdit = !!id;
+
+            const selectedEvents = [];
+            document.querySelectorAll('input[name="webhook-events"]:checked').forEach(cb => {
+                selectedEvents.push(cb.value);
+            });
+
+            if (selectedEvents.length === 0) {
+                showToast('Select at least one trigger event');
+                return;
+            }
+
+            const data = {
+                name: document.getElementById('webhook-name').value,
+                url: document.getElementById('webhook-url').value,
+                trigger_events: selectedEvents,
+            };
+
+            try {
+                const url = isEdit ? `/api/webhooks/${id}` : '/api/webhooks';
+                const method = isEdit ? 'PUT' : 'POST';
+                const response = await Auth.fetchWithAuth(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.detail || 'Failed to save webhook');
+                }
+
+                hideWebhookModal();
+                loadWebhooks();
+                showToast(isEdit ? 'Webhook updated' : 'Webhook added');
+            } catch (err) {
+                showToast(err.message);
+            }
+        });
 
         // Load personas on page load
         loadPersonas();

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="/static/images/Icon only.png">
-    <title>Content Library - Still</title>
+    <title>The Reserve - Still</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -53,16 +53,76 @@
     <div id="nav-container"></div>
 
     <div class="max-w-7xl mx-auto px-4 py-8">
+        <!-- The Sommelier Section -->
+        <div class="bg-still-card rounded-lg shadow-sm p-6 mb-6 border border-still-border">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="text-2xl">🍷</span>
+                <div>
+                    <h2 class="text-xl font-bold text-still-text">Ask the Sommelier</h2>
+                    <p class="text-still-muted text-sm">AI-powered search to find the perfect stills for your content</p>
+                </div>
+            </div>
+
+            <div class="flex gap-3">
+                <input type="text" id="sommelier-query" placeholder="What kind of content are you creating?"
+          class="flex-1 input-premium" >
+                <button id="sommelier-search-btn" class="btn btn-primary text-white px-6 py-3 rounded-lg transition flex items-center gap-2">
+                    <span>Find Stills</span>
+                </button>
+            </div>
+
+            <div class="mt-3 flex flex-wrap gap-2" id="example-queries">
+                <!-- Example queries will be loaded here -->
+            </div>
+
+            <!-- Sommelier Results -->
+            <div id="sommelier-results" class="hidden mt-6">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="text-lg font-semibold text-still-text">Search Results</h3>
+                        <p id="sommelier-understood" class="text-still-muted text-sm"></p>
+                    </div>
+                    <button id="clear-sommelier" class="text-still-muted hover:text-still-text text-sm">
+                        Clear Results
+                    </button>
+                </div>
+
+                <div id="sommelier-results-grid" class="grid md:grid-cols-2 gap-4">
+                    <!-- Results will be rendered here -->
+                </div>
+
+                <div class="mt-4 flex justify-end">
+                    <button id="blend-selected-btn" disabled
+                        class="btn btn-primary text-white px-4 py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed">
+                        Blend Selected (<span id="sommelier-selected-count">0</span>)
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Header -->
         <div class="flex justify-between items-center mb-8">
             <div>
-                <h1 class="text-3xl font-bold text-still-text">Content Library</h1>
+                <h1 class="text-3xl font-bold text-still-text">The Reserve</h1>
                 <p class="text-still-muted mt-1" id="library-stats">Loading...</p>
             </div>
             <button id="generate-btn" disabled
                 class="btn btn-primary text-white px-4 py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed">
                 Generate from Selected (<span id="selected-count">0</span>)
             </button>
+        </div>
+
+        <!-- Job filter banner (shown when filtering by job_id) -->
+        <div id="job-filter-banner" class="hidden bg-still-copper bg-opacity-20 border border-still-copper rounded-lg p-4 mb-6">
+            <div class="flex justify-between items-center">
+                <div>
+                    <p class="text-still-text font-medium">Showing stills from recent Quick Distill</p>
+                    <p class="text-still-muted text-sm">These stills were just extracted from your uploaded content</p>
+                </div>
+                <button id="clear-job-filter" class="text-still-copper hover:underline">
+                    Show All Stills
+                </button>
+            </div>
         </div>
 
         <!-- Filters -->
@@ -78,6 +138,7 @@
                         <option value="insight">Insight</option>
                         <option value="problem">Problem</option>
                         <option value="solution">Solution</option>
+                        <option value="quote">Quote</option>
                     </select>
                 </div>
 
@@ -116,11 +177,11 @@
             </div>
         </div>
 
-        <!-- Library Grid -->
+        <!-- Reserve Grid -->
         <div id="library-container" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div class="col-span-full text-center py-12">
                 <div class="animate-spin h-8 w-8 border-4 border-still-copper border-t-transparent rounded-full mx-auto"></div>
-                <p class="mt-4 text-still-muted">Loading library...</p>
+                <p class="mt-4 text-still-muted">Loading the Reserve...</p>
             </div>
         </div>
 
@@ -131,7 +192,7 @@
     <!-- Generate Modal -->
     <div id="generate-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
         <div class="bg-still-card rounded-lg shadow-xl max-w-md w-full mx-4 p-6 border border-still-border">
-            <h2 class="text-xl font-bold mb-4 text-still-text">Generate Content from Library</h2>
+            <h2 class="text-xl font-bold mb-4 text-still-text">Generate Content from Stills</h2>
 
             <div class="space-y-4">
                 <div>
@@ -157,9 +218,9 @@
                     </div>
                 </div>
 
-                <div id="selected-atoms-preview" class="p-3 bg-still-bg rounded text-sm border border-still-border">
-                    <strong class="text-still-text">Selected atoms:</strong>
-                    <div id="atoms-preview-list" class="mt-2 space-y-1"></div>
+                <div id="selected-stills-preview" class="p-3 bg-still-bg rounded text-sm border border-still-border">
+                    <strong class="text-still-text">Selected stills:</strong>
+                    <div id="stills-preview-list" class="mt-2 space-y-1"></div>
                 </div>
             </div>
 
@@ -185,8 +246,13 @@
 
         let allEntries = [];
         let selectedIds = new Set();
+        let sommelierSelectedIds = new Set();
         let currentPage = 0;
         const pageSize = 24;
+
+        // Check for job_id filter in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const jobIdFilter = urlParams.get('job_id');
 
         function getTypeColor(type) {
             const colors = {
@@ -194,7 +260,8 @@
                 'story': 'still-green',
                 'insight': 'still-amber',
                 'problem': 'still-error',
-                'solution': 'still-copper'
+                'solution': 'still-copper',
+                'quote': 'still-amber'
             };
             return colors[type] || 'still-muted';
         }
@@ -205,7 +272,8 @@
                 'story': 'border-l-[#4A7C59]',
                 'insight': 'border-l-[#D4A574]',
                 'problem': 'border-l-[#C45C4A]',
-                'solution': 'border-l-[#B87333]'
+                'solution': 'border-l-[#B87333]',
+                'quote': 'border-l-[#D4A574]'
             };
             return borders[type] || 'border-l-[#A3A3A3]';
         }
@@ -216,16 +284,20 @@
                 'story': 'text-[#4A7C59]',
                 'insight': 'text-[#D4A574]',
                 'problem': 'text-[#C45C4A]',
-                'solution': 'text-[#B87333]'
+                'solution': 'text-[#B87333]',
+                'quote': 'text-[#D4A574]'
             };
             return texts[type] || 'text-[#A3A3A3]';
         }
 
-        // copyToClipboard is now provided by utils.js
-
         function updateSelectedCount() {
             document.getElementById('selected-count').textContent = selectedIds.size;
             document.getElementById('generate-btn').disabled = selectedIds.size === 0;
+        }
+
+        function updateSommelierSelectedCount() {
+            document.getElementById('sommelier-selected-count').textContent = sommelierSelectedIds.size;
+            document.getElementById('blend-selected-btn').disabled = sommelierSelectedIds.size === 0;
         }
 
         function toggleSelect(id, content) {
@@ -244,6 +316,22 @@
             }
         }
 
+        function toggleSommelierSelect(id) {
+            if (sommelierSelectedIds.has(id)) {
+                sommelierSelectedIds.delete(id);
+            } else {
+                sommelierSelectedIds.add(id);
+            }
+            updateSommelierSelectedCount();
+
+            // Update card styling
+            const card = document.querySelector(`[data-sommelier-id="${id}"]`);
+            if (card) {
+                card.classList.toggle('ring-2', sommelierSelectedIds.has(id));
+                card.classList.toggle('ring-still-copper', sommelierSelectedIds.has(id));
+            }
+        }
+
         function renderLibrary(entries) {
             const container = document.getElementById('library-container');
             container.innerHTML = '';
@@ -251,9 +339,9 @@
             if (entries.length === 0) {
                 container.innerHTML = `
                     <div class="col-span-full text-center py-12">
-                        <p class="text-still-muted">No entries found</p>
+                        <p class="text-still-muted">No stills found</p>
                         <a href="/upload.html" class="text-still-copper hover:underline mt-2 inline-block">
-                            Upload content to build your library
+                            Upload content to build your Reserve
                         </a>
                     </div>
                 `;
@@ -301,7 +389,109 @@
             });
         }
 
-        // escapeHtml is now provided by utils.js
+        function renderSommelierResults(results, queryUnderstood) {
+            document.getElementById('sommelier-understood').textContent = `Looking for: ${queryUnderstood}`;
+
+            const container = document.getElementById('sommelier-results-grid');
+            container.innerHTML = '';
+
+            if (results.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full text-center py-6">
+                        <p class="text-still-muted">No matching stills found. Try different search terms.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            results.forEach(result => {
+                const borderClass = getTypeBorderClass(result.entry_type);
+                const textClass = getTypeTextClass(result.entry_type);
+                const isSelected = sommelierSelectedIds.has(result.id);
+
+                const card = document.createElement('div');
+                card.className = `bg-still-bg p-4 rounded-lg border-l-4 ${borderClass} cursor-pointer hover:bg-still-border transition ${isSelected ? 'ring-2 ring-still-copper' : ''}`;
+                card.dataset.sommelierId = result.id;
+
+                // Relevance indicator
+                const relevanceStars = '★'.repeat(result.relevance_score) + '☆'.repeat(5 - result.relevance_score);
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-semibold ${textClass} uppercase">${result.entry_type}</span>
+                            <span class="text-still-copper text-xs">${relevanceStars}</span>
+                        </div>
+                        <input type="checkbox" ${isSelected ? 'checked' : ''}
+              class="rounded border-still-border input-premium" onclick="event.stopPropagation(); toggleSommelierSelect(${result.id})">
+                    </div>
+                    <p class="text-still-text text-sm line-clamp-3">${escapeHtml(result.content)}</p>
+                    <details class="mt-2">
+                        <summary class="text-still-copper text-xs cursor-pointer hover:underline">Why this still?</summary>
+                        <p class="mt-1 text-still-muted text-xs">${escapeHtml(result.why_relevant)}</p>
+                    </details>
+                `;
+
+                card.addEventListener('click', (e) => {
+                    if (e.target.type !== 'checkbox' && e.target.tagName !== 'SUMMARY') {
+                        toggleSommelierSelect(result.id);
+                        const checkbox = card.querySelector('input[type="checkbox"]');
+                        checkbox.checked = sommelierSelectedIds.has(result.id);
+                    }
+                });
+
+                container.appendChild(card);
+            });
+        }
+
+        async function searchSommelier() {
+            const query = document.getElementById('sommelier-query').value.trim();
+            if (!query) return;
+
+            const searchBtn = document.getElementById('sommelier-search-btn');
+            searchBtn.disabled = true;
+            searchBtn.innerHTML = '<span class="animate-spin">⏳</span> Searching...';
+
+            try {
+                const response = await Auth.fetchWithAuth('/api/sommelier/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query, limit: 10 })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('sommelier-results').classList.remove('hidden');
+                    renderSommelierResults(data.results, data.query_understood);
+                } else {
+                    throw new Error(data.detail || 'Search failed');
+                }
+            } catch (err) {
+                alert('Search error: ' + err.message);
+            } finally {
+                searchBtn.disabled = false;
+                searchBtn.innerHTML = '<span>Find Stills</span>';
+            }
+        }
+
+        // Load example queries
+        async function loadExampleQueries() {
+            try {
+                const response = await Auth.fetchWithAuth('/api/sommelier/examples');
+                const data = await response.json();
+
+                const container = document.getElementById('example-queries');
+                container.innerHTML = data.examples.map(q =>
+                    `<button class="text-sm px-3 py-1 bg-still-border text-still-muted rounded-full hover:bg-still-copper hover:text-white transition"
+                             onclick="document.getElementById('sommelier-query').value='${escapeHtml(q)}'; searchSommelier();">
+                        ${escapeHtml(q)}
+                    </button>`
+                ).join('');
+            } catch (err) {
+                console.error('Failed to load examples:', err);
+            }
+        }
 
         // Load personas dynamically
         async function loadPersonas() {
@@ -312,13 +502,9 @@
                 const filterSelect = document.getElementById('filter-persona');
                 const genSelect = document.getElementById('gen-persona');
 
-                // Clear and reset filter-persona
                 filterSelect.innerHTML = '<option value="">All Personas</option>';
-
-                // Clear gen-persona
                 genSelect.innerHTML = '';
 
-                // Add custom personas first (if any)
                 if (data.custom_personas && data.custom_personas.length > 0) {
                     const filterCustomGroup = document.createElement('optgroup');
                     filterCustomGroup.label = 'Your Custom Personas';
@@ -340,7 +526,6 @@
                     genSelect.appendChild(genCustomGroup);
                 }
 
-                // Add default personas
                 if (data.default_personas && data.default_personas.length > 0) {
                     const filterDefaultGroup = document.createElement('optgroup');
                     filterDefaultGroup.label = 'Default Personas';
@@ -363,16 +548,6 @@
                 }
             } catch (err) {
                 console.error('Failed to load personas:', err);
-                // Fallback to hardcoded options
-                const filterSelect = document.getElementById('filter-persona');
-                const genSelect = document.getElementById('gen-persona');
-                const fallbackOptions = `
-                    <option value="ceo_longterm_care">CEO of Long-Term Care Facility</option>
-                    <option value="don_memory_care">Director of Nursing (Memory Care)</option>
-                    <option value="marketing_director">Marketing Director (Senior Living)</option>
-                `;
-                filterSelect.innerHTML = '<option value="">All Personas</option>' + fallbackOptions;
-                genSelect.innerHTML = fallbackOptions;
             }
         }
 
@@ -395,7 +570,7 @@
                 const data = await response.json();
 
                 document.getElementById('library-stats').textContent =
-                    `${data.total} entries in library`;
+                    `${data.total} stills in your Reserve`;
 
                 allEntries = data.entries;
                 renderLibrary(allEntries);
@@ -419,18 +594,17 @@
                 }
 
             } catch (err) {
-                console.error('Failed to load library:', err);
+                console.error('Failed to load Reserve:', err);
             }
         }
 
-        // Load stats
         async function loadStats() {
             try {
                 const response = await Auth.fetchWithAuth('/api/library/stats');
                 const data = await response.json();
 
                 document.getElementById('library-stats').textContent =
-                    `${data.total_entries} total entries`;
+                    `${data.total_entries} total stills`;
             } catch (err) {
                 console.error('Failed to load stats:', err);
             }
@@ -449,9 +623,27 @@
             }
         });
 
+        document.getElementById('sommelier-search-btn').addEventListener('click', searchSommelier);
+
+        document.getElementById('sommelier-query').addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') searchSommelier();
+        });
+
+        document.getElementById('clear-sommelier').addEventListener('click', () => {
+            document.getElementById('sommelier-results').classList.add('hidden');
+            document.getElementById('sommelier-query').value = '';
+            sommelierSelectedIds.clear();
+            updateSommelierSelectedCount();
+        });
+
+        document.getElementById('blend-selected-btn').addEventListener('click', () => {
+            // Navigate to upload page with pre-selected stills
+            const ids = Array.from(sommelierSelectedIds).join(',');
+            window.location.href = `/upload.html?blend_stills=${ids}`;
+        });
+
         document.getElementById('generate-btn').addEventListener('click', () => {
-            // Populate preview
-            const previewList = document.getElementById('atoms-preview-list');
+            const previewList = document.getElementById('stills-preview-list');
             previewList.innerHTML = '';
 
             const selectedEntries = allEntries.filter(e => selectedIds.has(e.id));
@@ -493,7 +685,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        atom_ids: Array.from(selectedIds),
+                        still_ids: Array.from(selectedIds),
                         target_persona: persona,
                         asset_types: assetTypes,
                         asset_quantities: assetQuantities
@@ -512,10 +704,19 @@
             }
         });
 
+        // Show job filter banner if filtering
+        if (jobIdFilter) {
+            document.getElementById('job-filter-banner').classList.remove('hidden');
+            document.getElementById('clear-job-filter').addEventListener('click', () => {
+                window.location.href = '/reserve.html';
+            });
+        }
+
         // Initial load
         loadPersonas();
         loadLibrary();
         loadStats();
+        loadExampleQueries();
     </script>
 </body>
 </html>

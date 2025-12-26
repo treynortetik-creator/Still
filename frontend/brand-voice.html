@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" class="no-transitions">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/static/images/Icon only.png">
+    <title>Brand Voice - Still</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="/static/theme.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/static/utils.js"></script>
+    <script src="/static/auth.js"></script>
+    <script src="/static/components.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        still: {
+                            bg: 'var(--still-bg)',
+                            card: 'var(--still-card)',
+                            border: 'var(--still-border)',
+                            text: 'var(--still-text)',
+                            muted: 'var(--still-muted)',
+                            disabled: 'var(--still-disabled)',
+                            copper: 'var(--still-copper)',
+                            amber: 'var(--still-amber)',
+                            green: 'var(--still-green)',
+                            error: 'var(--still-error)',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="/static/styles.css">
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; }
+    </style>
+    <script>
+        window.addEventListener('load', () => {
+            document.documentElement.classList.remove('no-transitions');
+        });
+    </script>
+</head>
+<body class="bg-still-bg min-h-screen">
+    <!-- Navigation -->
+    <div id="nav-container"></div>
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-still-text">Brand Voice Configuration</h1>
+            <p class="text-still-muted mt-1">Define your brand's voice to ensure consistent, on-brand content generation</p>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="text-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-still-copper mx-auto"></div>
+            <p class="mt-4 text-still-muted">Loading configuration...</p>
+        </div>
+
+        <!-- Main Content -->
+        <div id="main-content" class="hidden space-y-8">
+            <!-- Company Info Section -->
+            <div class="bg-still-card rounded-lg shadow p-6 border border-still-border">
+                <h2 class="text-lg font-semibold text-still-text mb-4">
+                    <i class="fas fa-building mr-2 text-still-copper"></i>Company Information
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-still-muted mb-1">Company Name</label>
+                        <input type="text" id="company-name" class="w-full input-premium" placeholder="Acme Corp">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-still-muted mb-1">Industry</label>
+                        <input type="text" id="industry" class="w-full input-premium" placeholder="Technology, Healthcare, etc.">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tone by Platform Section -->
+            <div class="bg-still-card rounded-lg shadow p-6 border border-still-border">
+                <h2 class="text-lg font-semibold text-still-text mb-4">
+                    <i class="fas fa-microphone mr-2 text-still-copper"></i>Tone by Platform
+                </h2>
+                <p class="text-sm text-still-muted mb-4">Define how your brand should sound on each platform</p>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-still-muted mb-1">
+                            <i class="fab fa-linkedin text-still-copper mr-1"></i>LinkedIn Tone
+                        </label>
+                        <input type="text" id="tone-linkedin" class="w-full input-premium" placeholder="Professional and insightful">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-still-muted mb-1">
+                            <i class="fas fa-blog text-still-green mr-1"></i>Blog Tone
+                        </label>
+                        <input type="text" id="tone-blog" class="w-full input-premium" placeholder="Educational and engaging">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-still-muted mb-1">
+                            <i class="fas fa-envelope text-still-amber mr-1"></i>Email Tone
+                        </label>
+                        <input type="text" id="tone-email" class="w-full input-premium" placeholder="Friendly and direct">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-still-muted mb-1">
+                            <i class="fab fa-twitter text-still-copper mr-1"></i>Twitter/X Tone
+                        </label>
+                        <input type="text" id="tone-twitter" class="w-full input-premium" placeholder="Conversational and punchy">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Core Principles Section -->
+            <div class="bg-still-card rounded-lg shadow p-6 border border-still-border">
+                <h2 class="text-lg font-semibold text-still-text mb-4">
+                    <i class="fas fa-compass mr-2 text-still-copper"></i>Core Brand Principles
+                </h2>
+                <p class="text-sm text-still-muted mb-4">Key values and principles that guide your brand's messaging</p>
+                <div id="principles-container" class="space-y-2 mb-4">
+                    <!-- Principles will be added here -->
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" id="new-principle" class="flex-1 input-premium" placeholder="Add a core principle...">
+                    <button onclick="addPrinciple()" class="btn btn-primary text-still-text px-4 py-2 rounded-lg hover:opacity-90">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Vocabulary Section -->
+            <div class="bg-still-card rounded-lg shadow p-6 border border-still-border">
+                <h2 class="text-lg font-semibold text-still-text mb-4">
+                    <i class="fas fa-book mr-2 text-still-copper"></i>Vocabulary & Phrases
+                </h2>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-still-muted mb-1">Vocabulary Level</label>
+                    <select id="vocabulary-level" class="w-full input-premium select-premium" >
+                        <option value="casual">Casual - Simple, everyday language</option>
+                        <option value="professional">Professional - Business-appropriate language</option>
+                        <option value="technical">Technical - Industry-specific terminology</option>
+                        <option value="academic">Academic - Formal, scholarly language</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Phrases to Use -->
+                    <div>
+                        <h3 class="font-medium text-still-green mb-2">
+                            <i class="fas fa-check-circle mr-1"></i>Phrases to Use
+                        </h3>
+                        <div id="phrases-use-container" class="space-y-2 mb-2 max-h-40 overflow-y-auto">
+                            <!-- Phrases will be added here -->
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="text" id="new-phrase-use" class="flex-1 input-premium" placeholder="Add phrase...">
+                            <button onclick="addPhraseUse()" class="bg-still-green text-still-text px-3 py-2 rounded-lg hover:opacity-90 text-sm">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Phrases to Avoid -->
+                    <div>
+                        <h3 class="font-medium text-still-error mb-2">
+                            <i class="fas fa-times-circle mr-1"></i>Phrases to Avoid
+                        </h3>
+                        <div id="phrases-avoid-container" class="space-y-2 mb-2 max-h-40 overflow-y-auto">
+                            <!-- Phrases will be added here -->
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="text" id="new-phrase-avoid" class="flex-1 input-premium" placeholder="Add phrase...">
+                            <button onclick="addPhraseAvoid()" class="bg-still-error text-still-text px-3 py-2 rounded-lg hover:opacity-90 text-sm">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex justify-between items-center">
+                <button onclick="resetConfig()" class="text-still-error hover:opacity-80">
+                    <i class="fas fa-undo mr-1"></i>Reset to Defaults
+                </button>
+                <button onclick="saveConfig()" id="save-btn" class="btn btn-primary text-still-text px-6 py-2 rounded-lg hover:opacity-90">
+                    <i class="fas fa-save mr-2"></i>Save Configuration
+                </button>
+            </div>
+
+            <!-- Status Message -->
+            <div id="status-message" class="hidden p-4 rounded-lg"></div>
+        </div>
+    </main>
+
+    <script>
+        let config = {
+            company_name: '',
+            industry: '',
+            tone_linkedin: '',
+            tone_blog: '',
+            tone_email: '',
+            tone_twitter: '',
+            core_principles: [],
+            phrases_to_use: [],
+            phrases_to_avoid: [],
+            vocabulary_level: 'professional'
+        };
+
+        document.addEventListener('DOMContentLoaded', loadConfig);
+
+        async function loadConfig() {
+            try {
+                const response = await Auth.fetchWithAuth('/api/brand-voice/config');
+                if (response.ok) {
+                    config = await response.json();
+                    renderConfig();
+                }
+            } catch (error) {
+                console.error('Failed to load config:', error);
+                showStatus('Failed to load configuration', 'error');
+            }
+
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('main-content').classList.remove('hidden');
+        }
+
+        function renderConfig() {
+            document.getElementById('company-name').value = config.company_name || '';
+            document.getElementById('industry').value = config.industry || '';
+            document.getElementById('tone-linkedin').value = config.tone_linkedin || '';
+            document.getElementById('tone-blog').value = config.tone_blog || '';
+            document.getElementById('tone-email').value = config.tone_email || '';
+            document.getElementById('tone-twitter').value = config.tone_twitter || '';
+            document.getElementById('vocabulary-level').value = config.vocabulary_level || 'professional';
+
+            renderPrinciples();
+            renderPhrasesUse();
+            renderPhrasesAvoid();
+        }
+
+        function renderPrinciples() {
+            const container = document.getElementById('principles-container');
+            container.innerHTML = (config.core_principles || []).map((principle, i) => `
+                <div class="flex items-center gap-2 bg-still-bg rounded-lg px-3 py-2 border border-still-border">
+                    <span class="flex-1 text-still-text">${escapeHtml(principle)}</span>
+                    <button onclick="removePrinciple(${i})" class="text-still-error hover:opacity-80">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function renderPhrasesUse() {
+            const container = document.getElementById('phrases-use-container');
+            container.innerHTML = (config.phrases_to_use || []).map((phrase, i) => `
+                <div class="flex items-center gap-2 bg-still-green/10 rounded px-2 py-1 text-sm border border-still-green/30">
+                    <span class="flex-1 text-still-green">${escapeHtml(phrase)}</span>
+                    <button onclick="removePhraseUse(${i})" class="text-still-green hover:opacity-80">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function renderPhrasesAvoid() {
+            const container = document.getElementById('phrases-avoid-container');
+            container.innerHTML = (config.phrases_to_avoid || []).map((phrase, i) => `
+                <div class="flex items-center gap-2 bg-still-error/10 rounded px-2 py-1 text-sm border border-still-error/30">
+                    <span class="flex-1 text-still-error">${escapeHtml(phrase)}</span>
+                    <button onclick="removePhraseAvoid(${i})" class="text-still-error hover:opacity-80">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function addPrinciple() {
+            const input = document.getElementById('new-principle');
+            const value = input.value.trim();
+            if (value) {
+                if (!config.core_principles) config.core_principles = [];
+                config.core_principles.push(value);
+                input.value = '';
+                renderPrinciples();
+            }
+        }
+
+        function removePrinciple(index) {
+            config.core_principles.splice(index, 1);
+            renderPrinciples();
+        }
+
+        function addPhraseUse() {
+            const input = document.getElementById('new-phrase-use');
+            const value = input.value.trim();
+            if (value) {
+                if (!config.phrases_to_use) config.phrases_to_use = [];
+                config.phrases_to_use.push(value);
+                input.value = '';
+                renderPhrasesUse();
+            }
+        }
+
+        function removePhraseUse(index) {
+            config.phrases_to_use.splice(index, 1);
+            renderPhrasesUse();
+        }
+
+        function addPhraseAvoid() {
+            const input = document.getElementById('new-phrase-avoid');
+            const value = input.value.trim();
+            if (value) {
+                if (!config.phrases_to_avoid) config.phrases_to_avoid = [];
+                config.phrases_to_avoid.push(value);
+                input.value = '';
+                renderPhrasesAvoid();
+            }
+        }
+
+        function removePhraseAvoid(index) {
+            config.phrases_to_avoid.splice(index, 1);
+            renderPhrasesAvoid();
+        }
+
+        function gatherConfig() {
+            return {
+                company_name: document.getElementById('company-name').value,
+                industry: document.getElementById('industry').value,
+                tone_linkedin: document.getElementById('tone-linkedin').value,
+                tone_blog: document.getElementById('tone-blog').value,
+                tone_email: document.getElementById('tone-email').value,
+                tone_twitter: document.getElementById('tone-twitter').value,
+                core_principles: config.core_principles || [],
+                phrases_to_use: config.phrases_to_use || [],
+                phrases_to_avoid: config.phrases_to_avoid || [],
+                vocabulary_level: document.getElementById('vocabulary-level').value
+            };
+        }
+
+        async function saveConfig() {
+            const btn = document.getElementById('save-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+
+            try {
+                const data = gatherConfig();
+                const response = await Auth.fetchWithAuth('/api/brand-voice/config', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    showStatus('Configuration saved successfully!', 'success');
+                    config = data;
+                } else {
+                    const error = await response.json();
+                    showStatus(error.detail || 'Failed to save configuration', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to save config:', error);
+                showStatus('Failed to save configuration', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-save mr-2"></i>Save Configuration';
+            }
+        }
+
+        async function resetConfig() {
+            if (!confirm('Are you sure you want to reset your brand voice configuration to defaults?')) {
+                return;
+            }
+
+            try {
+                const response = await Auth.fetchWithAuth('/api/brand-voice/config', {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    showStatus('Configuration reset to defaults', 'success');
+                    await loadConfig();
+                }
+            } catch (error) {
+                console.error('Failed to reset config:', error);
+                showStatus('Failed to reset configuration', 'error');
+            }
+        }
+
+        function showStatus(message, type) {
+            const el = document.getElementById('status-message');
+            el.textContent = message;
+            el.className = `p-4 rounded-lg border ${type === 'success' ? 'bg-still-green/10 text-still-green border-still-green/30' : 'bg-still-error/10 text-still-error border-still-error/30'}`;
+            el.classList.remove('hidden');
+
+            setTimeout(() => {
+                el.classList.add('hidden');
+            }, 5000);
+        }
+
+        // escapeHtml is now provided by utils.js
+
+        // Handle enter key for inputs
+        document.getElementById('new-principle').addEventListener('keypress', e => {
+            if (e.key === 'Enter') addPrinciple();
+        });
+        document.getElementById('new-phrase-use').addEventListener('keypress', e => {
+            if (e.key === 'Enter') addPhraseUse();
+        });
+        document.getElementById('new-phrase-avoid').addEventListener('keypress', e => {
+            if (e.key === 'Enter') addPhraseAvoid();
+        });
+    </script>
+</body>
+</html>

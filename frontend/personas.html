@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" class="no-transitions">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/static/images/Icon only.png">
+    <title>Custom Personas - Still</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="/static/theme.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        still: {
+                            bg: 'var(--still-bg)',
+                            card: 'var(--still-card)',
+                            border: 'var(--still-border)',
+                            text: 'var(--still-text)',
+                            muted: 'var(--still-muted)',
+                            disabled: 'var(--still-disabled)',
+                            copper: 'var(--still-copper)',
+                            amber: 'var(--still-amber)',
+                            green: 'var(--still-green)',
+                            error: 'var(--still-error)',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; }
+    </style>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/utils.js"></script>
+    <script src="/static/auth.js"></script>
+    <script src="/static/components.js"></script>
+    <script>
+        window.addEventListener('load', () => {
+            document.documentElement.classList.remove('no-transitions');
+        });
+    </script>
+</head>
+<body class="bg-still-bg min-h-screen">
+    <!-- Navigation -->
+    <div id="nav-container"></div>
+
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-3xl font-bold text-still-text">Custom Personas</h1>
+                <p class="text-still-muted mt-1">Create target audience profiles for personalized content generation</p>
+            </div>
+            <button onclick="openCreateModal()"
+                class="btn btn-primary text-white px-4 py-2 rounded-lg font-medium transition flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                New Persona
+            </button>
+        </div>
+
+        <!-- Default Personas Section -->
+        <div class="mb-8">
+            <h2 class="text-lg font-semibold text-still-muted mb-4">Default Personas</h2>
+            <div id="default-personas" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Loaded dynamically -->
+            </div>
+        </div>
+
+        <!-- Custom Personas Section -->
+        <div>
+            <h2 class="text-lg font-semibold text-still-muted mb-4">Your Custom Personas</h2>
+            <div id="custom-personas" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Loaded dynamically -->
+            </div>
+            <div id="no-custom-personas" class="hidden text-center py-12 bg-still-card rounded-lg border-2 border-dashed border-still-border">
+                <svg class="mx-auto h-12 w-12 text-still-disabled" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                </svg>
+                <h3 class="mt-4 text-lg font-medium text-still-text">No custom personas yet</h3>
+                <p class="mt-2 text-still-muted">Create your first persona to target specific audiences</p>
+                <button onclick="openCreateModal()" class="mt-4 text-still-copper hover:text-still-amber font-medium">
+                    Create your first persona
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Modal -->
+    <div id="persona-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-still-card rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto border border-still-border">
+            <div class="p-6 border-b border-still-border">
+                <h2 id="modal-title" class="text-xl font-bold text-still-text">Create New Persona</h2>
+            </div>
+            <form id="persona-form" class="p-6 space-y-6">
+                <input type="hidden" id="persona-id">
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-still-muted mb-1">Persona Name *</label>
+                        <input type="text" id="persona-name" required
+              class="w-full input-premium" placeholder="e.g., Healthcare Administrator">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-still-muted mb-1">Job Title/Role *</label>
+                        <input type="text" id="persona-role" required
+              class="w-full input-premium" placeholder="e.g., VP of Operations">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-still-muted mb-1">Industry</label>
+                    <input type="text" id="persona-industry"
+            class="w-full input-premium" placeholder="e.g., Healthcare, Technology, Finance">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-still-muted mb-1">Pain Points / Challenges *</label>
+                    <p class="text-xs text-still-disabled mb-2">What problems keep them up at night? (one per line)</p>
+                    <textarea id="persona-pain-points" rows="4" required
+                        class="w-full bg-still-bg border border-still-border rounded-lg p-2 text-still-text focus:ring-2 focus:ring-still-copper focus:border-still-copper"
+                        placeholder="Budget constraints&#10;Staff turnover&#10;Regulatory compliance&#10;Technology adoption"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-still-muted mb-1">Goals / Priorities *</label>
+                    <p class="text-xs text-still-disabled mb-2">What are they trying to achieve? (one per line)</p>
+                    <textarea id="persona-goals" rows="4" required
+                        class="w-full bg-still-bg border border-still-border rounded-lg p-2 text-still-text focus:ring-2 focus:ring-still-copper focus:border-still-copper"
+                        placeholder="Reduce costs&#10;Improve patient outcomes&#10;Increase efficiency&#10;Drive growth"></textarea>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-still-muted mb-1">Content Length</label>
+                        <select id="persona-length"
+              class="w-full input-premium select-premium" >
+                            <option value="Short">Short - time-constrained</option>
+                            <option value="Medium" selected>Medium - balanced</option>
+                            <option value="Long">Long - comprehensive</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-still-muted mb-1">Data Preference</label>
+                        <select id="persona-data"
+              class="w-full input-premium select-premium" >
+                            <option value="Low">Low - stories over stats</option>
+                            <option value="Moderate" selected>Moderate - balanced</option>
+                            <option value="High">High - metrics-driven</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-still-muted mb-1">Tone</label>
+                        <select id="persona-tone"
+              class="w-full input-premium select-premium" >
+                            <option value="Professional">Professional</option>
+                            <option value="Executive">Executive - ROI-focused</option>
+                            <option value="Empathetic">Empathetic - supportive</option>
+                            <option value="Creative">Creative - innovative</option>
+                            <option value="Technical">Technical - detailed</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 border-t border-still-border">
+                    <button type="button" onclick="closeModal()"
+                        class="px-4 py-2 text-still-muted hover:bg-still-border rounded-lg transition">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                        class="px-4 py-2 btn btn-primary text-white rounded-lg transition">
+                        Save Persona
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-still-card rounded-xl shadow-xl max-w-md w-full mx-4 p-6 border border-still-border">
+            <h3 class="text-lg font-bold text-still-text mb-2">Delete Persona?</h3>
+            <p class="text-still-muted mb-6">Are you sure you want to delete this persona? This action cannot be undone.</p>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeDeleteModal()"
+                    class="px-4 py-2 text-still-muted hover:bg-still-border rounded-lg transition">
+                    Cancel
+                </button>
+                <button onclick="confirmDelete()"
+                    class="px-4 py-2 bg-still-error text-white rounded-lg hover:opacity-90 transition">
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="hidden fixed bottom-4 right-4 bg-still-card text-still-text px-4 py-3 rounded-lg shadow-lg z-50 border border-still-border"></div>
+
+    <script>
+        // Require authentication
+        Auth.requireAuth();
+
+        let editingPersonaId = null;
+        let deletingPersonaId = null;
+
+        // Load personas on page load
+        document.addEventListener('DOMContentLoaded', loadPersonas);
+
+        async function loadPersonas() {
+            try {
+                const response = await Auth.fetchWithAuth('/api/personas/all');
+                const data = await response.json();
+
+                renderDefaultPersonas(data.default_personas || []);
+                renderCustomPersonas(data.custom_personas || []);
+            } catch (err) {
+                showToast('Failed to load personas', 'error');
+            }
+        }
+
+        function renderDefaultPersonas(personas) {
+            const container = document.getElementById('default-personas');
+            container.innerHTML = personas.map(p => `
+                <div class="bg-still-card rounded-lg shadow-sm border border-still-border p-4">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <span class="inline-block px-2 py-1 text-xs font-medium bg-still-border text-still-muted rounded mb-2">Default</span>
+                            <h3 class="font-semibold text-still-text">${escapeHtml(p.title)}</h3>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div>
+                            <span class="text-still-muted">Pain Points:</span>
+                            <div class="flex flex-wrap gap-1 mt-1">
+                                ${(p.pain_points || []).slice(0, 3).map(pp =>
+                                    `<span class="px-2 py-0.5 bg-still-error/20 text-still-error rounded text-xs">${escapeHtml(pp)}</span>`
+                                ).join('')}
+                            </div>
+                        </div>
+                        <div>
+                            <span class="text-still-muted">Priorities:</span>
+                            <div class="flex flex-wrap gap-1 mt-1">
+                                ${(p.priorities || []).slice(0, 3).map(pr =>
+                                    `<span class="px-2 py-0.5 bg-still-green/20 text-still-green rounded text-xs">${escapeHtml(pr)}</span>`
+                                ).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderCustomPersonas(personas) {
+            const container = document.getElementById('custom-personas');
+            const emptyState = document.getElementById('no-custom-personas');
+
+            if (personas.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            container.innerHTML = personas.map(p => `
+                <div class="bg-still-card rounded-lg shadow-sm border border-still-border p-4">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <span class="inline-block px-2 py-1 text-xs font-medium bg-still-copper/20 text-still-copper rounded mb-2">Custom</span>
+                            <h3 class="font-semibold text-still-text">${escapeHtml(p.name)}</h3>
+                            <p class="text-sm text-still-muted">${escapeHtml(p.role)}</p>
+                        </div>
+                        <div class="flex gap-1">
+                            <button onclick="editPersona('${p.id}')" class="p-1 text-still-disabled hover:text-still-copper">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                </svg>
+                            </button>
+                            <button onclick="deletePersona('${p.id}')" class="p-1 text-still-disabled hover:text-still-error">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    ${p.industry ? `<p class="text-xs text-still-muted mb-2">Industry: ${escapeHtml(p.industry)}</p>` : ''}
+                    <div class="space-y-2 text-sm">
+                        <div>
+                            <span class="text-still-muted">Pain Points:</span>
+                            <div class="flex flex-wrap gap-1 mt-1">
+                                ${(p.pain_points || []).slice(0, 3).map(pp =>
+                                    `<span class="px-2 py-0.5 bg-still-error/20 text-still-error rounded text-xs">${escapeHtml(pp)}</span>`
+                                ).join('')}
+                                ${(p.pain_points || []).length > 3 ? `<span class="text-xs text-still-disabled">+${p.pain_points.length - 3} more</span>` : ''}
+                            </div>
+                        </div>
+                        <div>
+                            <span class="text-still-muted">Goals:</span>
+                            <div class="flex flex-wrap gap-1 mt-1">
+                                ${(p.goals || []).slice(0, 3).map(g =>
+                                    `<span class="px-2 py-0.5 bg-still-green/20 text-still-green rounded text-xs">${escapeHtml(g)}</span>`
+                                ).join('')}
+                                ${(p.goals || []).length > 3 ? `<span class="text-xs text-still-disabled">+${p.goals.length - 3} more</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openCreateModal() {
+            editingPersonaId = null;
+            document.getElementById('modal-title').textContent = 'Create New Persona';
+            document.getElementById('persona-form').reset();
+            document.getElementById('persona-id').value = '';
+            document.getElementById('persona-modal').classList.remove('hidden');
+        }
+
+        async function editPersona(id) {
+            try {
+                const response = await Auth.fetchWithAuth(`/api/custom-personas/${id}`);
+                if (!response.ok) throw new Error('Failed to load persona');
+
+                const persona = await response.json();
+                editingPersonaId = id;
+
+                document.getElementById('modal-title').textContent = 'Edit Persona';
+                document.getElementById('persona-id').value = id;
+                document.getElementById('persona-name').value = persona.name || '';
+                document.getElementById('persona-role').value = persona.role || '';
+                document.getElementById('persona-industry').value = persona.industry || '';
+                document.getElementById('persona-pain-points').value = (persona.pain_points || []).join('\n');
+                document.getElementById('persona-goals').value = (persona.goals || []).join('\n');
+
+                if (persona.content_preferences) {
+                    document.getElementById('persona-length').value = persona.content_preferences.length || 'Medium';
+                    document.getElementById('persona-data').value = persona.content_preferences.data_density || 'Moderate';
+                    document.getElementById('persona-tone').value = persona.content_preferences.tone || 'Professional';
+                }
+
+                document.getElementById('persona-modal').classList.remove('hidden');
+            } catch (err) {
+                showToast('Failed to load persona details', 'error');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('persona-modal').classList.add('hidden');
+            editingPersonaId = null;
+        }
+
+        function deletePersona(id) {
+            deletingPersonaId = id;
+            document.getElementById('delete-modal').classList.remove('hidden');
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('delete-modal').classList.add('hidden');
+            deletingPersonaId = null;
+        }
+
+        async function confirmDelete() {
+            if (!deletingPersonaId) return;
+
+            try {
+                const response = await Auth.fetchWithAuth(`/api/custom-personas/${deletingPersonaId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) throw new Error('Failed to delete persona');
+
+                showToast('Persona deleted successfully');
+                closeDeleteModal();
+                loadPersonas();
+            } catch (err) {
+                showToast('Failed to delete persona', 'error');
+            }
+        }
+
+        // Form submission
+        document.getElementById('persona-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const painPoints = document.getElementById('persona-pain-points').value
+                .split('\n')
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+
+            const goals = document.getElementById('persona-goals').value
+                .split('\n')
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+
+            if (painPoints.length === 0) {
+                showToast('Please add at least one pain point', 'error');
+                return;
+            }
+
+            if (goals.length === 0) {
+                showToast('Please add at least one goal', 'error');
+                return;
+            }
+
+            const personaData = {
+                name: document.getElementById('persona-name').value.trim(),
+                role: document.getElementById('persona-role').value.trim(),
+                industry: document.getElementById('persona-industry').value.trim() || null,
+                pain_points: painPoints,
+                goals: goals,
+                content_preferences: {
+                    length: document.getElementById('persona-length').value,
+                    data_density: document.getElementById('persona-data').value,
+                    tone: document.getElementById('persona-tone').value
+                }
+            };
+
+            try {
+                const url = editingPersonaId
+                    ? `/api/custom-personas/${editingPersonaId}`
+                    : '/api/custom-personas';
+                const method = editingPersonaId ? 'PUT' : 'POST';
+
+                const response = await Auth.fetchWithAuth(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(personaData)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to save persona');
+                }
+
+                showToast(editingPersonaId ? 'Persona updated successfully' : 'Persona created successfully');
+                closeModal();
+                loadPersonas();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        });
+
+        // showToast and escapeHtml are now provided by utils.js
+    </script>
+</body>
+</html>

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" class="no-transitions">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/static/images/Icon only.png">
+    <title>Batch Status - Still</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="/static/theme.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/static/utils.js"></script>
+    <script src="/static/auth.js"></script>
+    <script src="/static/components.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        still: {
+                            bg: 'var(--still-bg)',
+                            card: 'var(--still-card)',
+                            border: 'var(--still-border)',
+                            text: 'var(--still-text)',
+                            muted: 'var(--still-muted)',
+                            disabled: 'var(--still-disabled)',
+                            copper: 'var(--still-copper)',
+                            amber: 'var(--still-amber)',
+                            green: 'var(--still-green)',
+                            error: 'var(--still-error)',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="/static/styles.css">
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; }
+    </style>
+    <script>
+        window.addEventListener('load', () => {
+            document.documentElement.classList.remove('no-transitions');
+        });
+    </script>
+</head>
+<body class="bg-still-bg min-h-screen">
+    <!-- Navigation -->
+    <div id="nav-container"></div>
+
+    <div class="max-w-4xl mx-auto px-4 py-8">
+        <!-- Batch Header -->
+        <div class="bg-still-card rounded-lg shadow-sm border border-still-border p-6 mb-6">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-still-text">Batch Processing</h1>
+                    <p class="text-still-muted mt-1" id="batch-id-display">Batch ID: Loading...</p>
+                </div>
+                <span id="batch-status-badge" class="px-3 py-1 rounded-full text-sm font-medium bg-still-border text-still-muted">
+                    Loading...
+                </span>
+            </div>
+
+            <!-- Overall Progress -->
+            <div class="mb-4">
+                <div class="flex justify-between text-sm mb-1">
+                    <span class="text-still-muted">Overall Progress</span>
+                    <span id="progress-text" class="text-still-text font-medium">0 / 0 jobs complete</span>
+                </div>
+                <div class="w-full bg-still-border rounded-full h-3">
+                    <div id="overall-progress" class="btn btn-primary h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="grid grid-cols-4 gap-4 text-center">
+                <div>
+                    <p class="text-2xl font-bold text-still-text" id="total-jobs">0</p>
+                    <p class="text-xs text-still-muted">Total</p>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-still-green" id="completed-jobs">0</p>
+                    <p class="text-xs text-still-muted">Completed</p>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-still-amber" id="processing-jobs">0</p>
+                    <p class="text-xs text-still-muted">Processing</p>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-still-error" id="failed-jobs">0</p>
+                    <p class="text-xs text-still-muted">Failed</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Download Button (shown when batch is complete/partial) -->
+        <div id="download-section" class="hidden mb-6">
+            <button onclick="downloadBatch()" id="download-btn"
+                class="w-full bg-still-green text-still-text py-3 rounded-lg font-semibold hover:opacity-90 transition flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                Download All as ZIP
+            </button>
+        </div>
+
+        <!-- Jobs List -->
+        <div class="space-y-4" id="jobs-list">
+            <!-- Jobs will be rendered here -->
+        </div>
+
+        <!-- Back to Upload -->
+        <div class="mt-8 text-center">
+            <a href="/upload.html" class="text-still-copper hover:text-still-amber font-medium">
+                Upload more files
+            </a>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="hidden fixed bottom-4 right-4 bg-still-card text-still-text px-4 py-3 rounded-lg shadow-lg z-50 border border-still-border"></div>
+
+    <script>
+        // Require authentication
+        Auth.requireAuth();
+
+        // Get batch ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const batchId = urlParams.get('batch_id');
+
+        if (!batchId) {
+            window.location.href = '/upload.html';
+        }
+
+        let pollInterval = null;
+        let batchStatus = 'pending';
+
+        // Load batch status on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('batch-id-display').textContent = `Batch ID: ${batchId.slice(0, 8)}...`;
+            loadBatchStatus();
+            // Start polling
+            pollInterval = setInterval(loadBatchStatus, 3000);
+        });
+
+        async function loadBatchStatus() {
+            try {
+                const response = await Auth.fetchWithAuth(`/api/batch/${batchId}/status`);
+                if (!response.ok) {
+                    throw new Error('Failed to load batch status');
+                }
+
+                const data = await response.json();
+                batchStatus = data.status;
+
+                // Update UI
+                updateBatchHeader(data);
+                renderJobs(data.jobs);
+
+                // Show download section if complete or partial
+                if (data.status === 'complete' || data.status === 'partial') {
+                    document.getElementById('download-section').classList.remove('hidden');
+                    // Stop polling
+                    if (pollInterval) {
+                        clearInterval(pollInterval);
+                        pollInterval = null;
+                    }
+                }
+
+            } catch (err) {
+                console.error('Error loading batch status:', err);
+                showToast('Failed to load batch status', 'error');
+            }
+        }
+
+        function updateBatchHeader(data) {
+            // Update status badge
+            const badge = document.getElementById('batch-status-badge');
+            const statusColors = {
+                'pending': 'bg-still-border text-still-muted',
+                'processing': 'bg-still-copper/20 text-still-copper',
+                'complete': 'bg-still-green/20 text-still-green',
+                'partial': 'bg-still-amber/20 text-still-amber',
+                'failed': 'bg-still-error/20 text-still-error',
+            };
+            badge.className = `px-3 py-1 rounded-full text-sm font-medium ${statusColors[data.status] || statusColors.pending}`;
+            badge.textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1);
+
+            // Update progress
+            const progressPercent = data.total_jobs > 0
+                ? Math.round(((data.completed_jobs + data.failed_jobs) / data.total_jobs) * 100)
+                : 0;
+            document.getElementById('overall-progress').style.width = `${progressPercent}%`;
+            document.getElementById('progress-text').textContent = `${data.completed_jobs} / ${data.total_jobs} jobs complete`;
+
+            // Update stats
+            document.getElementById('total-jobs').textContent = data.total_jobs;
+            document.getElementById('completed-jobs').textContent = data.completed_jobs;
+            document.getElementById('failed-jobs').textContent = data.failed_jobs;
+
+            // Calculate processing jobs
+            const processingCount = data.jobs.filter(j =>
+                j.status !== 'complete' && j.status !== 'failed'
+            ).length;
+            document.getElementById('processing-jobs').textContent = processingCount;
+        }
+
+        function renderJobs(jobs) {
+            const container = document.getElementById('jobs-list');
+
+            container.innerHTML = jobs.map(job => {
+                const statusColors = {
+                    'uploading': 'bg-still-border text-still-muted',
+                    'transcribing': 'bg-still-copper/20 text-still-copper',
+                    'cleaning': 'bg-still-copper/20 text-still-copper',
+                    'atomizing': 'bg-still-amber/20 text-still-amber',
+                    'drafting': 'bg-still-copper/20 text-still-copper',
+                    'editing': 'bg-still-copper/20 text-still-copper',
+                    'factchecking': 'bg-still-amber/20 text-still-amber',
+                    'complete': 'bg-still-green/20 text-still-green',
+                    'failed': 'bg-still-error/20 text-still-error',
+                };
+
+                const statusColor = statusColors[job.status] || 'bg-still-border text-still-muted';
+                const isComplete = job.status === 'complete';
+                const isFailed = job.status === 'failed';
+                const isProcessing = !isComplete && !isFailed;
+
+                return `
+                    <div class="bg-still-card rounded-lg shadow-sm border border-still-border p-4">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="flex-1 min-w-0">
+                                <h3 class="font-medium text-still-text truncate">${escapeHtml(job.filename)}</h3>
+                                ${job.current_step ? `<p class="text-sm text-still-muted">${escapeHtml(job.current_step)}</p>` : ''}
+                            </div>
+                            <span class="ml-2 px-2 py-1 rounded text-xs font-medium ${statusColor}">
+                                ${job.status.charAt(0).toUpperCase() + job.status.slice(1)}
+                            </span>
+                        </div>
+
+                        ${isProcessing ? `
+                            <div class="mb-2">
+                                <div class="flex justify-between text-xs text-still-muted mb-1">
+                                    <span>Progress</span>
+                                    <span>${job.progress}%</span>
+                                </div>
+                                <div class="w-full bg-still-border rounded-full h-2">
+                                    <div class="btn btn-primary h-2 rounded-full transition-all duration-500" style="width: ${job.progress}%"></div>
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        ${isFailed && job.error_message ? `
+                            <div class="mt-2 p-2 bg-still-error/10 rounded text-sm text-still-error">
+                                ${escapeHtml(job.error_message)}
+                            </div>
+                        ` : ''}
+
+                        ${isComplete ? `
+                            <div class="mt-2 flex gap-2">
+                                <a href="/results.html?job_id=${job.job_id}"
+                                   class="text-sm text-still-copper hover:text-still-amber font-medium">
+                                    View Results
+                                </a>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function downloadBatch() {
+            const btn = document.getElementById('download-btn');
+            btn.disabled = true;
+            btn.innerHTML = `
+                <svg class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Preparing download...
+            `;
+
+            try {
+                const response = await Auth.fetchWithAuth(`/api/batch/${batchId}/download`);
+                if (!response.ok) {
+                    throw new Error('Download failed');
+                }
+
+                // Download the file
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `batch_${batchId.slice(0, 8)}.zip`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+
+                showToast('Download started');
+            } catch (err) {
+                showToast('Failed to download batch', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    Download All as ZIP
+                `;
+            }
+        }
+
+        // showToast and escapeHtml are now provided by utils.js
+
+        // Cleanup on page leave
+        window.addEventListener('beforeunload', () => {
+            if (pollInterval) {
+                clearInterval(pollInterval);
+            }
+        });
+    </script>
+</body>
+</html>
