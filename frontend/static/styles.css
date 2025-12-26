@@ -5,49 +5,85 @@
    ============================================ */
 
 :root {
-    /* Dark theme (default) */
-    --still-bg: #0D0D0D;
-    --still-card: #1A1A1A;
-    --still-border: #2A2A2A;
-    --still-text: #F5F5F5;
-    --still-muted: #A3A3A3;
-    --still-disabled: #737373;
+    /* Dark theme (default) - Liquid Premium */
+    --still-bg: #09090B;
+    --still-card: #18181B;
+    --still-card-elevated: #27272A;
+    --still-border: #27272A;
+    --still-border-subtle: #1F1F23;
+    --still-text: #FAFAFA;
+    --still-muted: #A1A1AA;
+    --still-disabled: #52525B;
 
-    /* Accent colors (same for both themes) */
+    /* Accent colors - refined */
     --still-copper: #B87333;
-    --still-copper-hover: #A66329;
+    --still-copper-hover: #C4844A;
+    --still-copper-glow: rgba(184, 115, 51, 0.4);
     --still-amber: #D4A574;
-    --still-green: #4A7C59;
-    --still-error: #C45C4A;
+    --still-green: #22C55E;
+    --still-green-muted: #4ADE80;
+    --still-error: #EF4444;
+    --still-error-muted: #F87171;
 
     /* Gradient colors */
     --still-gradient-start: #B87333;
     --still-gradient-end: #D4A574;
-    --still-gradient-hover-start: #A66329;
-    --still-gradient-hover-end: #C49464;
+    --still-gradient-hover-start: #C4844A;
+    --still-gradient-hover-end: #E0B68A;
+
+    /* Glassmorphism */
+    --glass-bg: rgba(24, 24, 27, 0.7);
+    --glass-bg-solid: rgba(24, 24, 27, 0.95);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-border-hover: rgba(255, 255, 255, 0.12);
+
+    /* Glow effects */
+    --glow-copper: 0 0 20px rgba(184, 115, 51, 0.3);
+    --glow-copper-intense: 0 0 30px rgba(184, 115, 51, 0.5);
+    --glow-green: 0 0 15px rgba(34, 197, 94, 0.3);
+    --glow-error: 0 0 15px rgba(239, 68, 68, 0.3);
+
+    /* Shadows - enhanced depth */
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --shadow-xl: 0 12px 40px rgba(0, 0, 0, 0.6);
+
+    /* Premium card shadow */
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 1px rgba(255, 255, 255, 0.05);
+    --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 1px rgba(255, 255, 255, 0.1);
 
     /* Scrollbar */
-    --scrollbar-track: #2A2A2A;
-    --scrollbar-thumb: #4A4A4A;
-    --scrollbar-thumb-hover: #5A5A5A;
+    --scrollbar-track: #18181B;
+    --scrollbar-thumb: #3F3F46;
+    --scrollbar-thumb-hover: #52525B;
 
-    /* Focus ring */
-    --focus-ring: #6366f1;
+    /* Focus ring - copper glow */
+    --focus-ring: var(--still-copper);
+    --focus-ring-offset: #09090B;
 
     /* Skeleton loading */
-    --skeleton-base: #2A2A2A;
-    --skeleton-highlight: #3A3A3A;
+    --skeleton-base: #27272A;
+    --skeleton-highlight: #3F3F46;
 
     /* Modal backdrop */
-    --backdrop-color: rgba(0, 0, 0, 0.7);
+    --backdrop-color: rgba(0, 0, 0, 0.8);
+    --backdrop-blur: 8px;
 
-    /* Shadows */
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
-    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3);
+    /* Animation timing */
+    --transition-fast: 150ms;
+    --transition-base: 200ms;
+    --transition-slow: 300ms;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 
-    /* Hover lift shadow */
-    --hover-lift-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    /* Border radius - slightly larger */
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-xl: 20px;
+    --radius-full: 9999px;
 
     /* Platform colors - dark theme */
     --platform-linkedin-bg: rgba(59, 130, 246, 0.2);
@@ -85,44 +121,64 @@
     --score-high-border: #3B82F6;
 }
 
-/* Light theme overrides */
+/* Light theme - Liquid Premium */
 [data-theme="light"] {
-    --still-bg: #FFFFFF;
-    --still-card: #F8F9FA;
-    --still-border: #E2E8F0;
-    --still-text: #1F2937;
-    --still-muted: #6B7280;
-    --still-disabled: #9CA3AF;
+    --still-bg: #FAFAFA;
+    --still-card: #FFFFFF;
+    --still-card-elevated: #F4F4F5;
+    --still-border: #E4E4E7;
+    --still-border-subtle: #F4F4F5;
+    --still-text: #18181B;
+    --still-muted: #71717A;
+    --still-disabled: #A1A1AA;
 
-    /* Slightly adjusted accents for better contrast on light */
-    --still-copper: #B87333;
-    --still-copper-hover: #9A5F2A;
-    --still-amber: #C49464;
-    --still-green: #3D6B4A;
-    --still-error: #B54A3A;
+    /* Accent colors - adjusted for light */
+    --still-copper: #A66329;
+    --still-copper-hover: #8B5324;
+    --still-copper-glow: rgba(166, 99, 41, 0.25);
+    --still-amber: #B8894A;
+    --still-green: #16A34A;
+    --still-green-muted: #22C55E;
+    --still-error: #DC2626;
+    --still-error-muted: #EF4444;
+
+    /* Glassmorphism - light mode */
+    --glass-bg: rgba(255, 255, 255, 0.8);
+    --glass-bg-solid: rgba(255, 255, 255, 0.95);
+    --glass-border: rgba(0, 0, 0, 0.06);
+    --glass-border-hover: rgba(0, 0, 0, 0.1);
+
+    /* Glow effects - subtle for light */
+    --glow-copper: 0 0 20px rgba(166, 99, 41, 0.15);
+    --glow-copper-intense: 0 0 30px rgba(166, 99, 41, 0.25);
+    --glow-green: 0 0 15px rgba(22, 163, 74, 0.2);
+    --glow-error: 0 0 15px rgba(220, 38, 38, 0.2);
+
+    /* Shadows - softer for light mode */
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.06);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
+    --shadow-xl: 0 12px 40px rgba(0, 0, 0, 0.12);
+
+    /* Premium card shadow - light */
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.06), 0 0 1px rgba(0, 0, 0, 0.1);
+    --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.1), 0 0 1px rgba(0, 0, 0, 0.15);
 
     /* Scrollbar */
-    --scrollbar-track: #F1F5F9;
-    --scrollbar-thumb: #CBD5E1;
-    --scrollbar-thumb-hover: #94A3B8;
+    --scrollbar-track: #F4F4F5;
+    --scrollbar-thumb: #D4D4D8;
+    --scrollbar-thumb-hover: #A1A1AA;
 
-    /* Focus ring */
-    --focus-ring: #3B82F6;
+    /* Focus ring offset */
+    --focus-ring-offset: #FAFAFA;
 
     /* Skeleton loading */
-    --skeleton-base: #E2E8F0;
-    --skeleton-highlight: #F1F5F9;
+    --skeleton-base: #E4E4E7;
+    --skeleton-highlight: #F4F4F5;
 
     /* Modal backdrop */
     --backdrop-color: rgba(0, 0, 0, 0.5);
-
-    /* Shadows */
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
-
-    /* Hover lift shadow */
-    --hover-lift-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 
     /* Platform colors - light theme */
     --platform-linkedin-bg: rgba(59, 130, 246, 0.1);
