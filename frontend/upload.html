@@ -1,207 +1,527 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark" class="no-transitions">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upload Content - ContentMultiplier</title>
+    <link rel="icon" type="image/png" href="/static/images/Icon only.png">
+    <title>Upload Content - Still</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="/static/theme.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        still: {
+                            bg: 'var(--still-bg)',
+                            card: 'var(--still-card)',
+                            border: 'var(--still-border)',
+                            text: 'var(--still-text)',
+                            muted: 'var(--still-muted)',
+                            disabled: 'var(--still-disabled)',
+                            copper: 'var(--still-copper)',
+                            amber: 'var(--still-amber)',
+                            green: 'var(--still-green)',
+                            error: 'var(--still-error)',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
     <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/utils.js"></script>
     <script src="/static/auth.js"></script>
+    <script src="/static/components.js"></script>
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; }
+    </style>
+    <script>
+        window.addEventListener('load', () => {
+            document.documentElement.classList.remove('no-transitions');
+        });
+    </script>
 </head>
-<body class="bg-gray-50 min-h-screen">
-    <!-- Navigation -->
-    <nav class="bg-white shadow-sm border-b">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <a href="/" class="text-xl font-bold text-indigo-600">ContentMultiplier</a>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <a href="/upload.html" class="text-indigo-600 font-medium">Upload</a>
-                    <a href="/library.html" class="text-gray-600 hover:text-gray-900">Library</a>
-                    <div id="navbar-user" class="flex items-center"></div>
-                </div>
-            </div>
-        </div>
-    </nav>
+<body class="bg-still-bg min-h-screen text-still-text">
+    <div id="nav-container"></div>
 
     <div class="max-w-3xl mx-auto px-4 py-12">
-        <h1 class="text-3xl font-bold mb-8">Upload Content</h1>
+        <h1 class="text-3xl font-bold mb-8 text-still-text">Upload Content</h1>
 
         <!-- Upload Tabs -->
-        <div class="mb-6">
-            <div class="flex border-b">
-                <button id="tab-file" class="px-4 py-2 border-b-2 border-indigo-600 text-indigo-600 font-medium" onclick="showTab('file')">
-                    Upload File
-                </button>
-                <button id="tab-text" class="px-4 py-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700" onclick="showTab('text')">
-                    Paste Text
-                </button>
-            </div>
+        <div class="tabs-premium mb-6">
+            <button id="tab-file" class="tab-premium active" onclick="showTab('file')">
+                Full Pipeline
+            </button>
+            <button id="tab-text" class="tab-premium" onclick="showTab('text')">
+                Paste Text
+            </button>
+            <button id="tab-quick" class="tab-premium" onclick="showTab('quick')">
+                Quick Distill
+            </button>
         </div>
 
         <!-- File Upload Form -->
         <form id="upload-form" class="space-y-6">
             <!-- File Upload Section -->
             <div id="file-section">
-                <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-indigo-500 transition"
-                     id="drop-zone">
-                    <input type="file" id="file-input" class="hidden"
+                <div class="dropzone-premium" id="drop-zone">
+                    <input type="file" id="file-input" class="hidden" multiple
                            accept=".mp4,.mov,.avi,.webm,.mp3,.wav,.m4a,.pdf,.txt,.md,.docx,.png,.jpg,.jpeg,.gif,.webp">
-                    <div class="space-y-2">
-                        <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                    <div class="space-y-3">
+                        <svg class="dropzone-icon" stroke="currentColor" fill="none" viewBox="0 0 48 48">
                             <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
-                        <p class="text-gray-600">
-                            <label for="file-input" class="text-indigo-600 cursor-pointer hover:underline">Upload a file</label>
+                        <p class="text-still-muted">
+                            <label for="file-input" class="text-still-copper font-medium cursor-pointer hover:text-still-amber">Upload files</label>
                             or drag and drop
                         </p>
-                        <p class="text-sm text-gray-500">Video, Audio, PDF, Word, Images, or Text (max 100MB)</p>
+                        <p class="text-sm text-still-muted">Video, Audio, PDF, Word, Images, or Text (max 100MB per file)</p>
+                        <p class="text-xs text-still-disabled">Select up to 5 files for batch processing</p>
                     </div>
                 </div>
-                <p id="file-name" class="mt-2 text-sm text-gray-600"></p>
+                <div id="file-list" class="mt-3 space-y-2"></div>
             </div>
 
             <!-- Text Paste Section (hidden by default) -->
             <div id="text-section" class="hidden">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Paste your content</label>
+                <label class="block text-sm font-medium text-still-text mb-2">Paste your content</label>
                 <textarea id="text-content" rows="10"
-                    class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    class="input-premium"
                     placeholder="Paste your transcript, article, or any text content here..."></textarea>
                 <input type="text" id="content-name"
-                    class="mt-2 w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500"
+                    class="input-premium mt-2"
                     placeholder="Content name (optional)">
             </div>
 
-            <!-- Target Persona -->
+            <!-- Quick Distill Section (hidden by default) -->
+            <div id="quick-section" class="hidden">
+                <div class="bg-still-copper/10 border border-still-copper/30 rounded-lg p-6 mb-6">
+                    <div class="flex items-start gap-4">
+                        <div class="p-3 bg-still-copper/20 rounded-lg">
+                            <svg class="w-8 h-8 text-still-copper" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-still-copper mb-1">Quick Distill</h3>
+                            <p class="text-still-muted text-sm">
+                                Extract stills from any document and save them directly to your Reserve.
+                                No content generation - just fast extraction for building your library.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                    <div class="dropzone-premium" id="quick-drop-zone">
+                        <input type="file" id="quick-file-input" class="hidden"
+                               accept=".mp4,.mov,.avi,.webm,.mp3,.wav,.m4a,.pdf,.txt,.md,.docx,.png,.jpg,.jpeg,.gif,.webp">
+                        <div class="space-y-3">
+                            <svg class="dropzone-icon text-still-copper" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+                            </svg>
+                            <p class="text-still-muted">
+                                <label for="quick-file-input" class="text-still-copper font-medium cursor-pointer hover:text-still-amber">Upload a file</label>
+                                or drag and drop
+                            </p>
+                            <p class="text-sm text-still-muted">Video, Audio, PDF, Word, Images, or Text</p>
+                        </div>
+                    </div>
+                <div id="quick-file-display" class="hidden mt-3 flex items-center justify-between bg-still-card rounded-lg p-3 border border-still-border">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-5 h-5 text-still-copper" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <span id="quick-file-name" class="text-sm font-medium text-still-text"></span>
+                    </div>
+                    <button type="button" onclick="clearQuickFile()" class="p-1 text-still-muted hover:text-still-error">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Optional Persona for Quick Distill -->
+                <div class="mt-6">
+                    <label class="block text-sm font-medium text-still-text mb-2">Target Persona (optional)</label>
+                    <select id="quick-persona"
+                        class="input-premium select-premium">
+                        <option value="">No persona - extract all stills</option>
+                    </select>
+                    <p class="text-xs text-still-muted mt-1">If selected, stills will be tagged with relevance scores for this persona</p>
+                </div>
+
+                <div class="mt-6">
+                    <button type="button" id="quick-submit-btn" onclick="submitQuickDistill()" class="btn btn-primary btn-lg w-full">
+                        Distill to Reserve
+                    </button>
+                </div>
+            </div>
+
+            <!-- Target Persona (hidden in quick distill mode) -->
+            <div id="full-pipeline-options">
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Target Persona</label>
+                <label class="block text-sm font-medium text-still-text mb-2">Target Persona</label>
                 <select id="target-persona" required
-                    class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                    <option value="">Select a persona...</option>
-                    <option value="ceo_longterm_care">CEO of Long-Term Care Facility</option>
-                    <option value="don_memory_care">Director of Nursing (Memory Care)</option>
-                    <option value="marketing_director">Marketing Director (Senior Living)</option>
+                    class="input-premium select-premium">
+                    <option value="">Loading personas...</option>
                 </select>
+                <p class="text-xs text-still-muted mt-1">
+                    <a href="/personas.html" class="text-still-copper hover:text-still-amber">Create custom personas</a> to target specific audiences
+                </p>
             </div>
 
             <!-- Asset Types -->
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Content Types to Generate</label>
+                <label class="block text-sm font-medium text-still-text mb-2">Content Types to Generate</label>
                 <div class="space-y-3">
-                    <label class="flex items-center">
+                    <label class="flex items-center text-still-text">
                         <input type="checkbox" id="asset-linkedin" checked
-                            class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                            class="h-4 w-4 text-still-copper bg-still-card border-still-border rounded focus:ring-still-copper">
                         <span class="ml-2">LinkedIn Posts</span>
                         <input type="number" id="qty-linkedin" value="3" min="1" max="5"
-                            class="ml-auto w-16 border border-gray-300 rounded p-1 text-center">
+                            class="ml-auto w-16 bg-still-card border border-still-border rounded p-1 text-center text-still-text">
                     </label>
-                    <label class="flex items-center">
+                    <label class="flex items-center text-still-text">
                         <input type="checkbox" id="asset-blog" checked
-                            class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                            class="h-4 w-4 text-still-copper bg-still-card border-still-border rounded focus:ring-still-copper">
                         <span class="ml-2">Blog Post</span>
                         <input type="number" id="qty-blog" value="1" min="1" max="3"
-                            class="ml-auto w-16 border border-gray-300 rounded p-1 text-center">
+                            class="ml-auto w-16 bg-still-card border border-still-border rounded p-1 text-center text-still-text">
                     </label>
-                    <label class="flex items-center">
+                    <label class="flex items-center text-still-text">
                         <input type="checkbox" id="asset-email"
-                            class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                            class="h-4 w-4 text-still-copper bg-still-card border-still-border rounded focus:ring-still-copper">
                         <span class="ml-2">Email</span>
                         <input type="number" id="qty-email" value="1" min="1" max="3"
-                            class="ml-auto w-16 border border-gray-300 rounded p-1 text-center">
+                            class="ml-auto w-16 bg-still-card border border-still-border rounded p-1 text-center text-still-text">
+                    </label>
+                    <label class="flex items-center text-still-text">
+                        <input type="checkbox" id="asset-email-sequence"
+                            class="h-4 w-4 text-still-copper bg-still-card border-still-border rounded focus:ring-still-copper">
+                        <span class="ml-2">Email Sequence (5-email drip campaign)</span>
+                        <span class="ml-auto text-sm text-still-muted">Day 0, 3, 7, 14, 30</span>
                     </label>
                 </div>
             </div>
 
             <!-- Campaign Name -->
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Campaign Name (optional)</label>
+                <label class="block text-sm font-medium text-still-text mb-2">Campaign Name (optional)</label>
                 <input type="text" id="campaign-name"
-                    class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500"
+                    class="input-premium"
                     placeholder="e.g., Q1 Webinar Series">
             </div>
 
             <!-- Domain Vocabulary -->
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Domain Vocabulary (optional)</label>
+                <label class="block text-sm font-medium text-still-text mb-2">Domain Vocabulary (optional)</label>
                 <textarea id="magic-words" rows="2"
-                    class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    class="input-premium"
                     placeholder="SafelyYou, Q4, ROI, DON, CMS - helps transcription accuracy"></textarea>
-                <p class="text-sm text-gray-500 mt-1">Enter brand names, acronyms, or technical terms (comma-separated) to improve transcription accuracy</p>
+                <p class="text-sm text-still-muted mt-1">Enter brand names, acronyms, or technical terms (comma-separated) to improve transcription accuracy</p>
             </div>
 
             <!-- Submit Button -->
             <div class="pt-4">
-                <button type="submit" id="submit-btn"
-                    class="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                <button type="submit" id="submit-btn" class="btn btn-primary btn-lg w-full">
                     Start Processing
                 </button>
+            </div>
             </div>
         </form>
 
         <!-- Error Message -->
-        <div id="error-message" class="hidden mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600"></div>
+        <div id="error-message" class="hidden mt-4 p-4 bg-still-error/20 border border-still-error rounded-lg text-still-error"></div>
     </div>
 
     <script>
         // Require authentication
-        if (!Auth.requireAuth()) {
-            // Will redirect to login
-        }
+        Auth.requireAuth();
 
         let uploadMode = 'file';
-        let selectedFile = null;
+        let selectedFiles = [];
+        let quickDistillFile = null;
+        const MAX_FILES = 5;
+
+        // Load personas dynamically
+        async function loadPersonas() {
+            const select = document.getElementById('target-persona');
+            const quickSelect = document.getElementById('quick-persona');
+
+            try {
+                const response = await Auth.fetchWithAuth('/api/personas/all');
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.detail || `HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                select.innerHTML = '<option value="">Select a persona...</option>';
+                quickSelect.innerHTML = '<option value="">No persona - extract all stills</option>';
+
+                // Add custom personas first (if any)
+                if (data.custom_personas && data.custom_personas.length > 0) {
+                    const customGroup = document.createElement('optgroup');
+                    customGroup.label = 'Your Custom Personas';
+                    const quickCustomGroup = document.createElement('optgroup');
+                    quickCustomGroup.label = 'Your Custom Personas';
+
+                    data.custom_personas.forEach(p => {
+                        const option = document.createElement('option');
+                        option.value = p.id;
+                        option.textContent = `${p.name} (${p.role})`;
+                        customGroup.appendChild(option);
+
+                        const quickOption = option.cloneNode(true);
+                        quickCustomGroup.appendChild(quickOption);
+                    });
+                    select.appendChild(customGroup);
+                    quickSelect.appendChild(quickCustomGroup);
+                }
+
+                // Add default personas
+                if (data.default_personas && data.default_personas.length > 0) {
+                    const defaultGroup = document.createElement('optgroup');
+                    defaultGroup.label = 'Default Personas';
+                    const quickDefaultGroup = document.createElement('optgroup');
+                    quickDefaultGroup.label = 'Default Personas';
+
+                    data.default_personas.forEach(p => {
+                        const option = document.createElement('option');
+                        option.value = p.id;
+                        option.textContent = p.title;
+                        defaultGroup.appendChild(option);
+
+                        const quickOption = option.cloneNode(true);
+                        quickDefaultGroup.appendChild(quickOption);
+                    });
+                    select.appendChild(defaultGroup);
+                    quickSelect.appendChild(quickDefaultGroup);
+                }
+            } catch (err) {
+                console.error('Failed to load personas:', err);
+                // Fallback to hardcoded options for both dropdowns
+                select.innerHTML = `
+                    <option value="">Select a persona...</option>
+                    <option value="ceo_longterm_care">CEO of Long-Term Care Facility</option>
+                    <option value="don_memory_care">Director of Nursing (Memory Care)</option>
+                    <option value="marketing_director">Marketing Director (Senior Living)</option>
+                `;
+                quickSelect.innerHTML = `
+                    <option value="">No persona - extract all stills</option>
+                    <option value="ceo_longterm_care">CEO of Long-Term Care Facility</option>
+                    <option value="don_memory_care">Director of Nursing (Memory Care)</option>
+                    <option value="marketing_director">Marketing Director (Senior Living)</option>
+                `;
+            }
+        }
+
+        // Load personas on page load
+        document.addEventListener('DOMContentLoaded', loadPersonas);
 
         function showTab(tab) {
             uploadMode = tab;
-            document.getElementById('tab-file').classList.toggle('border-indigo-600', tab === 'file');
-            document.getElementById('tab-file').classList.toggle('text-indigo-600', tab === 'file');
-            document.getElementById('tab-file').classList.toggle('border-transparent', tab !== 'file');
-            document.getElementById('tab-file').classList.toggle('text-gray-500', tab !== 'file');
 
-            document.getElementById('tab-text').classList.toggle('border-indigo-600', tab === 'text');
-            document.getElementById('tab-text').classList.toggle('text-indigo-600', tab === 'text');
-            document.getElementById('tab-text').classList.toggle('border-transparent', tab !== 'text');
-            document.getElementById('tab-text').classList.toggle('text-gray-500', tab !== 'text');
+            // Update tab styling
+            ['file', 'text', 'quick'].forEach(t => {
+                const tabBtn = document.getElementById(`tab-${t}`);
+                tabBtn.classList.toggle('active', tab === t);
+            });
 
+            // Show/hide sections
             document.getElementById('file-section').classList.toggle('hidden', tab !== 'file');
             document.getElementById('text-section').classList.toggle('hidden', tab !== 'text');
+            document.getElementById('quick-section').classList.toggle('hidden', tab !== 'quick');
+            document.getElementById('full-pipeline-options').classList.toggle('hidden', tab === 'quick');
         }
 
         // File upload handling
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
 
-        dropZone.addEventListener('click', () => fileInput.click());
+        // Only trigger file input click if clicking outside the label
+        dropZone.addEventListener('click', (e) => {
+            // Don't trigger if clicking on the label (it already triggers the input)
+            if (e.target.tagName !== 'LABEL' && !e.target.closest('label')) {
+                fileInput.click();
+            }
+        });
 
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
-            dropZone.classList.add('border-indigo-500', 'bg-indigo-50');
+            dropZone.classList.add('border-still-copper');
         });
 
         dropZone.addEventListener('dragleave', () => {
-            dropZone.classList.remove('border-indigo-500', 'bg-indigo-50');
+            dropZone.classList.remove('border-still-copper');
         });
 
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
-            dropZone.classList.remove('border-indigo-500', 'bg-indigo-50');
-            const files = e.dataTransfer.files;
-            if (files.length) {
-                handleFile(files[0]);
-            }
+            dropZone.classList.remove('border-still-copper');
+            const files = Array.from(e.dataTransfer.files);
+            handleFiles(files);
         });
 
         fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length) {
-                handleFile(e.target.files[0]);
+            const files = Array.from(e.target.files);
+            handleFiles(files);
+        });
+
+        function handleFiles(files) {
+            // Limit to max files
+            const newFiles = files.slice(0, MAX_FILES - selectedFiles.length);
+            selectedFiles = [...selectedFiles, ...newFiles].slice(0, MAX_FILES);
+            renderFileList();
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            renderFileList();
+        }
+
+        function renderFileList() {
+            const container = document.getElementById('file-list');
+            if (selectedFiles.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            container.innerHTML = selectedFiles.map((file, index) => {
+                const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                return `
+                    <div class="flex items-center justify-between bg-still-card rounded-lg p-3 border border-still-border">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <svg class="w-5 h-5 text-still-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            <div class="min-w-0">
+                                <p class="text-sm font-medium text-still-text truncate">${escapeHtml(file.name)}</p>
+                                <p class="text-xs text-still-muted">${sizeMB} MB</p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="removeFile(${index})" class="p-1 text-still-muted hover:text-still-error">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+
+            // Show batch mode indicator
+            if (selectedFiles.length > 1) {
+                container.innerHTML += `
+                    <div class="text-sm text-still-copper font-medium mt-2">
+                        Batch mode: ${selectedFiles.length} files will be processed together
+                    </div>
+                `;
+            }
+        }
+
+        // escapeHtml is now provided by utils.js
+
+        // Quick Distill file handling
+        const quickDropZone = document.getElementById('quick-drop-zone');
+        const quickFileInput = document.getElementById('quick-file-input');
+
+        // Only trigger file input click if clicking outside the label
+        quickDropZone.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'LABEL' && !e.target.closest('label')) {
+                quickFileInput.click();
             }
         });
 
-        function handleFile(file) {
-            selectedFile = file;
-            const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
-            document.getElementById('file-name').textContent = `Selected: ${file.name} (${sizeMB} MB)`;
+        quickDropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            quickDropZone.classList.add('border-still-copper');
+        });
+
+        quickDropZone.addEventListener('dragleave', () => {
+            quickDropZone.classList.remove('border-still-copper');
+        });
+
+        quickDropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            quickDropZone.classList.remove('border-still-copper');
+            const files = Array.from(e.dataTransfer.files);
+            if (files.length > 0) {
+                setQuickFile(files[0]);
+            }
+        });
+
+        quickFileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length > 0) {
+                setQuickFile(files[0]);
+            }
+        });
+
+        function setQuickFile(file) {
+            quickDistillFile = file;
+            document.getElementById('quick-drop-zone').classList.add('hidden');
+            document.getElementById('quick-file-display').classList.remove('hidden');
+            document.getElementById('quick-file-name').textContent = file.name;
+        }
+
+        function clearQuickFile() {
+            quickDistillFile = null;
+            quickFileInput.value = '';
+            document.getElementById('quick-drop-zone').classList.remove('hidden');
+            document.getElementById('quick-file-display').classList.add('hidden');
+        }
+
+        async function submitQuickDistill() {
+            const submitBtn = document.getElementById('quick-submit-btn');
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.classList.add('hidden');
+
+            if (!quickDistillFile) {
+                errorDiv.textContent = 'Please select a file to distill';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Distilling...';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', quickDistillFile);
+
+                const persona = document.getElementById('quick-persona').value;
+                if (persona) {
+                    formData.append('target_persona', persona);
+                }
+
+                const response = await Auth.fetchWithAuth('/api/quick-distill', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Redirect to status page with quick_distill flag - it will redirect to Reserve when complete
+                    window.location.href = `/status.html?job_id=${data.job_id}&mode=quick_distill`;
+                } else {
+                    throw new Error(data.detail || 'Quick distill failed');
+                }
+            } catch (err) {
+                errorDiv.textContent = err.message;
+                errorDiv.classList.remove('hidden');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Distill to Reserve';
+            }
         }
 
         // Form submission
@@ -220,8 +540,8 @@
                 return;
             }
 
-            if (uploadMode === 'file' && !selectedFile) {
-                errorDiv.textContent = 'Please select a file to upload';
+            if (uploadMode === 'file' && selectedFiles.length === 0) {
+                errorDiv.textContent = 'Please select at least one file to upload';
                 errorDiv.classList.remove('hidden');
                 return;
             }
@@ -248,6 +568,9 @@
                 assetTypes.push('email');
                 assetQuantities.email = parseInt(document.getElementById('qty-email').value);
             }
+            if (document.getElementById('asset-email-sequence').checked) {
+                assetTypes.push('email_sequence');
+            }
 
             if (assetTypes.length === 0) {
                 errorDiv.textContent = 'Please select at least one content type to generate';
@@ -265,7 +588,6 @@
 
                 if (uploadMode === 'file') {
                     const formData = new FormData();
-                    formData.append('file', selectedFile);
                     formData.append('target_persona', persona);
                     formData.append('asset_types', JSON.stringify(assetTypes));
                     formData.append('asset_quantities', JSON.stringify(assetQuantities));
@@ -274,10 +596,33 @@
                         formData.append('magic_words', magicWords);
                     }
 
-                    response = await Auth.fetchWithAuth('/api/upload', {
-                        method: 'POST',
-                        body: formData
-                    });
+                    // Use batch endpoint if multiple files, single upload otherwise
+                    if (selectedFiles.length > 1) {
+                        // Batch upload
+                        selectedFiles.forEach(file => {
+                            formData.append('files', file);
+                        });
+
+                        response = await Auth.fetchWithAuth('/api/batch/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const data = await response.json();
+                        if (response.ok) {
+                            window.location.href = `/batch-status.html?batch_id=${data.batch_id}`;
+                        } else {
+                            throw new Error(data.detail || 'Batch upload failed');
+                        }
+                        return;
+                    } else {
+                        // Single file upload
+                        formData.append('file', selectedFiles[0]);
+                        response = await Auth.fetchWithAuth('/api/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+                    }
                 } else {
                     const formData = new FormData();
                     formData.append('content', document.getElementById('text-content').value);
