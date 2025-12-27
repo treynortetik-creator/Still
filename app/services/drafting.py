@@ -104,7 +104,7 @@ async def draft_linkedin_posts(
     # Get user-specific context (memory rules, style DNA, brand voice)
     user_context = ""
     if user_id:
-        user_context = await get_user_context(user_id)
+        user_context = await get_user_context(user_id, content_type="linkedin")
 
     # Add JSON output instruction
     full_prompt = prompt + user_context + f"""
@@ -196,7 +196,7 @@ async def draft_blog_post(
     # Get user-specific context (memory rules, style DNA, brand voice)
     user_context = ""
     if user_id:
-        user_context = await get_user_context(user_id)
+        user_context = await get_user_context(user_id, content_type="blog")
 
     # Add JSON output instruction
     full_prompt = prompt + user_context + """
@@ -264,7 +264,7 @@ async def draft_email(
     # Get user-specific context (memory rules, style DNA, brand voice)
     user_context = ""
     if user_id:
-        user_context = await get_user_context(user_id)
+        user_context = await get_user_context(user_id, content_type="email")
 
     # Add output instruction
     full_prompt = prompt + user_context + """
@@ -353,7 +353,7 @@ QUOTES:
     # Get user-specific context (memory rules, style DNA, brand voice)
     user_context = ""
     if user_id:
-        user_context = await get_user_context(user_id)
+        user_context = await get_user_context(user_id, content_type="email")
 
     prompt = f"""You are an expert email marketing strategist creating a 5-email nurture sequence.
 {user_context}
