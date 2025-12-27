@@ -650,7 +650,10 @@
 
                 // Load data for tab
                 if (tab === 'memory') loadMemoryRules();
-                if (tab === 'brand-voice') loadVoiceProfile();
+                if (tab === 'brand-voice') {
+                    loadBrandVoiceConfig();
+                    loadVoiceProfile();
+                }
                 if (tab === 'personas') loadPersonas();
                 if (tab === 'webhooks') loadWebhooks();
             });
@@ -1162,6 +1165,74 @@
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Analyze My Voice';
+            }
+        }
+
+        // ============ Brand Voice Config ============
+        async function loadBrandVoiceConfig() {
+            try {
+                const response = await Auth.fetchWithAuth('/api/brand-voice/config');
+                if (response.ok) {
+                    const data = await response.json();
+
+                    document.getElementById('bv-company-name').value = data.company_name || '';
+                    document.getElementById('bv-industry').value = data.industry || '';
+                    document.getElementById('bv-vocabulary').value = data.vocabulary_level || 'professional';
+                    document.getElementById('bv-core-principles').value = (data.core_principles || []).join('\n');
+                    document.getElementById('bv-phrases-use').value = (data.phrases_to_use || []).join('\n');
+                    document.getElementById('bv-phrases-avoid').value = (data.phrases_to_avoid || []).join('\n');
+                    document.getElementById('bv-tone-linkedin').value = data.tone_linkedin || '';
+                    document.getElementById('bv-tone-blog').value = data.tone_blog || '';
+                    document.getElementById('bv-tone-email').value = data.tone_email || '';
+                }
+            } catch (err) {
+                console.log('No brand voice config yet');
+            }
+        }
+
+        async function saveBrandVoiceConfig() {
+            const corePrinciples = document.getElementById('bv-core-principles').value
+                .split('\n')
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+
+            const phrasesToUse = document.getElementById('bv-phrases-use').value
+                .split('\n')
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+
+            const phrasesToAvoid = document.getElementById('bv-phrases-avoid').value
+                .split('\n')
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+
+            const configData = {
+                company_name: document.getElementById('bv-company-name').value.trim() || null,
+                industry: document.getElementById('bv-industry').value.trim() || null,
+                vocabulary_level: document.getElementById('bv-vocabulary').value,
+                core_principles: corePrinciples.length > 0 ? corePrinciples : null,
+                phrases_to_use: phrasesToUse.length > 0 ? phrasesToUse : null,
+                phrases_to_avoid: phrasesToAvoid.length > 0 ? phrasesToAvoid : null,
+                tone_linkedin: document.getElementById('bv-tone-linkedin').value.trim() || null,
+                tone_blog: document.getElementById('bv-tone-blog').value.trim() || null,
+                tone_email: document.getElementById('bv-tone-email').value.trim() || null,
+            };
+
+            try {
+                const response = await Auth.fetchWithAuth('/api/brand-voice/config', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(configData)
+                });
+
+                if (response.ok) {
+                    showToast('Brand voice settings saved!');
+                } else {
+                    const err = await response.json();
+                    showToast(err.detail || 'Failed to save', 'error');
+                }
+            } catch (err) {
+                showToast('Error saving brand voice settings');
             }
         }
 
