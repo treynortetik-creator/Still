@@ -204,56 +204,202 @@
 
         <!-- Brand Voice Tab -->
         <div id="brand-voice-tab" class="hidden space-y-6">
+            <!-- Master Voice Section -->
             <div class="bg-still-card rounded-lg shadow-sm p-6 border border-still-border">
-                <h2 class="text-xl font-semibold mb-4 text-still-text">AI Brand Voice Analysis</h2>
-                <p class="text-still-muted mb-6">
-                    Upload 3-5 samples of content you've written. Our AI will analyze your writing style and extract patterns to use in future content generation.
+                <h2 class="text-xl font-semibold mb-2 text-still-text">Master Brand Voice</h2>
+                <p class="text-still-muted text-sm mb-6">
+                    Define your core brand identity. These settings apply to all content types.
                 </p>
 
-                <!-- Upload Samples -->
-                <div class="mb-6">
-                    <label class="block text-sm font-medium text-still-text mb-2">Paste a content sample</label>
-                    <textarea id="voice-sample" rows="6"
-                        class="w-full bg-still-bg border border-still-border rounded-lg p-3 text-still-text placeholder-still-disabled focus:ring-2 focus:ring-still-copper"
-                        placeholder="Paste a LinkedIn post, blog excerpt, or email you've written..."></textarea>
-                    <div class="flex gap-2 mt-2">
-                        <select id="sample-type" class="input-premium select-premium" >
-                            <option value="linkedin">LinkedIn Post</option>
-                            <option value="blog">Blog Post</option>
-                            <option value="email">Email</option>
-                            <option value="other">Other</option>
-                        </select>
-                        <button onclick="addVoiceSample()" class="bg-still-border text-still-text px-4 py-2 rounded-lg hover:bg-still-muted/20">
-                            Add Sample
-                        </button>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-still-text mb-2">Company/Brand Name</label>
+                        <input type="text" id="bv-company-name"
+                            class="w-full input-premium"
+                            placeholder="e.g., Acme Healthcare">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-still-text mb-2">Industry</label>
+                        <input type="text" id="bv-industry"
+                            class="w-full input-premium"
+                            placeholder="e.g., Healthcare Technology">
                     </div>
                 </div>
 
-                <!-- Samples List -->
-                <div id="voice-samples-list" class="space-y-2 mb-6">
-                    <!-- Populated by JS -->
+                <div class="mt-6">
+                    <label class="block text-sm font-medium text-still-text mb-2">Vocabulary Level</label>
+                    <select id="bv-vocabulary" class="w-full input-premium select-premium">
+                        <option value="casual">Casual - everyday language, conversational</option>
+                        <option value="professional" selected>Professional - business appropriate</option>
+                        <option value="technical">Technical - industry jargon acceptable</option>
+                    </select>
                 </div>
 
-                <!-- Analyze Button -->
-                <button id="analyze-voice-btn" onclick="analyzeVoice()" disabled
-                    class="w-full btn btn-primary text-white py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">
-                    Analyze My Voice (need 3+ samples)
-                </button>
+                <div class="mt-6">
+                    <label class="block text-sm font-medium text-still-text mb-2">Core Principles</label>
+                    <p class="text-xs text-still-disabled mb-2">What does your brand stand for? (one per line)</p>
+                    <textarea id="bv-core-principles" rows="4"
+                        class="w-full bg-still-bg border border-still-border rounded-lg p-3 text-still-text focus:ring-2 focus:ring-still-copper"
+                        placeholder="Clarity over jargon&#10;Lead with value, not features&#10;Speak to outcomes"></textarea>
+                </div>
 
-                <!-- Voice Profile -->
-                <div id="voice-profile" class="hidden mt-6 p-4 bg-still-copper/10 rounded-lg border border-still-copper/30">
-                    <h3 class="font-semibold text-still-copper mb-3">Your Brand Voice Profile</h3>
-                    <div id="voice-profile-content" class="text-sm text-still-copper/80 space-y-3">
-                        <!-- Populated by JS -->
+                <div class="grid md:grid-cols-2 gap-6 mt-6">
+                    <div>
+                        <label class="block text-sm font-medium text-still-text mb-2">Phrases to Use</label>
+                        <p class="text-xs text-still-disabled mb-2">Signature expressions (one per line)</p>
+                        <textarea id="bv-phrases-use" rows="4"
+                            class="w-full bg-still-bg border border-still-border rounded-lg p-3 text-still-text focus:ring-2 focus:ring-still-copper"
+                            placeholder="Here's the thing&#10;What this means for you&#10;The real challenge is"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-still-text mb-2">Phrases to Avoid</label>
+                        <p class="text-xs text-still-disabled mb-2">Words that don't fit your brand (one per line)</p>
+                        <textarea id="bv-phrases-avoid" rows="4"
+                            class="w-full bg-still-bg border border-still-border rounded-lg p-3 text-still-text focus:ring-2 focus:ring-still-copper"
+                            placeholder="Synergy&#10;Circle back&#10;Low-hanging fruit"></textarea>
                     </div>
                 </div>
             </div>
+
+            <!-- Platform-Specific Tones -->
+            <div class="bg-still-card rounded-lg shadow-sm p-6 border border-still-border">
+                <h2 class="text-xl font-semibold mb-2 text-still-text">Platform-Specific Tones</h2>
+                <p class="text-still-muted text-sm mb-6">
+                    Customize how your brand voice adapts to each content type.
+                </p>
+
+                <div class="space-y-6">
+                    <!-- LinkedIn -->
+                    <div class="p-4 bg-still-bg rounded-lg border border-still-border">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-10 h-10 rounded-lg bg-[#0A66C2]/20 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-[#0A66C2]" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-still-text">LinkedIn</h3>
+                                <p class="text-xs text-still-muted">Professional networking, thought leadership</p>
+                            </div>
+                        </div>
+                        <textarea id="bv-tone-linkedin" rows="3"
+                            class="w-full bg-still-card border border-still-border rounded-lg p-3 text-still-text focus:ring-2 focus:ring-still-copper"
+                            placeholder="e.g., Punchy and data-driven. Lead with insights. Position as thought leadership. Keep paragraphs short (2-3 lines max). Use statistics when available."></textarea>
+                    </div>
+
+                    <!-- Blog -->
+                    <div class="p-4 bg-still-bg rounded-lg border border-still-border">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-10 h-10 rounded-lg bg-still-green/20 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-still-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-still-text">Blog Posts</h3>
+                                <p class="text-xs text-still-muted">Educational content, SEO, detailed exploration</p>
+                            </div>
+                        </div>
+                        <textarea id="bv-tone-blog" rows="3"
+                            class="w-full bg-still-card border border-still-border rounded-lg p-3 text-still-text focus:ring-2 focus:ring-still-copper"
+                            placeholder="e.g., Educational and engaging. Use storytelling with real examples. Include actionable takeaways. Aim for comprehensive depth while remaining accessible."></textarea>
+                    </div>
+
+                    <!-- Email -->
+                    <div class="p-4 bg-still-bg rounded-lg border border-still-border">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-10 h-10 rounded-lg bg-still-copper/20 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-still-copper" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-still-text">Email</h3>
+                                <p class="text-xs text-still-muted">Direct communication, newsletters, sequences</p>
+                            </div>
+                        </div>
+                        <textarea id="bv-tone-email" rows="3"
+                            class="w-full bg-still-card border border-still-border rounded-lg p-3 text-still-text focus:ring-2 focus:ring-still-copper"
+                            placeholder="e.g., Direct and personal. Write like you're talking to one person. Get to the point quickly. Always include a clear call to action."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Save Button -->
+            <div class="flex justify-end">
+                <button onclick="saveBrandVoiceConfig()" class="btn btn-primary text-white px-8 py-3 rounded-lg font-semibold">
+                    Save Brand Voice Settings
+                </button>
+            </div>
+
+            <!-- AI Analysis Section (collapsed) -->
+            <details class="bg-still-card rounded-lg shadow-sm border border-still-border">
+                <summary class="p-6 cursor-pointer text-still-text font-semibold">
+                    AI Voice Analysis (from writing samples)
+                </summary>
+                <div class="px-6 pb-6 pt-2 border-t border-still-border">
+                    <p class="text-still-muted text-sm mb-4">
+                        Optionally, upload samples of your own writing to let AI analyze your natural voice patterns.
+                    </p>
+
+                    <!-- Upload Samples -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-still-text mb-2">Paste a content sample</label>
+                        <textarea id="voice-sample" rows="4"
+                            class="w-full bg-still-bg border border-still-border rounded-lg p-3 text-still-text placeholder-still-disabled focus:ring-2 focus:ring-still-copper"
+                            placeholder="Paste a LinkedIn post, blog excerpt, or email you've written..."></textarea>
+                        <div class="flex gap-2 mt-2">
+                            <select id="sample-type" class="input-premium select-premium">
+                                <option value="linkedin">LinkedIn Post</option>
+                                <option value="blog">Blog Post</option>
+                                <option value="email">Email</option>
+                                <option value="other">Other</option>
+                            </select>
+                            <button onclick="addVoiceSample()" class="bg-still-border text-still-text px-4 py-2 rounded-lg hover:bg-still-muted/20">
+                                Add Sample
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Samples List -->
+                    <div id="voice-samples-list" class="space-y-2 mb-6">
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <!-- Analyze Button -->
+                    <button id="analyze-voice-btn" onclick="analyzeVoice()" disabled
+                        class="w-full btn btn-primary text-white py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">
+                        Analyze My Voice (need 3+ samples)
+                    </button>
+
+                    <!-- Voice Profile -->
+                    <div id="voice-profile" class="hidden mt-6 p-4 bg-still-copper/10 rounded-lg border border-still-copper/30">
+                        <h3 class="font-semibold text-still-copper mb-3">Your Analyzed Voice Profile</h3>
+                        <div id="voice-profile-content" class="text-sm text-still-copper/80 space-y-3">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </details>
         </div>
 
         <!-- Personas Tab -->
-        <div id="personas-tab" class="hidden">
-            <div id="personas-list" class="space-y-4">
-                <!-- Personas will be loaded here -->
+        <div id="personas-tab" class="hidden space-y-6">
+            <div class="bg-still-card rounded-lg shadow-sm p-6 border border-still-border">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h2 class="text-xl font-semibold text-still-text">Target Personas</h2>
+                        <p class="text-still-muted text-sm mt-1">
+                            Manage target audience profiles for personalized content generation.
+                        </p>
+                    </div>
+                    <button onclick="showAddPersonaModal()" class="btn btn-primary text-white px-4 py-2 rounded-lg transition text-sm">
+                        + Add Persona
+                    </button>
+                </div>
+                <div id="personas-list" class="space-y-4">
+                    <!-- Personas will be loaded here -->
+                </div>
             </div>
         </div>
 
@@ -386,6 +532,88 @@
         </div>
     </div>
 
+    <!-- Persona Modal -->
+    <div id="persona-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+        <div class="bg-still-card rounded-lg max-w-2xl w-full border border-still-border max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-still-border">
+                <div class="flex justify-between items-center">
+                    <h3 id="persona-modal-title" class="text-lg font-semibold text-still-text">Add Custom Persona</h3>
+                    <button onclick="hidePersonaModal()" class="text-still-muted hover:text-still-text text-2xl">&times;</button>
+                </div>
+            </div>
+            <form id="persona-form" class="p-6 space-y-4">
+                <input type="hidden" id="edit-persona-id">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-still-text mb-1">Persona Name *</label>
+                        <input type="text" id="persona-name" required
+                            class="w-full input-premium" placeholder="e.g., Healthcare Administrator">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-still-text mb-1">Job Title/Role *</label>
+                        <input type="text" id="persona-role" required
+                            class="w-full input-premium" placeholder="e.g., VP of Operations">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-still-text mb-1">Industry</label>
+                    <input type="text" id="persona-industry"
+                        class="w-full input-premium" placeholder="e.g., Healthcare, Technology, Finance">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-still-text mb-1">Pain Points / Challenges *</label>
+                    <p class="text-xs text-still-disabled mb-2">What problems keep them up at night? (one per line)</p>
+                    <textarea id="persona-pain-points" rows="3" required
+                        class="w-full bg-still-bg border border-still-border rounded-lg p-2 text-still-text focus:ring-2 focus:ring-still-copper focus:border-still-copper"
+                        placeholder="Budget constraints&#10;Staff turnover&#10;Regulatory compliance"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-still-text mb-1">Goals / Priorities *</label>
+                    <p class="text-xs text-still-disabled mb-2">What are they trying to achieve? (one per line)</p>
+                    <textarea id="persona-goals" rows="3" required
+                        class="w-full bg-still-bg border border-still-border rounded-lg p-2 text-still-text focus:ring-2 focus:ring-still-copper focus:border-still-copper"
+                        placeholder="Reduce costs&#10;Improve outcomes&#10;Increase efficiency"></textarea>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-still-text mb-1">Content Length</label>
+                        <select id="persona-length" class="w-full input-premium select-premium">
+                            <option value="Short">Short - time-constrained</option>
+                            <option value="Medium" selected>Medium - balanced</option>
+                            <option value="Long">Long - comprehensive</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-still-text mb-1">Data Preference</label>
+                        <select id="persona-data" class="w-full input-premium select-premium">
+                            <option value="Low">Low - stories over stats</option>
+                            <option value="Moderate" selected>Moderate - balanced</option>
+                            <option value="High">High - metrics-driven</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-still-text mb-1">Tone</label>
+                        <select id="persona-tone" class="w-full input-premium select-premium">
+                            <option value="Professional">Professional</option>
+                            <option value="Executive">Executive - ROI-focused</option>
+                            <option value="Empathetic">Empathetic - supportive</option>
+                            <option value="Creative">Creative - innovative</option>
+                            <option value="Technical">Technical - detailed</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-4 border-t border-still-border">
+                    <button type="submit" class="flex-1 btn btn-primary text-white py-2 rounded-lg">
+                        Save Persona
+                    </button>
+                    <button type="button" onclick="hidePersonaModal()" class="px-4 py-2 border border-still-border rounded-lg text-still-text hover:bg-still-border">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Copy Toast -->
     <div id="copy-toast" class="fixed bottom-4 right-4 bg-still-card border border-still-border text-still-text px-4 py-2 rounded-lg shadow-lg hidden">
         Copied to clipboard!
@@ -423,92 +651,174 @@
                 // Load data for tab
                 if (tab === 'memory') loadMemoryRules();
                 if (tab === 'brand-voice') loadVoiceProfile();
+                if (tab === 'personas') loadPersonas();
                 if (tab === 'webhooks') loadWebhooks();
             });
         });
 
         async function loadPersonas() {
             try {
-                const response = await Auth.fetchWithAuth('/api/personas');
+                const response = await Auth.fetchWithAuth('/api/personas/all');
                 const data = await response.json();
 
                 if (!response.ok) {
                     throw new Error(data.detail || 'Failed to load personas');
                 }
 
-                personas = data.personas || [];
+                const defaultPersonas = data.default_personas || [];
+                const customPersonas = data.custom_personas || [];
+                personas = [...customPersonas, ...defaultPersonas];
 
-                // Populate dropdown
+                // Populate dropdown - clear existing options first (keep the default option)
                 const select = document.getElementById('preview-persona');
-                personas.forEach(p => {
-                    const option = document.createElement('option');
-                    option.value = p.id;
-                    option.textContent = p.title;
-                    select.appendChild(option);
-                });
+                select.innerHTML = '<option value="">Select a persona...</option>';
 
-                // Render personas list
-                renderPersonasList();
+                // Add custom personas first
+                if (customPersonas.length > 0) {
+                    const customGroup = document.createElement('optgroup');
+                    customGroup.label = 'Your Custom Personas';
+                    customPersonas.forEach(p => {
+                        const option = document.createElement('option');
+                        option.value = p.id;
+                        option.textContent = p.title || `${p.name} (${p.role})`;
+                        customGroup.appendChild(option);
+                    });
+                    select.appendChild(customGroup);
+                }
+
+                // Add default personas
+                if (defaultPersonas.length > 0) {
+                    const defaultGroup = document.createElement('optgroup');
+                    defaultGroup.label = 'Default Personas';
+                    defaultPersonas.forEach(p => {
+                        const option = document.createElement('option');
+                        option.value = p.id;
+                        option.textContent = p.title;
+                        defaultGroup.appendChild(option);
+                    });
+                    select.appendChild(defaultGroup);
+                }
+
+                // Render personas list in the Personas tab
+                renderPersonasList(customPersonas, defaultPersonas);
 
             } catch (err) {
                 console.error('Failed to load personas:', err);
+                showToast('Failed to load personas');
             }
         }
 
-        function renderPersonasList() {
+        function renderPersonasList(customPersonas = [], defaultPersonas = []) {
             const container = document.getElementById('personas-list');
             container.innerHTML = '';
 
-            personas.forEach(persona => {
-                const card = document.createElement('div');
-                card.className = 'bg-still-card rounded-lg shadow-sm p-6 border border-still-border';
+            // Show empty state if no personas
+            if (customPersonas.length === 0 && defaultPersonas.length === 0) {
+                container.innerHTML = '<p class="text-still-muted text-center py-8">No personas available.</p>';
+                return;
+            }
 
-                const painPoints = persona.pain_points || [];
-                const priorities = persona.priorities || [];
-                const prefs = persona.content_preferences || {};
+            // Render custom personas section
+            if (customPersonas.length > 0) {
+                const customSection = document.createElement('div');
+                customSection.className = 'mb-6';
+                customSection.innerHTML = '<h3 class="text-sm font-medium text-still-muted mb-3">Your Custom Personas</h3>';
+                const customGrid = document.createElement('div');
+                customGrid.className = 'space-y-3';
 
-                card.innerHTML = `
-                    <div class="flex justify-between items-start mb-4">
-                        <div>
-                            <h3 class="text-lg font-semibold text-still-text">${persona.title}</h3>
-                            <p class="text-sm text-still-muted">${persona.company_size || ''}</p>
+                customPersonas.forEach(persona => {
+                    const card = createPersonaCard(persona, true);
+                    customGrid.appendChild(card);
+                });
+
+                customSection.appendChild(customGrid);
+                container.appendChild(customSection);
+            }
+
+            // Render default personas section
+            if (defaultPersonas.length > 0) {
+                const defaultSection = document.createElement('div');
+                defaultSection.innerHTML = '<h3 class="text-sm font-medium text-still-muted mb-3">Default Personas</h3>';
+                const defaultGrid = document.createElement('div');
+                defaultGrid.className = 'space-y-3';
+
+                defaultPersonas.forEach(persona => {
+                    const card = createPersonaCard(persona, false);
+                    defaultGrid.appendChild(card);
+                });
+
+                defaultSection.appendChild(defaultGrid);
+                container.appendChild(defaultSection);
+            }
+        }
+
+        function createPersonaCard(persona, isCustom) {
+            const card = document.createElement('div');
+            card.className = 'bg-still-bg rounded-lg p-4 border border-still-border';
+
+            const painPoints = persona.pain_points || [];
+            const priorities = persona.priorities || persona.goals || [];
+            const prefs = persona.content_preferences || {};
+            const title = persona.title || `${persona.name} (${persona.role})`;
+
+            const actionButtons = isCustom ? `
+                <div class="flex gap-2">
+                    <button onclick="editPersona('${persona.id}')" class="p-1 text-still-muted hover:text-still-copper" title="Edit">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                        </svg>
+                    </button>
+                    <button onclick="deletePersona('${persona.id}')" class="p-1 text-still-muted hover:text-still-error" title="Delete">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                    </button>
+                    <button onclick="testPersona('${persona.id}')" class="text-still-copper hover:underline text-sm font-medium">
+                        Test
+                    </button>
+                </div>
+            ` : `
+                <button onclick="testPersona('${persona.id}')" class="text-still-copper hover:underline text-sm font-medium">
+                    Test
+                </button>
+            `;
+
+            card.innerHTML = `
+                <div class="flex justify-between items-start mb-3">
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <h4 class="font-semibold text-still-text">${escapeHtml(title)}</h4>
+                            <span class="px-2 py-0.5 text-xs rounded ${isCustom ? 'bg-still-copper/20 text-still-copper' : 'bg-still-border text-still-muted'}">${isCustom ? 'Custom' : 'Default'}</span>
                         </div>
-                        <span class="px-2 py-1 bg-still-copper/20 text-still-copper rounded text-sm">${persona.id}</span>
+                        <p class="text-sm text-still-muted">${persona.company_size || persona.industry || ''}</p>
                     </div>
+                    ${actionButtons}
+                </div>
 
-                    <div class="grid md:grid-cols-2 gap-4 text-sm">
-                        <div>
-                            <p class="font-medium text-still-text mb-1">Pain Points</p>
-                            <ul class="list-disc list-inside text-still-muted space-y-1">
-                                ${painPoints.map(p => `<li>${p}</li>`).join('')}
-                            </ul>
-                        </div>
-                        <div>
-                            <p class="font-medium text-still-text mb-1">Priorities</p>
-                            <ul class="list-disc list-inside text-still-muted space-y-1">
-                                ${priorities.map(p => `<li>${p}</li>`).join('')}
-                            </ul>
+                <div class="grid md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p class="font-medium text-still-text mb-1">Pain Points</p>
+                        <div class="flex flex-wrap gap-1">
+                            ${painPoints.slice(0, 3).map(p => `<span class="px-2 py-0.5 bg-still-error/20 text-still-error rounded text-xs">${escapeHtml(p)}</span>`).join('')}
+                            ${painPoints.length > 3 ? `<span class="text-xs text-still-disabled">+${painPoints.length - 3} more</span>` : ''}
                         </div>
                     </div>
-
-                    <div class="mt-4 pt-4 border-t border-still-border text-sm">
-                        <p class="text-still-muted">
-                            <span class="font-medium text-still-text">Language:</span> ${persona.language_level || 'Professional'}<br>
-                            <span class="font-medium text-still-text">Tone:</span> ${prefs.tone || 'Professional'}<br>
-                            <span class="font-medium text-still-text">Length:</span> ${prefs.length || 'Medium'}
-                        </p>
+                    <div>
+                        <p class="font-medium text-still-text mb-1">Priorities</p>
+                        <div class="flex flex-wrap gap-1">
+                            ${priorities.slice(0, 3).map(p => `<span class="px-2 py-0.5 bg-still-green/20 text-still-green rounded text-xs">${escapeHtml(p)}</span>`).join('')}
+                            ${priorities.length > 3 ? `<span class="text-xs text-still-disabled">+${priorities.length - 3} more</span>` : ''}
+                        </div>
                     </div>
+                </div>
 
-                    <div class="mt-4">
-                        <button onclick="testPersona('${persona.id}')"
-                            class="text-still-copper hover:underline text-sm font-medium">
-                            Test this persona
-                        </button>
-                    </div>
-                `;
+                <div class="mt-3 pt-3 border-t border-still-border flex gap-4 text-xs text-still-muted">
+                    <span><span class="font-medium text-still-text">Tone:</span> ${prefs.tone || 'Professional'}</span>
+                    <span><span class="font-medium text-still-text">Length:</span> ${prefs.length || 'Medium'}</span>
+                </div>
+            `;
 
-                container.appendChild(card);
-            });
+            return card;
         }
 
         function testPersona(personaId) {
@@ -1034,6 +1344,123 @@
                 hideWebhookModal();
                 loadWebhooks();
                 showToast(isEdit ? 'Webhook updated' : 'Webhook added');
+            } catch (err) {
+                showToast(err.message);
+            }
+        });
+
+        // ============ Persona Modal ============
+        let editingPersonaId = null;
+
+        function showAddPersonaModal() {
+            editingPersonaId = null;
+            document.getElementById('persona-modal-title').textContent = 'Add Custom Persona';
+            document.getElementById('persona-form').reset();
+            document.getElementById('edit-persona-id').value = '';
+            document.getElementById('persona-modal').classList.remove('hidden');
+        }
+
+        function hidePersonaModal() {
+            document.getElementById('persona-modal').classList.add('hidden');
+            editingPersonaId = null;
+        }
+
+        async function editPersona(id) {
+            try {
+                const response = await Auth.fetchWithAuth(`/api/custom-personas/${id}`);
+                if (!response.ok) throw new Error('Failed to load persona');
+
+                const persona = await response.json();
+                editingPersonaId = id;
+
+                document.getElementById('persona-modal-title').textContent = 'Edit Persona';
+                document.getElementById('edit-persona-id').value = id;
+                document.getElementById('persona-name').value = persona.name || '';
+                document.getElementById('persona-role').value = persona.role || '';
+                document.getElementById('persona-industry').value = persona.industry || '';
+                document.getElementById('persona-pain-points').value = (persona.pain_points || []).join('\n');
+                document.getElementById('persona-goals').value = (persona.goals || []).join('\n');
+
+                if (persona.content_preferences) {
+                    document.getElementById('persona-length').value = persona.content_preferences.length || 'Medium';
+                    document.getElementById('persona-data').value = persona.content_preferences.data_density || 'Moderate';
+                    document.getElementById('persona-tone').value = persona.content_preferences.tone || 'Professional';
+                }
+
+                document.getElementById('persona-modal').classList.remove('hidden');
+            } catch (err) {
+                showToast('Failed to load persona details');
+            }
+        }
+
+        async function deletePersona(id) {
+            if (!confirm('Delete this persona?')) return;
+            try {
+                const response = await Auth.fetchWithAuth(`/api/custom-personas/${id}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error('Failed to delete persona');
+                loadPersonas();
+                showToast('Persona deleted');
+            } catch (err) {
+                showToast('Error deleting persona');
+            }
+        }
+
+        document.getElementById('persona-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const painPoints = document.getElementById('persona-pain-points').value
+                .split('\n')
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+
+            const goals = document.getElementById('persona-goals').value
+                .split('\n')
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+
+            if (painPoints.length === 0) {
+                showToast('Please add at least one pain point');
+                return;
+            }
+
+            if (goals.length === 0) {
+                showToast('Please add at least one goal');
+                return;
+            }
+
+            const personaData = {
+                name: document.getElementById('persona-name').value.trim(),
+                role: document.getElementById('persona-role').value.trim(),
+                industry: document.getElementById('persona-industry').value.trim() || null,
+                pain_points: painPoints,
+                goals: goals,
+                content_preferences: {
+                    length: document.getElementById('persona-length').value,
+                    data_density: document.getElementById('persona-data').value,
+                    tone: document.getElementById('persona-tone').value
+                }
+            };
+
+            try {
+                const url = editingPersonaId
+                    ? `/api/custom-personas/${editingPersonaId}`
+                    : '/api/custom-personas';
+                const method = editingPersonaId ? 'PUT' : 'POST';
+
+                const response = await Auth.fetchWithAuth(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(personaData)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to save persona');
+                }
+
+                showToast(editingPersonaId ? 'Persona updated' : 'Persona created');
+                hidePersonaModal();
+                loadPersonas();
             } catch (err) {
                 showToast(err.message);
             }
