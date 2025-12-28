@@ -1,0 +1,11 @@
+# Nixpacks configuration for Railway deployment
+# This is a Python FastAPI application - the package.json is only for dev/testing
+
+[phases.setup]
+nixPkgs = ["python311", "python311Packages.pip"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[start]
+cmd = "python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"
