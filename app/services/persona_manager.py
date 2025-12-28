@@ -13,7 +13,7 @@ _personas_cache: Optional[dict] = None
 
 
 async def load_personas() -> dict:
-    """Load personas from the JSON file."""
+    """Load default personas from the JSON file."""
     global _personas_cache
 
     if _personas_cache is not None:
@@ -48,27 +48,144 @@ async def save_personas(personas_data: dict):
     _personas_cache = personas_data
 
 
-async def get_persona(persona_id: str) -> Optional[dict]:
-    """Get a specific persona by ID."""
-    personas = await load_personas()
+async def get_persona(persona_id: str, user_id: int = None) -> Optional[dict]:
+    """
+    Get a specific persona by ID.
 
+    First checks custom personas in DB (if user_id provided), then falls back to defaults.
+    """
+    # Check custom personas in DB first if user_id is provided
+    if user_id:
+        from app.database import get_db
+        async with get_db() as db:
+            cursor = await db.execute(
+                "SELECT * FROM personas WHERE id = ? AND user_id = ?",
+                (persona_id, user_id)
+            )
+            row = await cursor.fetchone()
+            if row:
+                return _row_to_persona_dict(row)
+
+    # Fall back to default personas from JSON
+    personas = await load_personas()
     for persona in personas.get("personas", []):
         if persona.get("id") == persona_id:
-            return persona
+            persona_copy = dict(persona)
+            persona_copy["is_default"] = True
+            persona_copy["is_custom"] = False
+            return persona_copy
 
     return None
 
 
+async def get_persona_for_job(persona_id: str, user_id: int = None) -> Optional[dict]:
+    """
+    Get persona for use in job processing.
+
+    Returns a normalized persona dict that works with drafting/editing services.
+    """
+    persona = await get_persona(persona_id, user_id)
+    if not persona:
+        return None
+
+    # Normalize the persona to ensure it has all fields needed by the pipeline
+    normalized = {
+        "id": persona.get("id"),
+        "title": persona.get("title") or f"{persona.get('name', '')} ({persona.get('role', '')})",
+        "name": persona.get("name") or persona.get("title", ""),
+        "role": persona.get("role", ""),
+        "industry": persona.get("industry"),
+        "pain_points": persona.get("pain_points", []),
+        "priorities": persona.get("priorities") or persona.get("goals", []),
+        "goals": persona.get("goals") or persona.get("priorities", []),
+        "language_level": persona.get("language_level", "Professional"),
+        "content_preferences": persona.get("content_preferences", {}),
+        "tone_preferences": persona.get("tone_preferences", {}),
+        "is_default": persona.get("is_default", False),
+        "is_custom": persona.get("is_custom", False),
+    }
+    return normalized
+
+
 async def list_personas() -> list[dict]:
-    """List all available personas."""
+    """List all default personas from JSON."""
     personas = await load_personas()
     return personas.get("personas", [])
+
+
+async def list_all_personas(user_id: int) -> list[dict]:
+    """List default personas + user's custom personas."""
+    from app.database import get_db
+
+    # Get defaults from JSON
+    defaults = await load_personas()
+    result = []
+    for p in defaults.get("personas", []):
+        persona = dict(p)
+        persona["is_default"] = True
+        persona["is_custom"] = False
+        result.append(persona)
+
+    # Add custom personas from DB
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT * FROM personas WHERE user_id = ? ORDER BY created_at DESC",
+            (user_id,)
+        )
+        rows = await cursor.fetchall()
+        for row in rows:
+            result.append(_row_to_persona_dict(row))
+
+    return result
+
+
+def _row_to_persona_dict(row) -> dict:
+    """Convert a database row to a persona dictionary."""
+    return {
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "name": row["name"],
+        "role": row["role"],
+        "title": f"{row['name']} ({row['role']})",
+        "industry": row["industry"],
+        "pain_points": json.loads(row["pain_points"]) if row["pain_points"] else [],
+        "goals": json.loads(row["goals"]) if row["goals"] else [],
+        "priorities": json.loads(row["goals"]) if row["goals"] else [],
+        "language_level": "Professional",
+        "tone_preferences": json.loads(row["tone_preferences"]) if row["tone_preferences"] else None,
+        "content_preferences": json.loads(row["content_preferences"]) if row["content_preferences"] else None,
+        "is_default": bool(row["is_default"]),
+        "is_custom": True,
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
 
 
 def get_default_personas() -> dict:
     """Return the default hardcoded personas for MVP."""
     return {
         "personas": [
+            {
+                "id": "general_audience",
+                "title": "General Audience",
+                "company_size": "Any",
+                "pain_points": [
+                    "Information overload",
+                    "Time constraints",
+                    "Relevance to their needs"
+                ],
+                "language_level": "Professional - clear and accessible",
+                "priorities": [
+                    "Clear communication",
+                    "Actionable insights",
+                    "Value and relevance"
+                ],
+                "content_preferences": {
+                    "length": "Medium - balanced",
+                    "data_density": "Moderate - mix of insights and evidence",
+                    "tone": "Professional and engaging"
+                }
+            },
             {
                 "id": "ceo_longterm_care",
                 "title": "CEO of Long-Term Care Facility",

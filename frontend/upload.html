@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="/static/images/Icon only.png">
-    <title>Upload Content - Still</title>
+    <title>Distill Content - Still</title>
+    <meta name="description" content="Upload your content to Still and extract reusable stills for your Reserve.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -40,7 +41,131 @@
     <script src="/static/auth.js"></script>
     <script src="/static/components.js"></script>
     <style>
-        body { font-family: 'Inter', system-ui, sans-serif; }
+        /* Custom checkbox styling */
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background: var(--surface-elevated);
+            border: 1.5px solid var(--surface-subtle);
+            border-radius: var(--radius-lg);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .checkbox-label:hover {
+            border-color: var(--still-copper);
+            background: var(--surface-highlight);
+        }
+        .checkbox-label:has(input:checked) {
+            border-color: var(--still-copper);
+            background: rgba(212, 117, 43, 0.08);
+        }
+        .checkbox-label input[type="checkbox"] {
+            appearance: none;
+            width: 22px;
+            height: 22px;
+            border: 2px solid var(--surface-subtle);
+            border-radius: 6px;
+            background: var(--surface-raised);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            position: relative;
+            flex-shrink: 0;
+        }
+        .checkbox-label input[type="checkbox"]:checked {
+            background: var(--still-copper);
+            border-color: var(--still-copper);
+        }
+        .checkbox-label input[type="checkbox"]:checked::after {
+            content: '';
+            position: absolute;
+            left: 6px;
+            top: 3px;
+            width: 6px;
+            height: 10px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+        .checkbox-label input[type="checkbox"]:focus-visible {
+            outline: 2px solid var(--copper-accessible);
+            outline-offset: 2px;
+        }
+        /* Number input stepper */
+        .qty-input {
+            width: 70px;
+            padding: 8px 12px;
+            text-align: center;
+            background: var(--surface-raised);
+            border: 1.5px solid var(--surface-subtle);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        .qty-input:focus {
+            outline: none;
+            border-color: var(--still-copper);
+            box-shadow: 0 0 0 3px var(--still-copper-glow);
+        }
+        /* Toggle switch styling */
+        .toggle-switch {
+            position: relative;
+            width: 52px;
+            height: 28px;
+            background: var(--surface-subtle);
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+        .toggle-switch:has(input:checked) {
+            background: var(--still-copper);
+        }
+        .toggle-switch input {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+            margin: 0;
+        }
+        .toggle-switch:focus-within {
+            outline: 2px solid var(--copper-accessible);
+            outline-offset: 2px;
+        }
+        .toggle-switch .toggle-knob {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        .toggle-switch:has(input:checked) .toggle-knob {
+            left: 27px;
+        }
+        /* Collapsible section animation */
+        .collapsible-section {
+            overflow: hidden;
+            transition: max-height 0.3s ease, opacity 0.2s ease, margin 0.3s ease;
+            max-height: 0;
+            opacity: 0;
+            margin-top: 0;
+        }
+        .collapsible-section.expanded {
+            max-height: 1000px;
+            opacity: 1;
+            margin-top: 2rem;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .collapsible-section {
+                transition: none;
+            }
+        }
     </style>
     <script>
         window.addEventListener('load', () => {
@@ -51,195 +176,274 @@
 <body class="bg-still-bg min-h-screen text-still-text">
     <div id="nav-container"></div>
 
-    <div class="max-w-3xl mx-auto px-4 py-12">
-        <h1 class="text-3xl font-bold mb-8 text-still-text">Upload Content</h1>
+    <main class="max-w-3xl mx-auto px-4 py-12">
+        <!-- Page Header -->
+        <div class="mb-10">
+            <h1 class="text-4xl font-bold text-still-text mb-3">Distill Content</h1>
+            <p class="text-lg text-still-muted">Extract reusable stills (quotes, stats, stories) and save them to your Reserve.</p>
+        </div>
 
         <!-- Upload Tabs -->
-        <div class="tabs-premium mb-6">
-            <button id="tab-file" class="tab-premium active" onclick="showTab('file')">
-                Full Pipeline
+        <div class="tabs-premium mb-8" role="tablist" aria-label="Upload method">
+            <button id="tab-file" class="tab-premium active" onclick="showTab('file')" role="tab" aria-selected="true" aria-controls="file-panel">
+                Upload File
             </button>
-            <button id="tab-text" class="tab-premium" onclick="showTab('text')">
+            <button id="tab-text" class="tab-premium" onclick="showTab('text')" role="tab" aria-selected="false" aria-controls="text-panel">
                 Paste Text
-            </button>
-            <button id="tab-quick" class="tab-premium" onclick="showTab('quick')">
-                Quick Distill
             </button>
         </div>
 
-        <!-- File Upload Form -->
-        <form id="upload-form" class="space-y-6">
-            <!-- File Upload Section -->
-            <div id="file-section">
-                <div class="dropzone-premium" id="drop-zone">
-                    <input type="file" id="file-input" class="hidden" multiple
-                           accept=".mp4,.mov,.avi,.webm,.mp3,.wav,.m4a,.pdf,.txt,.md,.docx,.png,.jpg,.jpeg,.gif,.webp">
-                    <div class="space-y-3">
-                        <svg class="dropzone-icon" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                        <p class="text-still-muted">
-                            <label for="file-input" class="text-still-copper font-medium cursor-pointer hover:text-still-amber">Upload files</label>
-                            or drag and drop
-                        </p>
-                        <p class="text-sm text-still-muted">Video, Audio, PDF, Word, Images, or Text (max 100MB per file)</p>
-                        <p class="text-xs text-still-disabled">Select up to 5 files for batch processing</p>
+        <!-- Upload Form -->
+        <form id="upload-form" class="space-y-8" novalidate>
+
+            <!-- ============================================
+                 FILE UPLOAD SECTION
+                 ============================================ -->
+            <div id="file-panel" role="tabpanel" aria-labelledby="tab-file">
+                <fieldset>
+                    <legend class="sr-only">File Upload</legend>
+
+                    <div class="dropzone-premium" id="drop-zone" tabindex="0" role="button" aria-label="Upload files or drag and drop">
+                        <input type="file" id="file-input" class="hidden" multiple
+                               accept=".mp4,.mov,.avi,.webm,.mp3,.wav,.m4a,.pdf,.txt,.md,.docx,.png,.jpg,.jpeg,.gif,.webp"
+                               aria-describedby="file-help">
+                        <div class="space-y-4">
+                            <div class="w-16 h-16 mx-auto rounded-2xl bg-still-copper/10 flex items-center justify-center">
+                                <svg class="w-8 h-8 text-still-copper" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-still-text text-lg">
+                                    <label for="file-input" class="text-copper-accessible font-semibold cursor-pointer hover:text-still-amber underline underline-offset-2 decoration-still-copper/30 hover:decoration-still-amber">Choose files</label>
+                                    <span class="text-still-muted"> or drag and drop</span>
+                                </p>
+                                <p id="file-help" class="text-sm text-still-muted mt-2">Video, Audio, PDF, Word, Images, or Text (max 100MB per file)</p>
+                                <p class="text-xs text-still-disabled mt-1">Up to 5 files for batch processing</p>
+                            </div>
+                        </div>
                     </div>
+
+                    <!-- File List -->
+                    <div id="file-list" class="mt-4 space-y-3" aria-live="polite"></div>
+                </fieldset>
+            </div>
+
+            <!-- ============================================
+                 TEXT PASTE SECTION
+                 ============================================ -->
+            <div id="text-panel" class="hidden" role="tabpanel" aria-labelledby="tab-text">
+                <fieldset class="space-y-6">
+                    <legend class="sr-only">Paste Text Content</legend>
+
+                    <div>
+                        <label for="text-content" class="form-label form-label-required">Your Content</label>
+                        <textarea id="text-content" rows="12"
+                            class="input-premium"
+                            placeholder="Paste your transcript, article, or any text content here..."
+                            aria-required="true"
+                            aria-describedby="text-content-help"></textarea>
+                        <p id="text-content-help" class="form-helper">Paste a transcript, article, notes, or any text you want to repurpose.</p>
+                    </div>
+
+                    <div>
+                        <label for="content-name" class="form-label">Content Name <span class="text-still-muted font-normal">(optional)</span></label>
+                        <input type="text" id="content-name"
+                            class="input-premium"
+                            placeholder="e.g., Q1 Webinar Transcript">
+                        <p class="form-helper">Give your content a name for easy reference.</p>
+                    </div>
+                </fieldset>
+            </div>
+
+            <!-- ============================================
+                 SHARED OPTIONS (Both modes)
+                 ============================================ -->
+            <div class="space-y-6">
+
+                <!-- Campaign Name -->
+                <div>
+                    <label for="campaign-name" class="form-label">Campaign Name <span class="text-still-muted font-normal">(optional)</span></label>
+                    <input type="text" id="campaign-name"
+                        class="input-premium"
+                        placeholder="e.g., Q1 Webinar Series">
+                    <p class="form-helper">Group related content under a campaign name for easier organization.</p>
                 </div>
-                <div id="file-list" class="mt-3 space-y-2"></div>
+
+                <!-- Target Persona -->
+                <div>
+                    <label for="target-persona" class="form-label">Target Persona <span class="text-still-muted font-normal">(optional)</span></label>
+                    <select id="target-persona"
+                        class="input-premium select-premium"
+                        aria-describedby="persona-help">
+                        <option value="">No persona - general audience</option>
+                    </select>
+                    <p id="persona-help" class="form-helper">
+                        Stills will be tagged with relevance scores for this persona.
+                        <a href="/settings.html" class="text-copper-accessible hover:text-still-amber underline">Manage personas in Settings</a>
+                    </p>
+                </div>
+
+                <!-- Domain Vocabulary -->
+                <div>
+                    <label for="magic-words" class="form-label">Domain Vocabulary <span class="text-still-muted font-normal">(optional)</span></label>
+                    <textarea id="magic-words" rows="2"
+                        class="input-premium"
+                        placeholder="SafelyYou, Q4, ROI, DON, CMS"
+                        aria-describedby="magic-words-help"></textarea>
+                    <p id="magic-words-help" class="form-helper">Enter brand names, acronyms, or technical terms (comma-separated) to improve transcription accuracy.</p>
+                </div>
             </div>
 
-            <!-- Text Paste Section (hidden by default) -->
-            <div id="text-section" class="hidden">
-                <label class="block text-sm font-medium text-still-text mb-2">Paste your content</label>
-                <textarea id="text-content" rows="10"
-                    class="input-premium"
-                    placeholder="Paste your transcript, article, or any text content here..."></textarea>
-                <input type="text" id="content-name"
-                    class="input-premium mt-2"
-                    placeholder="Content name (optional)">
+            <!-- ============================================
+                 DIVIDER
+                 ============================================ -->
+            <div class="border-t border-still-border"></div>
+
+            <!-- ============================================
+                 ALSO GENERATE CONTENT TOGGLE
+                 ============================================ -->
+            <div class="card-premium p-6">
+                <label class="flex items-center justify-between cursor-pointer">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3">
+                            <svg class="w-6 h-6 text-still-copper" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                            </svg>
+                            <span class="font-semibold text-still-text text-lg">Also generate content</span>
+                        </div>
+                        <p class="text-still-muted mt-2 ml-9">Auto-generate LinkedIn posts, blog articles, and emails from your stills</p>
+                    </div>
+                    <div class="toggle-switch" id="generate-content-toggle">
+                        <input type="checkbox" id="generate-content-checkbox" onchange="toggleGenerateContent()" aria-label="Also generate content">
+                        <div class="toggle-knob"></div>
+                    </div>
+                </label>
             </div>
 
-            <!-- Quick Distill Section (hidden by default) -->
-            <div id="quick-section" class="hidden">
-                <div class="bg-still-copper/10 border border-still-copper/30 rounded-lg p-6 mb-6">
+            <!-- ============================================
+                 CONTENT GENERATION OPTIONS (Conditional)
+                 ============================================ -->
+            <div id="content-generation-options" class="collapsible-section" aria-hidden="true">
+                <fieldset>
+                    <legend class="form-label form-label-required mb-4">Content Types to Generate</legend>
+                    <div class="space-y-3" role="group" aria-describedby="content-types-help">
+
+                        <!-- LinkedIn -->
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="asset-linkedin" checked aria-describedby="linkedin-desc">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-[#0A66C2]" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                                    </svg>
+                                    <span class="font-medium text-still-text">LinkedIn Posts</span>
+                                </div>
+                                <p id="linkedin-desc" class="text-sm text-still-muted mt-1">Engaging posts with hooks and CTAs</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label for="qty-linkedin" class="sr-only">Number of LinkedIn posts</label>
+                                <input type="number" id="qty-linkedin" value="3" min="1" max="5" class="qty-input">
+                                <span class="text-sm text-still-muted">posts</span>
+                            </div>
+                        </label>
+
+                        <!-- Blog -->
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="asset-blog" checked aria-describedby="blog-desc">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-still-copper" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                    <span class="font-medium text-still-text">Blog Post</span>
+                                </div>
+                                <p id="blog-desc" class="text-sm text-still-muted mt-1">SEO-friendly, 800-1,200 words</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label for="qty-blog" class="sr-only">Number of blog posts</label>
+                                <input type="number" id="qty-blog" value="1" min="1" max="3" class="qty-input">
+                                <span class="text-sm text-still-muted">posts</span>
+                            </div>
+                        </label>
+
+                        <!-- Email -->
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="asset-email" aria-describedby="email-desc">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-[#A855F7]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                    </svg>
+                                    <span class="font-medium text-still-text">Email</span>
+                                </div>
+                                <p id="email-desc" class="text-sm text-still-muted mt-1">Subject line, preview text, and body</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label for="qty-email" class="sr-only">Number of emails</label>
+                                <input type="number" id="qty-email" value="1" min="1" max="3" class="qty-input">
+                                <span class="text-sm text-still-muted">emails</span>
+                            </div>
+                        </label>
+
+                        <!-- Email Sequence -->
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="asset-email-sequence" aria-describedby="email-seq-desc">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-[#A855F7]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                    </svg>
+                                    <span class="font-medium text-still-text">Email Sequence</span>
+                                </div>
+                                <p id="email-seq-desc" class="text-sm text-still-muted mt-1">5-email drip campaign (Day 0, 3, 7, 14, 30)</p>
+                            </div>
+                            <span class="badge badge-copper">Full Sequence</span>
+                        </label>
+                    </div>
+                    <p id="content-types-help" class="form-helper mt-3">Select at least one content type to generate.</p>
+                </fieldset>
+
+                <!-- Processing Time Estimate -->
+                <div class="mt-6 rounded-xl p-5" style="background: linear-gradient(135deg, rgba(212, 117, 43, 0.1) 0%, rgba(233, 168, 114, 0.05) 100%); border: 1px solid rgba(212, 117, 43, 0.2);">
                     <div class="flex items-start gap-4">
-                        <div class="p-3 bg-still-copper/20 rounded-lg">
-                            <svg class="w-8 h-8 text-still-copper" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+                        <div class="w-10 h-10 rounded-lg bg-still-copper/20 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-5 h-5 text-still-copper" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
                         </div>
                         <div>
-                            <h3 class="text-lg font-semibold text-still-copper mb-1">Quick Distill</h3>
-                            <p class="text-still-muted text-sm">
-                                Extract stills from any document and save them directly to your Reserve.
-                                No content generation - just fast extraction for building your library.
-                            </p>
+                            <p class="font-medium text-still-text mb-1">Full processing takes 2-5 minutes</p>
+                            <p class="text-sm text-still-muted">Includes drafting, editing, fact-checking, and quality scoring.</p>
                         </div>
                     </div>
                 </div>
-
-                    <div class="dropzone-premium" id="quick-drop-zone">
-                        <input type="file" id="quick-file-input" class="hidden"
-                               accept=".mp4,.mov,.avi,.webm,.mp3,.wav,.m4a,.pdf,.txt,.md,.docx,.png,.jpg,.jpeg,.gif,.webp">
-                        <div class="space-y-3">
-                            <svg class="dropzone-icon text-still-copper" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
-                            </svg>
-                            <p class="text-still-muted">
-                                <label for="quick-file-input" class="text-still-copper font-medium cursor-pointer hover:text-still-amber">Upload a file</label>
-                                or drag and drop
-                            </p>
-                            <p class="text-sm text-still-muted">Video, Audio, PDF, Word, Images, or Text</p>
-                        </div>
-                    </div>
-                <div id="quick-file-display" class="hidden mt-3 flex items-center justify-between bg-still-card rounded-lg p-3 border border-still-border">
-                    <div class="flex items-center gap-3">
-                        <svg class="w-5 h-5 text-still-copper" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                        </svg>
-                        <span id="quick-file-name" class="text-sm font-medium text-still-text"></span>
-                    </div>
-                    <button type="button" onclick="clearQuickFile()" class="p-1 text-still-muted hover:text-still-error">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
-
-                <!-- Optional Persona for Quick Distill -->
-                <div class="mt-6">
-                    <label class="block text-sm font-medium text-still-text mb-2">Target Persona (optional)</label>
-                    <select id="quick-persona"
-                        class="input-premium select-premium">
-                        <option value="">No persona - extract all stills</option>
-                    </select>
-                    <p class="text-xs text-still-muted mt-1">If selected, stills will be tagged with relevance scores for this persona</p>
-                </div>
-
-                <div class="mt-6">
-                    <button type="button" id="quick-submit-btn" onclick="submitQuickDistill()" class="btn btn-primary btn-lg w-full">
-                        Distill to Reserve
-                    </button>
-                </div>
             </div>
 
-            <!-- Target Persona (hidden in quick distill mode) -->
-            <div id="full-pipeline-options">
-            <div>
-                <label class="block text-sm font-medium text-still-text mb-2">Target Persona</label>
-                <select id="target-persona" required
-                    class="input-premium select-premium">
-                    <option value="">Loading personas...</option>
-                </select>
-                <p class="text-xs text-still-muted mt-1">
-                    <a href="/personas.html" class="text-still-copper hover:text-still-amber">Create custom personas</a> to target specific audiences
-                </p>
-            </div>
-
-            <!-- Asset Types -->
-            <div>
-                <label class="block text-sm font-medium text-still-text mb-2">Content Types to Generate</label>
-                <div class="space-y-3">
-                    <label class="flex items-center text-still-text">
-                        <input type="checkbox" id="asset-linkedin" checked
-                            class="h-4 w-4 text-still-copper bg-still-card border-still-border rounded focus:ring-still-copper">
-                        <span class="ml-2">LinkedIn Posts</span>
-                        <input type="number" id="qty-linkedin" value="3" min="1" max="5"
-                            class="ml-auto w-16 bg-still-card border border-still-border rounded p-1 text-center text-still-text">
-                    </label>
-                    <label class="flex items-center text-still-text">
-                        <input type="checkbox" id="asset-blog" checked
-                            class="h-4 w-4 text-still-copper bg-still-card border-still-border rounded focus:ring-still-copper">
-                        <span class="ml-2">Blog Post</span>
-                        <input type="number" id="qty-blog" value="1" min="1" max="3"
-                            class="ml-auto w-16 bg-still-card border border-still-border rounded p-1 text-center text-still-text">
-                    </label>
-                    <label class="flex items-center text-still-text">
-                        <input type="checkbox" id="asset-email"
-                            class="h-4 w-4 text-still-copper bg-still-card border-still-border rounded focus:ring-still-copper">
-                        <span class="ml-2">Email</span>
-                        <input type="number" id="qty-email" value="1" min="1" max="3"
-                            class="ml-auto w-16 bg-still-card border border-still-border rounded p-1 text-center text-still-text">
-                    </label>
-                    <label class="flex items-center text-still-text">
-                        <input type="checkbox" id="asset-email-sequence"
-                            class="h-4 w-4 text-still-copper bg-still-card border-still-border rounded focus:ring-still-copper">
-                        <span class="ml-2">Email Sequence (5-email drip campaign)</span>
-                        <span class="ml-auto text-sm text-still-muted">Day 0, 3, 7, 14, 30</span>
-                    </label>
-                </div>
-            </div>
-
-            <!-- Campaign Name -->
-            <div>
-                <label class="block text-sm font-medium text-still-text mb-2">Campaign Name (optional)</label>
-                <input type="text" id="campaign-name"
-                    class="input-premium"
-                    placeholder="e.g., Q1 Webinar Series">
-            </div>
-
-            <!-- Domain Vocabulary -->
-            <div>
-                <label class="block text-sm font-medium text-still-text mb-2">Domain Vocabulary (optional)</label>
-                <textarea id="magic-words" rows="2"
-                    class="input-premium"
-                    placeholder="SafelyYou, Q4, ROI, DON, CMS - helps transcription accuracy"></textarea>
-                <p class="text-sm text-still-muted mt-1">Enter brand names, acronyms, or technical terms (comma-separated) to improve transcription accuracy</p>
-            </div>
-
-            <!-- Submit Button -->
-            <div class="pt-4">
-                <button type="submit" id="submit-btn" class="btn btn-primary btn-lg w-full">
-                    Start Processing
-                </button>
-            </div>
-            </div>
+            <!-- ============================================
+                 SUBMIT BUTTON
+                 ============================================ -->
+            <button type="submit" id="submit-btn" class="btn btn-primary-glow btn-xl w-full">
+                <svg id="submit-icon-distill" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+                </svg>
+                <svg id="submit-icon-generate" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+                <span id="submit-text">Extract Stills</span>
+            </button>
         </form>
 
         <!-- Error Message -->
-        <div id="error-message" class="hidden mt-4 p-4 bg-still-error/20 border border-still-error rounded-lg text-still-error"></div>
-    </div>
+        <div id="error-message" class="hidden mt-6 p-4 rounded-xl border-l-4 border-l-still-error" style="background: var(--error-subtle);" role="alert">
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 text-still-error flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                </svg>
+                <p class="text-still-error" id="error-text"></p>
+            </div>
+        </div>
+    </main>
 
     <script>
         // Require authentication
@@ -247,13 +451,12 @@
 
         let uploadMode = 'file';
         let selectedFiles = [];
-        let quickDistillFile = null;
+        let generateContent = false;
         const MAX_FILES = 5;
 
         // Load personas dynamically
         async function loadPersonas() {
             const select = document.getElementById('target-persona');
-            const quickSelect = document.getElementById('quick-persona');
 
             try {
                 const response = await Auth.fetchWithAuth('/api/personas/all');
@@ -265,109 +468,113 @@
 
                 const data = await response.json();
 
-                select.innerHTML = '<option value="">Select a persona...</option>';
-                quickSelect.innerHTML = '<option value="">No persona - extract all stills</option>';
+                select.innerHTML = '<option value="">No persona - general audience</option>';
 
-                // Add custom personas first (if any)
+                // Add custom personas first
                 if (data.custom_personas && data.custom_personas.length > 0) {
                     const customGroup = document.createElement('optgroup');
                     customGroup.label = 'Your Custom Personas';
-                    const quickCustomGroup = document.createElement('optgroup');
-                    quickCustomGroup.label = 'Your Custom Personas';
 
                     data.custom_personas.forEach(p => {
                         const option = document.createElement('option');
                         option.value = p.id;
                         option.textContent = `${p.name} (${p.role})`;
                         customGroup.appendChild(option);
-
-                        const quickOption = option.cloneNode(true);
-                        quickCustomGroup.appendChild(quickOption);
                     });
                     select.appendChild(customGroup);
-                    quickSelect.appendChild(quickCustomGroup);
                 }
 
                 // Add default personas
                 if (data.default_personas && data.default_personas.length > 0) {
                     const defaultGroup = document.createElement('optgroup');
                     defaultGroup.label = 'Default Personas';
-                    const quickDefaultGroup = document.createElement('optgroup');
-                    quickDefaultGroup.label = 'Default Personas';
 
                     data.default_personas.forEach(p => {
                         const option = document.createElement('option');
                         option.value = p.id;
                         option.textContent = p.title;
                         defaultGroup.appendChild(option);
-
-                        const quickOption = option.cloneNode(true);
-                        quickDefaultGroup.appendChild(quickOption);
                     });
                     select.appendChild(defaultGroup);
-                    quickSelect.appendChild(quickDefaultGroup);
                 }
             } catch (err) {
                 console.error('Failed to load personas:', err);
-                // Fallback to hardcoded options for both dropdowns
-                select.innerHTML = `
-                    <option value="">Select a persona...</option>
-                    <option value="ceo_longterm_care">CEO of Long-Term Care Facility</option>
-                    <option value="don_memory_care">Director of Nursing (Memory Care)</option>
-                    <option value="marketing_director">Marketing Director (Senior Living)</option>
-                `;
-                quickSelect.innerHTML = `
-                    <option value="">No persona - extract all stills</option>
-                    <option value="ceo_longterm_care">CEO of Long-Term Care Facility</option>
-                    <option value="don_memory_care">Director of Nursing (Memory Care)</option>
-                    <option value="marketing_director">Marketing Director (Senior Living)</option>
-                `;
+                // Just show the "no persona" option as fallback
+                select.innerHTML = '<option value="">No persona - general audience</option>';
             }
         }
 
-        // Load personas on page load
         document.addEventListener('DOMContentLoaded', loadPersonas);
 
         function showTab(tab) {
             uploadMode = tab;
 
-            // Update tab styling
-            ['file', 'text', 'quick'].forEach(t => {
+            // Update ARIA states
+            ['file', 'text'].forEach(t => {
                 const tabBtn = document.getElementById(`tab-${t}`);
-                tabBtn.classList.toggle('active', tab === t);
+                const isActive = tab === t;
+                tabBtn.classList.toggle('active', isActive);
+                tabBtn.setAttribute('aria-selected', isActive);
             });
 
-            // Show/hide sections
-            document.getElementById('file-section').classList.toggle('hidden', tab !== 'file');
-            document.getElementById('text-section').classList.toggle('hidden', tab !== 'text');
-            document.getElementById('quick-section').classList.toggle('hidden', tab !== 'quick');
-            document.getElementById('full-pipeline-options').classList.toggle('hidden', tab === 'quick');
+            // Show/hide panels
+            document.getElementById('file-panel').classList.toggle('hidden', tab !== 'file');
+            document.getElementById('text-panel').classList.toggle('hidden', tab !== 'text');
+        }
+
+        function toggleGenerateContent() {
+            const checkbox = document.getElementById('generate-content-checkbox');
+            const optionsSection = document.getElementById('content-generation-options');
+            const submitText = document.getElementById('submit-text');
+            const iconDistill = document.getElementById('submit-icon-distill');
+            const iconGenerate = document.getElementById('submit-icon-generate');
+
+            generateContent = checkbox.checked;
+
+            if (generateContent) {
+                optionsSection.classList.add('expanded');
+                optionsSection.setAttribute('aria-hidden', 'false');
+                submitText.textContent = 'Extract & Generate Content';
+                iconDistill.classList.add('hidden');
+                iconGenerate.classList.remove('hidden');
+            } else {
+                optionsSection.classList.remove('expanded');
+                optionsSection.setAttribute('aria-hidden', 'true');
+                submitText.textContent = 'Extract Stills';
+                iconDistill.classList.remove('hidden');
+                iconGenerate.classList.add('hidden');
+            }
         }
 
         // File upload handling
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
 
-        // Only trigger file input click if clicking outside the label
         dropZone.addEventListener('click', (e) => {
-            // Don't trigger if clicking on the label (it already triggers the input)
             if (e.target.tagName !== 'LABEL' && !e.target.closest('label')) {
+                fileInput.click();
+            }
+        });
+
+        dropZone.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
                 fileInput.click();
             }
         });
 
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
-            dropZone.classList.add('border-still-copper');
+            dropZone.classList.add('active');
         });
 
         dropZone.addEventListener('dragleave', () => {
-            dropZone.classList.remove('border-still-copper');
+            dropZone.classList.remove('active');
         });
 
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
-            dropZone.classList.remove('border-still-copper');
+            dropZone.classList.remove('active');
             const files = Array.from(e.dataTransfer.files);
             handleFiles(files);
         });
@@ -378,10 +585,11 @@
         });
 
         function handleFiles(files) {
-            // Limit to max files
             const newFiles = files.slice(0, MAX_FILES - selectedFiles.length);
             selectedFiles = [...selectedFiles, ...newFiles].slice(0, MAX_FILES);
             renderFileList();
+            // Reset input to allow re-selecting same files
+            fileInput.value = '';
         }
 
         function removeFile(index) {
@@ -399,18 +607,20 @@
             container.innerHTML = selectedFiles.map((file, index) => {
                 const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
                 return `
-                    <div class="flex items-center justify-between bg-still-card rounded-lg p-3 border border-still-border">
+                    <div class="card-premium p-4 flex items-center justify-between">
                         <div class="flex items-center gap-3 min-w-0">
-                            <svg class="w-5 h-5 text-still-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                            </svg>
+                            <div class="w-10 h-10 rounded-lg bg-still-green/10 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-5 h-5 text-still-green" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            </div>
                             <div class="min-w-0">
-                                <p class="text-sm font-medium text-still-text truncate">${escapeHtml(file.name)}</p>
-                                <p class="text-xs text-still-muted">${sizeMB} MB</p>
+                                <p class="font-medium text-still-text truncate">${escapeHtml(file.name)}</p>
+                                <p class="text-sm text-still-muted">${sizeMB} MB</p>
                             </div>
                         </div>
-                        <button type="button" onclick="removeFile(${index})" class="p-1 text-still-muted hover:text-still-error">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <button type="button" onclick="removeFile(${index})" class="btn btn-ghost btn-sm" aria-label="Remove ${escapeHtml(file.name)}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                             </svg>
                         </button>
@@ -418,110 +628,27 @@
                 `;
             }).join('');
 
-            // Show batch mode indicator
             if (selectedFiles.length > 1) {
                 container.innerHTML += `
-                    <div class="text-sm text-still-copper font-medium mt-2">
-                        Batch mode: ${selectedFiles.length} files will be processed together
+                    <div class="flex items-center gap-2 p-3 rounded-lg" style="background: var(--info-subtle);">
+                        <svg class="w-5 h-5 text-info-muted" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="text-sm text-info-muted font-medium">Batch mode: ${selectedFiles.length} files will be processed together</span>
                     </div>
                 `;
             }
         }
 
-        // escapeHtml is now provided by utils.js
-
-        // Quick Distill file handling
-        const quickDropZone = document.getElementById('quick-drop-zone');
-        const quickFileInput = document.getElementById('quick-file-input');
-
-        // Only trigger file input click if clicking outside the label
-        quickDropZone.addEventListener('click', (e) => {
-            if (e.target.tagName !== 'LABEL' && !e.target.closest('label')) {
-                quickFileInput.click();
-            }
-        });
-
-        quickDropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            quickDropZone.classList.add('border-still-copper');
-        });
-
-        quickDropZone.addEventListener('dragleave', () => {
-            quickDropZone.classList.remove('border-still-copper');
-        });
-
-        quickDropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            quickDropZone.classList.remove('border-still-copper');
-            const files = Array.from(e.dataTransfer.files);
-            if (files.length > 0) {
-                setQuickFile(files[0]);
-            }
-        });
-
-        quickFileInput.addEventListener('change', (e) => {
-            const files = Array.from(e.target.files);
-            if (files.length > 0) {
-                setQuickFile(files[0]);
-            }
-        });
-
-        function setQuickFile(file) {
-            quickDistillFile = file;
-            document.getElementById('quick-drop-zone').classList.add('hidden');
-            document.getElementById('quick-file-display').classList.remove('hidden');
-            document.getElementById('quick-file-name').textContent = file.name;
-        }
-
-        function clearQuickFile() {
-            quickDistillFile = null;
-            quickFileInput.value = '';
-            document.getElementById('quick-drop-zone').classList.remove('hidden');
-            document.getElementById('quick-file-display').classList.add('hidden');
-        }
-
-        async function submitQuickDistill() {
-            const submitBtn = document.getElementById('quick-submit-btn');
+        function showError(message) {
             const errorDiv = document.getElementById('error-message');
-            errorDiv.classList.add('hidden');
+            document.getElementById('error-text').textContent = message;
+            errorDiv.classList.remove('hidden');
+            errorDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
 
-            if (!quickDistillFile) {
-                errorDiv.textContent = 'Please select a file to distill';
-                errorDiv.classList.remove('hidden');
-                return;
-            }
-
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Distilling...';
-
-            try {
-                const formData = new FormData();
-                formData.append('file', quickDistillFile);
-
-                const persona = document.getElementById('quick-persona').value;
-                if (persona) {
-                    formData.append('target_persona', persona);
-                }
-
-                const response = await Auth.fetchWithAuth('/api/quick-distill', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    // Redirect to status page with quick_distill flag - it will redirect to Reserve when complete
-                    window.location.href = `/status.html?job_id=${data.job_id}&mode=quick_distill`;
-                } else {
-                    throw new Error(data.detail || 'Quick distill failed');
-                }
-            } catch (err) {
-                errorDiv.textContent = err.message;
-                errorDiv.classList.remove('hidden');
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Distill to Reserve';
-            }
+        function hideError() {
+            document.getElementById('error-message').classList.add('hidden');
         }
 
         // Form submission
@@ -529,76 +656,78 @@
             e.preventDefault();
 
             const submitBtn = document.getElementById('submit-btn');
-            const errorDiv = document.getElementById('error-message');
-            errorDiv.classList.add('hidden');
+            hideError();
 
-            // Validate
+            // Get persona (optional - can be empty)
             const persona = document.getElementById('target-persona').value;
-            if (!persona) {
-                errorDiv.textContent = 'Please select a target persona';
-                errorDiv.classList.remove('hidden');
-                return;
-            }
 
+            // Validate file/text
             if (uploadMode === 'file' && selectedFiles.length === 0) {
-                errorDiv.textContent = 'Please select at least one file to upload';
-                errorDiv.classList.remove('hidden');
+                showError('Please select at least one file to upload');
                 return;
             }
 
             if (uploadMode === 'text' && !document.getElementById('text-content').value.trim()) {
-                errorDiv.textContent = 'Please enter some content';
-                errorDiv.classList.remove('hidden');
+                showError('Please enter some content');
                 return;
             }
 
-            // Build asset types and quantities
-            const assetTypes = [];
-            const assetQuantities = {};
+            // Build asset types (only if generating content)
+            let assetTypes = [];
+            let assetQuantities = {};
+            let processingMode = 'quick_distill';
 
-            if (document.getElementById('asset-linkedin').checked) {
-                assetTypes.push('linkedin');
-                assetQuantities.linkedin = parseInt(document.getElementById('qty-linkedin').value);
-            }
-            if (document.getElementById('asset-blog').checked) {
-                assetTypes.push('blog');
-                assetQuantities.blog = parseInt(document.getElementById('qty-blog').value);
-            }
-            if (document.getElementById('asset-email').checked) {
-                assetTypes.push('email');
-                assetQuantities.email = parseInt(document.getElementById('qty-email').value);
-            }
-            if (document.getElementById('asset-email-sequence').checked) {
-                assetTypes.push('email_sequence');
-            }
+            if (generateContent) {
+                processingMode = 'autopilot';
 
-            if (assetTypes.length === 0) {
-                errorDiv.textContent = 'Please select at least one content type to generate';
-                errorDiv.classList.remove('hidden');
-                return;
+                if (document.getElementById('asset-linkedin').checked) {
+                    assetTypes.push('linkedin');
+                    assetQuantities.linkedin = parseInt(document.getElementById('qty-linkedin').value);
+                }
+                if (document.getElementById('asset-blog').checked) {
+                    assetTypes.push('blog');
+                    assetQuantities.blog = parseInt(document.getElementById('qty-blog').value);
+                }
+                if (document.getElementById('asset-email').checked) {
+                    assetTypes.push('email');
+                    assetQuantities.email = parseInt(document.getElementById('qty-email').value);
+                }
+                if (document.getElementById('asset-email-sequence').checked) {
+                    assetTypes.push('email_sequence');
+                }
+
+                if (assetTypes.length === 0) {
+                    showError('Please select at least one content type to generate');
+                    return;
+                }
             }
 
             submitBtn.disabled = true;
-            submitBtn.textContent = 'Uploading...';
+            submitBtn.innerHTML = `
+                <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                ${generateContent ? 'Processing...' : 'Extracting...'}
+            `;
 
             try {
                 let response;
-
                 const magicWords = document.getElementById('magic-words').value.trim();
+                const campaignName = document.getElementById('campaign-name').value.trim();
 
                 if (uploadMode === 'file') {
                     const formData = new FormData();
                     formData.append('target_persona', persona);
                     formData.append('asset_types', JSON.stringify(assetTypes));
                     formData.append('asset_quantities', JSON.stringify(assetQuantities));
-                    formData.append('campaign_name', document.getElementById('campaign-name').value);
+                    formData.append('processing_mode', processingMode);
+                    formData.append('campaign_name', campaignName);
                     if (magicWords) {
                         formData.append('magic_words', magicWords);
                     }
 
-                    // Use batch endpoint if multiple files, single upload otherwise
                     if (selectedFiles.length > 1) {
-                        // Batch upload
                         selectedFiles.forEach(file => {
                             formData.append('files', file);
                         });
@@ -616,7 +745,6 @@
                         }
                         return;
                     } else {
-                        // Single file upload
                         formData.append('file', selectedFiles[0]);
                         response = await Auth.fetchWithAuth('/api/upload', {
                             method: 'POST',
@@ -629,7 +757,8 @@
                     formData.append('target_persona', persona);
                     formData.append('asset_types', JSON.stringify(assetTypes));
                     formData.append('asset_quantities', JSON.stringify(assetQuantities));
-                    formData.append('campaign_name', document.getElementById('campaign-name').value);
+                    formData.append('processing_mode', processingMode);
+                    formData.append('campaign_name', campaignName);
                     formData.append('content_name', document.getElementById('content-name').value || 'pasted_content.txt');
                     if (magicWords) {
                         formData.append('magic_words', magicWords);
@@ -644,15 +773,18 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    window.location.href = `/status.html?job_id=${data.job_id}`;
+                    const modeParam = generateContent ? '' : '&mode=quick_distill';
+                    window.location.href = `/status.html?job_id=${data.job_id}${modeParam}`;
                 } else {
                     throw new Error(data.detail || 'Upload failed');
                 }
             } catch (err) {
-                errorDiv.textContent = err.message;
-                errorDiv.classList.remove('hidden');
+                showError(err.message);
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Start Processing';
+                const iconHtml = generateContent
+                    ? '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>'
+                    : '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>';
+                submitBtn.innerHTML = `${iconHtml} ${generateContent ? 'Extract & Generate Content' : 'Extract Stills'}`;
             }
         });
     </script>

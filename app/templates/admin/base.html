@@ -1,24 +1,86 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark" class="no-transitions">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Admin{% endblock %} - ContentMultiplier</title>
+    <title>{% block title %}Admin{% endblock %} - Still</title>
+    <script src="/static/theme.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/styles.css">
     <style>
+        :root {
+            --admin-sidebar: #1f2937;
+            --admin-sidebar-hover: #374151;
+            --admin-accent: #4f46e5;
+            --admin-main-bg: #111827;
+            --admin-card-bg: #1f2937;
+            --admin-border: #374151;
+            --admin-text: #f9fafb;
+            --admin-text-muted: #9ca3af;
+        }
+        [data-theme="light"] {
+            --admin-sidebar: #1f2937;
+            --admin-sidebar-hover: #374151;
+            --admin-accent: #4f46e5;
+            --admin-main-bg: #f3f4f6;
+            --admin-card-bg: #ffffff;
+            --admin-border: #e5e7eb;
+            --admin-text: #111827;
+            --admin-text-muted: #6b7280;
+        }
         .sidebar-link.active {
-            background-color: #4f46e5;
+            background-color: var(--admin-accent);
             color: white;
+        }
+        /* Ensure form elements have visible text */
+        input, select, textarea {
+            color: var(--admin-text) !important;
+            background-color: var(--admin-card-bg) !important;
+            border-color: var(--admin-border) !important;
+        }
+        input::placeholder, textarea::placeholder {
+            color: var(--admin-text-muted) !important;
+        }
+        /* Admin main content area */
+        .admin-main {
+            background-color: var(--admin-main-bg);
+            color: var(--admin-text);
+        }
+        .admin-card {
+            background-color: var(--admin-card-bg);
+            border-color: var(--admin-border);
+        }
+        .theme-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: transparent;
+            border: 1px solid var(--admin-border);
+            color: var(--admin-text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .theme-toggle:hover {
+            background: var(--admin-border);
+            color: var(--admin-text);
         }
     </style>
     {% block head %}{% endblock %}
+    <script>
+        window.addEventListener('load', () => {
+            document.documentElement.classList.remove('no-transitions');
+        });
+    </script>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="admin-main min-h-screen">
     <div class="flex">
         <!-- Sidebar -->
         <div class="w-64 bg-gray-800 min-h-screen fixed">
             <div class="p-4">
-                <a href="/" class="text-xl font-bold text-white">ContentMultiplier</a>
+                <a href="/" class="text-xl font-bold text-white">Still</a>
                 <span class="text-gray-400 text-sm block">Admin Panel</span>
             </div>
 
@@ -56,7 +118,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                     </svg>
-                    Library
+                    Reserve
                 </a>
 
                 <a href="/admin/settings"
@@ -67,6 +129,15 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                     </svg>
                     Settings
+                </a>
+
+                <a href="/admin/error-logs"
+                    class="sidebar-link flex items-center px-4 py-3 text-gray-300 hover:bg-gray-700 hover:text-white transition {% block nav_error_logs %}{% endblock %}">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    Error Logs
                 </a>
 
                 <div class="border-t border-gray-700 my-4"></div>
@@ -83,8 +154,21 @@
         </div>
 
         <!-- Main Content -->
-        <div class="ml-64 flex-1 p-8">
-            {% block content %}{% endblock %}
+        <div class="ml-64 flex-1">
+            <!-- Top Header with Theme Toggle -->
+            <div class="flex justify-end items-center px-8 py-4 border-b" style="border-color: var(--admin-border);">
+                <button onclick="ThemeManager.toggle()" class="theme-toggle" title="Toggle light/dark mode" aria-label="Toggle light/dark mode">
+                    <svg class="theme-icon-sun w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
+                    <svg class="theme-icon-moon hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-8">
+                {% block content %}{% endblock %}
+            </div>
         </div>
     </div>
 

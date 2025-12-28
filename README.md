@@ -28,7 +28,7 @@ AI-powered content repurposing platform that transforms long-form content (webin
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.13+
 - API keys:
   - Anthropic (Claude) - [console.anthropic.com](https://console.anthropic.com/)
   - Google AI Studio (Gemini) - [aistudio.google.com](https://aistudio.google.com/)

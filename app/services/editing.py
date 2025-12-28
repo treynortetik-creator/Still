@@ -1,29 +1,40 @@
 """Content editing service - Step 2 of the pipeline."""
 import json
 from typing import Tuple
-import google.generativeai as genai
 
-from app.config import get_settings, calculate_cost
+from app.services.ai_client import call_llm_text, calculate_openrouter_cost
 from app.services.prompt_manager import get_rendered_prompt
 from app.services.persona_manager import get_persona
-from app.utils.retry import retry_async, gemini_circuit_breaker
+from app.utils.json_parser import parse_llm_json
 
-settings = get_settings()
+# Default persona values when no persona is selected
+DEFAULT_PERSONA = {
+    "title": "General Professional Audience",
+    "priorities": ["actionable insights", "practical solutions", "valuable information"],
+    "pain_points": ["common business challenges", "efficiency", "growth"],
+    "language_level": "Professional",
+    "content_preferences": {"tone": "Professional"},
+}
 
 
 async def edit_for_audience(
     draft_content: str,
     persona_id: str,
     content_type: str = "linkedin",
+    job_id: str = None,
+    user_id: int = None,
 ) -> Tuple[dict, float]:
     """
     Edit content for target audience - simplify jargon, check guardrails, improve flow.
 
     Returns (edited_result, cost) tuple.
     """
-    persona = await get_persona(persona_id)
+    # Get persona or use defaults if not provided
+    persona = None
+    if persona_id:
+        persona = await get_persona(persona_id, user_id=user_id)
     if not persona:
-        raise ValueError(f"Persona not found: {persona_id}")
+        persona = DEFAULT_PERSONA
 
     variables = {
         "persona_title": persona["title"],
@@ -56,41 +67,32 @@ OUTPUT FORMAT (valid JSON):
   "citations_needed": ["List of claims that need citation/verification"]
 }}"""
 
-    genai.configure(api_key=settings.gemini_api_key)
-    model = genai.GenerativeModel(config["model"])
-
-    async def do_edit():
-        return model.generate_content(
-            full_prompt,
-            generation_config=genai.GenerationConfig(
-                response_mime_type="application/json",
-                max_output_tokens=config["max_tokens"],
-            )
-        )
-
-    # Use retry logic for API call
-    response = await retry_async(
-        do_edit,
-        max_retries=3,
-        base_delay=2.0,
-        context="edit_for_audience",
+    # Call LLM via unified client
+    response_text, input_tokens, output_tokens, model = await call_llm_text(
+        prompt=full_prompt,
+        step="editing",
+        max_tokens=config.get("max_tokens", 4096),
+        response_format="json",
+        job_id=job_id,
+        user_id=user_id,
     )
 
+    # Use robust JSON parser that handles common LLM output issues
     try:
-        result = json.loads(response.text)
-    except json.JSONDecodeError:
-        text = response.text
-        start = text.find("{")
-        end = text.rfind("}") + 1
-        if start >= 0 and end > start:
-            result = json.loads(text[start:end])
-        else:
-            raise ValueError("Failed to parse editing response as JSON")
+        result = parse_llm_json(response_text, context="editing response")
+    except ValueError as e:
+        # If parsing still fails, return a minimal result with the raw content
+        # This allows the pipeline to continue rather than fail completely
+        result = {
+            "edited_content": draft_content,  # Return original content
+            "changes_made": [],
+            "warnings": [f"Could not parse LLM response: {str(e)}"],
+            "guardrails_status": {},
+            "citations_needed": []
+        }
 
     # Calculate cost
-    input_tokens = response.usage_metadata.prompt_token_count
-    output_tokens = response.usage_metadata.candidates_token_count
-    cost = calculate_cost(config["model"], input_tokens, output_tokens)
+    cost = calculate_openrouter_cost(model, input_tokens, output_tokens)
 
     return result, cost
 
@@ -98,6 +100,8 @@ OUTPUT FORMAT (valid JSON):
 async def batch_edit_content(
     drafts: list[dict],
     persona_id: str,
+    job_id: str = None,
+    user_id: int = None,
 ) -> Tuple[list[dict], float]:
     """
     Edit multiple drafts for audience.
@@ -115,7 +119,9 @@ async def batch_edit_content(
             edited_results.append(draft)
             continue
 
-        result, cost = await edit_for_audience(content, persona_id, content_type)
+        result, cost = await edit_for_audience(
+            content, persona_id, content_type, job_id, user_id
+        )
         total_cost += cost
 
         edited_draft = {

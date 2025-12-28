@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="/static/images/Icon only.png">
     <title>The Reserve - Still</title>
+    <meta name="description" content="Browse and manage your content library of reusable stills - quotes, statistics, stories, and insights.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -35,13 +36,96 @@
             }
         }
     </script>
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-    </style>
     <link rel="stylesheet" href="/static/styles.css">
     <script src="/static/utils.js"></script>
     <script src="/static/auth.js"></script>
     <script src="/static/components.js"></script>
+    <style>
+        /* Still card with color-coded left border */
+        .still-card {
+            position: relative;
+            background: var(--surface-raised);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            transition: all 0.2s ease;
+            overflow: hidden;
+        }
+        .still-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: var(--type-color, var(--still-copper));
+        }
+        .still-card:hover {
+            border-color: var(--glass-border-hover);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-card-hover);
+        }
+        .still-card.selected {
+            border-color: var(--still-copper);
+            box-shadow: 0 0 0 2px var(--still-copper-glow), var(--shadow-card);
+        }
+        /* Type colors */
+        .still-card[data-type="data"] { --type-color: #60A5FA; }
+        .still-card[data-type="story"] { --type-color: #4ADE80; }
+        .still-card[data-type="insight"] { --type-color: #C084FC; }
+        .still-card[data-type="problem"] { --type-color: #F87171; }
+        .still-card[data-type="solution"] { --type-color: #E9A872; }
+        .still-card[data-type="quote"] { --type-color: #FBBF24; }
+        /* Relevance indicator */
+        .relevance-dots {
+            display: flex;
+            gap: 3px;
+        }
+        .relevance-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--surface-subtle);
+        }
+        .relevance-dot.filled {
+            background: var(--still-copper);
+        }
+        /* Sommelier card */
+        .sommelier-section {
+            background: linear-gradient(135deg, rgba(212, 117, 43, 0.08) 0%, rgba(233, 168, 114, 0.04) 100%);
+            border: 1px solid rgba(212, 117, 43, 0.2);
+        }
+        /* Filter chip */
+        .filter-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: var(--surface-elevated);
+            border: 1px solid var(--surface-subtle);
+            border-radius: var(--radius-full);
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .filter-chip:hover {
+            background: var(--surface-highlight);
+            border-color: var(--still-copper);
+        }
+        .filter-chip.active {
+            background: rgba(212, 117, 43, 0.15);
+            border-color: var(--still-copper);
+            color: var(--copper-accessible);
+        }
+        /* Loading skeleton */
+        .skeleton-card {
+            height: 160px;
+            background: linear-gradient(90deg, var(--surface-elevated) 0%, var(--surface-highlight) 50%, var(--surface-elevated) 100%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite linear;
+            border-radius: var(--radius-lg);
+        }
+    </style>
     <script>
         window.addEventListener('load', () => {
             document.documentElement.classList.remove('no-transitions');
@@ -49,111 +133,144 @@
     </script>
 </head>
 <body class="bg-still-bg min-h-screen">
-    <!-- Navigation -->
     <div id="nav-container"></div>
 
-    <div class="max-w-7xl mx-auto px-4 py-8">
-        <!-- The Sommelier Section -->
-        <div class="bg-still-card rounded-lg shadow-sm p-6 mb-6 border border-still-border">
-            <div class="flex items-center gap-3 mb-4">
-                <span class="text-2xl">🍷</span>
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Sommelier Section -->
+        <section class="sommelier-section rounded-2xl p-6 mb-8" aria-labelledby="sommelier-heading">
+            <div class="flex items-start gap-4 mb-6">
+                <div class="w-12 h-12 rounded-xl bg-still-copper/20 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-6 h-6 text-still-copper" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
                 <div>
-                    <h2 class="text-xl font-bold text-still-text">Ask the Sommelier</h2>
-                    <p class="text-still-muted text-sm">AI-powered search to find the perfect stills for your content</p>
+                    <h2 id="sommelier-heading" class="text-xl font-bold text-still-text">Ask the Sommelier</h2>
+                    <p class="text-still-muted">AI-powered search to find the perfect stills for your content</p>
                 </div>
             </div>
 
             <div class="flex gap-3">
+                <label for="sommelier-query" class="sr-only">Search query</label>
                 <input type="text" id="sommelier-query" placeholder="What kind of content are you creating?"
-          class="flex-1 input-premium" >
-                <button id="sommelier-search-btn" class="btn btn-primary text-white px-6 py-3 rounded-lg transition flex items-center gap-2">
-                    <span>Find Stills</span>
+                       class="flex-1 input-premium" aria-describedby="sommelier-help">
+                <button id="sommelier-search-btn" class="btn btn-primary">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    Find Stills
                 </button>
             </div>
 
-            <div class="mt-3 flex flex-wrap gap-2" id="example-queries">
-                <!-- Example queries will be loaded here -->
-            </div>
+            <p id="sommelier-help" class="text-xs text-still-muted mt-2">Try: "LinkedIn post about reducing staff burnout" or "stats about ROI for senior living"</p>
+
+            <div class="mt-4 flex flex-wrap gap-2" id="example-queries" aria-label="Example searches"></div>
 
             <!-- Sommelier Results -->
-            <div id="sommelier-results" class="hidden mt-6">
+            <div id="sommelier-results" class="hidden mt-8">
                 <div class="flex justify-between items-center mb-4">
                     <div>
                         <h3 class="text-lg font-semibold text-still-text">Search Results</h3>
                         <p id="sommelier-understood" class="text-still-muted text-sm"></p>
                     </div>
-                    <button id="clear-sommelier" class="text-still-muted hover:text-still-text text-sm">
+                    <button id="clear-sommelier" class="btn btn-tertiary btn-sm">
                         Clear Results
                     </button>
                 </div>
 
-                <div id="sommelier-results-grid" class="grid md:grid-cols-2 gap-4">
-                    <!-- Results will be rendered here -->
-                </div>
+                <div id="sommelier-results-grid" class="grid md:grid-cols-2 gap-4"></div>
 
-                <div class="mt-4 flex justify-end">
-                    <button id="blend-selected-btn" disabled
-                        class="btn btn-primary text-white px-4 py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed">
+                <div class="mt-6 flex justify-end">
+                    <button id="blend-selected-btn" disabled class="btn btn-primary">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
                         Blend Selected (<span id="sommelier-selected-count">0</span>)
                     </button>
                 </div>
             </div>
-        </div>
+        </section>
 
         <!-- Header -->
-        <div class="flex justify-between items-center mb-8">
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
             <div>
-                <h1 class="text-3xl font-bold text-still-text">The Reserve</h1>
-                <p class="text-still-muted mt-1" id="library-stats">Loading...</p>
+                <h1 class="text-4xl font-bold text-still-text">The Reserve</h1>
+                <p class="text-still-muted mt-1" id="library-stats">Loading your stills...</p>
             </div>
-            <button id="generate-btn" disabled
-                class="btn btn-primary text-white px-4 py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed">
+            <button id="generate-btn" disabled class="btn btn-primary-glow">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
                 Generate from Selected (<span id="selected-count">0</span>)
             </button>
-        </div>
+        </header>
 
-        <!-- Job filter banner (shown when filtering by job_id) -->
-        <div id="job-filter-banner" class="hidden bg-still-copper bg-opacity-20 border border-still-copper rounded-lg p-4 mb-6">
+        <!-- Job filter banner -->
+        <div id="job-filter-banner" class="hidden card-premium p-4 mb-6 border-l-4 border-l-still-copper">
             <div class="flex justify-between items-center">
-                <div>
-                    <p class="text-still-text font-medium">Showing stills from recent Quick Distill</p>
-                    <p class="text-still-muted text-sm">These stills were just extracted from your uploaded content</p>
+                <div class="flex items-center gap-3">
+                    <svg class="w-5 h-5 text-still-copper" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <div>
+                        <p class="text-still-text font-medium">Showing stills from recent Quick Distill</p>
+                        <p class="text-still-muted text-sm">These stills were just extracted from your uploaded content</p>
+                    </div>
                 </div>
-                <button id="clear-job-filter" class="text-still-copper hover:underline">
+                <button id="clear-job-filter" class="btn btn-tertiary btn-sm">
                     Show All Stills
                 </button>
             </div>
         </div>
 
-        <!-- Filters -->
-        <div class="bg-still-card rounded-lg shadow-sm p-4 mb-6 border border-still-border">
-            <div class="flex flex-wrap gap-4">
-                <!-- Type Filter -->
-                <div>
-                    <label class="block text-sm font-medium text-still-text mb-1">Type</label>
-                    <select id="filter-type" class="input-premium select-premium" >
-                        <option value="">All Types</option>
-                        <option value="data">Data</option>
-                        <option value="story">Story</option>
-                        <option value="insight">Insight</option>
-                        <option value="problem">Problem</option>
-                        <option value="solution">Solution</option>
-                        <option value="quote">Quote</option>
-                    </select>
-                </div>
+        <!-- Filters - Real-time -->
+        <section class="card-premium p-5 mb-8" aria-labelledby="filters-heading">
+            <h2 id="filters-heading" class="sr-only">Filter stills</h2>
 
+            <!-- Quick type filters -->
+            <div class="flex flex-wrap gap-2 mb-4" role="group" aria-label="Filter by type">
+                <button class="filter-chip active" data-type="" onclick="setTypeFilter('')">
+                    All Types
+                </button>
+                <button class="filter-chip" data-type="data" onclick="setTypeFilter('data')">
+                    <span class="w-2 h-2 rounded-full" style="background: #60A5FA;"></span>
+                    Data
+                </button>
+                <button class="filter-chip" data-type="story" onclick="setTypeFilter('story')">
+                    <span class="w-2 h-2 rounded-full" style="background: #4ADE80;"></span>
+                    Story
+                </button>
+                <button class="filter-chip" data-type="insight" onclick="setTypeFilter('insight')">
+                    <span class="w-2 h-2 rounded-full" style="background: #C084FC;"></span>
+                    Insight
+                </button>
+                <button class="filter-chip" data-type="problem" onclick="setTypeFilter('problem')">
+                    <span class="w-2 h-2 rounded-full" style="background: #F87171;"></span>
+                    Problem
+                </button>
+                <button class="filter-chip" data-type="solution" onclick="setTypeFilter('solution')">
+                    <span class="w-2 h-2 rounded-full" style="background: #E9A872;"></span>
+                    Solution
+                </button>
+                <button class="filter-chip" data-type="quote" onclick="setTypeFilter('quote')">
+                    <span class="w-2 h-2 rounded-full" style="background: #FBBF24;"></span>
+                    Quote
+                </button>
+            </div>
+
+            <div class="flex flex-wrap gap-4">
                 <!-- Persona Filter -->
-                <div>
-                    <label class="block text-sm font-medium text-still-text mb-1">Persona</label>
-                    <select id="filter-persona" class="input-premium select-premium" >
+                <div class="flex-1 min-w-[200px]">
+                    <label for="filter-persona" class="form-label">Persona</label>
+                    <select id="filter-persona" class="input-premium select-premium">
                         <option value="">All Personas</option>
                     </select>
                 </div>
 
                 <!-- Min Relevance -->
-                <div>
-                    <label class="block text-sm font-medium text-still-text mb-1">Min Relevance</label>
-                    <select id="filter-relevance" class="input-premium select-premium" >
+                <div class="w-32">
+                    <label for="filter-relevance" class="form-label">Min Relevance</label>
+                    <select id="filter-relevance" class="input-premium select-premium">
                         <option value="1">1+</option>
                         <option value="2">2+</option>
                         <option value="3">3+</option>
@@ -162,86 +279,147 @@
                     </select>
                 </div>
 
-                <!-- Search -->
-                <div class="flex-1">
-                    <label class="block text-sm font-medium text-still-text mb-1">Search</label>
-                    <input type="text" id="filter-search" placeholder="Search content..."
-            class="w-full input-premium" >
+                <!-- Campaign Filter -->
+                <div class="flex-1 min-w-[200px]">
+                    <label for="filter-campaign" class="form-label">Campaign</label>
+                    <select id="filter-campaign" class="input-premium select-premium">
+                        <option value="">All Campaigns</option>
+                    </select>
                 </div>
 
-                <div class="flex items-end">
-                    <button id="apply-filters" class="bg-still-border text-still-text px-4 py-2 rounded-lg hover:bg-still-muted hover:text-still-bg transition">
-                        Apply Filters
-                    </button>
+                <!-- Topic Filter -->
+                <div class="flex-1 min-w-[200px]">
+                    <label for="filter-topic" class="form-label">Topic</label>
+                    <select id="filter-topic" class="input-premium select-premium">
+                        <option value="">All Topics</option>
+                    </select>
                 </div>
+
+                <!-- Search -->
+                <div class="flex-[2] min-w-[250px]">
+                    <label for="filter-search" class="form-label">Search</label>
+                    <div class="relative">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-still-disabled pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        <input type="text" id="filter-search" placeholder="Search content..."
+                               class="input-premium pl-10" aria-describedby="search-help">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active filters & count -->
+            <div class="flex items-center justify-between mt-4 pt-4 border-t" style="border-color: var(--glass-border);">
+                <p id="results-count" class="text-sm text-still-muted">Showing all stills</p>
+                <button id="clear-filters" class="btn btn-tertiary btn-sm hidden">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                    Clear all filters
+                </button>
+            </div>
+        </section>
+
+        <!-- Reserve Grid -->
+        <div id="library-container" class="grid md:grid-cols-2 lg:grid-cols-3 gap-5" role="list" aria-label="Content stills">
+            <!-- Loading skeletons -->
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+            <div class="skeleton-card"></div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden">
+            <div class="empty-state">
+                <div class="w-20 h-20 mx-auto rounded-2xl bg-still-copper/10 flex items-center justify-center mb-6">
+                    <svg class="w-10 h-10 text-still-copper" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                    </svg>
+                </div>
+                <h3 class="empty-state-title">Your Reserve is Empty</h3>
+                <p class="empty-state-text">Upload your first piece of content to start building your library of reusable stills — quotes, statistics, stories, and insights.</p>
+                <a href="/upload.html" class="btn btn-primary">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                    Upload Content
+                </a>
             </div>
         </div>
 
-        <!-- Reserve Grid -->
-        <div id="library-container" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div class="col-span-full text-center py-12">
-                <div class="animate-spin h-8 w-8 border-4 border-still-copper border-t-transparent rounded-full mx-auto"></div>
-                <p class="mt-4 text-still-muted">Loading the Reserve...</p>
+        <!-- No Results State -->
+        <div id="no-results-state" class="hidden">
+            <div class="empty-state">
+                <div class="w-20 h-20 mx-auto rounded-2xl bg-still-copper/10 flex items-center justify-center mb-6">
+                    <svg class="w-10 h-10 text-still-copper" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+                <h3 class="empty-state-title">No Stills Match Your Filters</h3>
+                <p class="empty-state-text">Try adjusting your filters or search terms to find what you're looking for.</p>
+                <button onclick="clearAllFilters()" class="btn btn-secondary">
+                    Clear All Filters
+                </button>
             </div>
         </div>
 
         <!-- Pagination -->
-        <div class="mt-8 flex justify-center gap-2" id="pagination"></div>
-    </div>
+        <nav class="mt-10 flex justify-center gap-2" id="pagination" aria-label="Pagination"></nav>
+    </main>
 
     <!-- Generate Modal -->
-    <div id="generate-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-        <div class="bg-still-card rounded-lg shadow-xl max-w-md w-full mx-4 p-6 border border-still-border">
-            <h2 class="text-xl font-bold mb-4 text-still-text">Generate Content from Stills</h2>
+    <div id="generate-modal" class="hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-backdrop" onclick="closeGenerateModal()"></div>
+        <div class="modal max-w-lg w-full p-6">
+            <h2 id="modal-title" class="text-xl font-bold mb-6 text-still-text">Generate Content from Stills</h2>
 
-            <div class="space-y-4">
+            <div class="space-y-6">
                 <div>
-                    <label class="block text-sm font-medium text-still-text mb-1">Target Persona</label>
-                    <select id="gen-persona" class="w-full input-premium select-premium" >
-                        <option value="">Loading personas...</option>
+                    <label for="gen-persona" class="form-label">Target Persona <span class="text-still-muted font-normal">(optional)</span></label>
+                    <select id="gen-persona" class="input-premium select-premium">
+                        <option value="">No persona - general audience</option>
                     </select>
                 </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-still-text mb-1">Content Types</label>
-                    <div class="space-y-2">
-                        <label class="flex items-center text-still-text">
-                            <input type="checkbox" id="gen-linkedin" checked class="rounded border-still-border input-premium" >
-                            <span class="ml-2">LinkedIn Posts</span>
-                            <input type="number" id="gen-linkedin-qty" value="2" min="1" max="5"
-                class="ml-auto w-16 input-premium" >
+                <fieldset>
+                    <legend class="form-label form-label-required mb-3">Content Types</legend>
+                    <div class="space-y-3">
+                        <label class="flex items-center gap-3 p-3 rounded-lg cursor-pointer" style="background: var(--surface-elevated);">
+                            <input type="checkbox" id="gen-linkedin" checked class="checkbox-premium">
+                            <div class="flex-1">
+                                <span class="font-medium text-still-text">LinkedIn Posts</span>
+                            </div>
+                            <input type="number" id="gen-linkedin-qty" value="2" min="1" max="5" class="qty-input w-16">
                         </label>
-                        <label class="flex items-center text-still-text">
-                            <input type="checkbox" id="gen-blog" class="rounded border-still-border input-premium" >
-                            <span class="ml-2">Blog Post</span>
+                        <label class="flex items-center gap-3 p-3 rounded-lg cursor-pointer" style="background: var(--surface-elevated);">
+                            <input type="checkbox" id="gen-blog" class="checkbox-premium">
+                            <span class="font-medium text-still-text">Blog Post</span>
                         </label>
                     </div>
-                </div>
+                </fieldset>
 
-                <div id="selected-stills-preview" class="p-3 bg-still-bg rounded text-sm border border-still-border">
-                    <strong class="text-still-text">Selected stills:</strong>
-                    <div id="stills-preview-list" class="mt-2 space-y-1"></div>
+                <div class="p-4 rounded-lg" style="background: var(--surface-elevated);">
+                    <p class="text-sm font-medium text-still-text mb-2">Selected stills (<span id="modal-still-count">0</span>)</p>
+                    <div id="stills-preview-list" class="space-y-1 max-h-32 overflow-y-auto text-sm text-still-muted"></div>
                 </div>
             </div>
 
-            <div class="mt-6 flex gap-3">
-                <button id="cancel-generate" class="flex-1 px-4 py-2 border border-still-border rounded-lg text-still-text hover:bg-still-border transition">
-                    Cancel
-                </button>
-                <button id="confirm-generate" class="flex-1 px-4 py-2 btn btn-primary text-white rounded-lg transition">
+            <div class="mt-8 flex gap-3">
+                <button id="cancel-generate" class="btn btn-ghost flex-1">Cancel</button>
+                <button id="confirm-generate" class="btn btn-primary flex-1">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
                     Generate
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Copy Toast -->
-    <div id="copy-toast" class="fixed bottom-4 right-4 bg-still-card text-still-text px-4 py-2 rounded-lg shadow-lg border border-still-border hidden">
-        Copied to clipboard!
-    </div>
-
     <script>
-        // Require authentication
         Auth.requireAuth();
 
         let allEntries = [];
@@ -249,45 +427,33 @@
         let sommelierSelectedIds = new Set();
         let currentPage = 0;
         const pageSize = 24;
+        let filterDebounceTimer = null;
 
-        // Check for job_id filter in URL
         const urlParams = new URLSearchParams(window.location.search);
         const jobIdFilter = urlParams.get('job_id');
 
-        function getTypeColor(type) {
-            const colors = {
-                'data': 'still-copper',
-                'story': 'still-green',
-                'insight': 'still-amber',
-                'problem': 'still-error',
-                'solution': 'still-copper',
-                'quote': 'still-amber'
-            };
-            return colors[type] || 'still-muted';
+        // Type badge colors
+        const typeColors = {
+            'data': { bg: 'rgba(96, 165, 250, 0.15)', text: '#60A5FA' },
+            'story': { bg: 'rgba(74, 222, 128, 0.15)', text: '#4ADE80' },
+            'insight': { bg: 'rgba(192, 132, 252, 0.15)', text: '#C084FC' },
+            'problem': { bg: 'rgba(248, 113, 113, 0.15)', text: '#F87171' },
+            'solution': { bg: 'rgba(233, 168, 114, 0.15)', text: '#E9A872' },
+            'quote': { bg: 'rgba(251, 191, 36, 0.15)', text: '#FBBF24' }
+        };
+
+        function setTypeFilter(type) {
+            // Update chip states
+            document.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.type === type);
+            });
+            currentPage = 0;
+            loadLibrary();
         }
 
-        function getTypeBorderClass(type) {
-            const borders = {
-                'data': 'border-l-[#B87333]',
-                'story': 'border-l-[#4A7C59]',
-                'insight': 'border-l-[#D4A574]',
-                'problem': 'border-l-[#C45C4A]',
-                'solution': 'border-l-[#B87333]',
-                'quote': 'border-l-[#D4A574]'
-            };
-            return borders[type] || 'border-l-[#A3A3A3]';
-        }
-
-        function getTypeTextClass(type) {
-            const texts = {
-                'data': 'text-[#B87333]',
-                'story': 'text-[#4A7C59]',
-                'insight': 'text-[#D4A574]',
-                'problem': 'text-[#C45C4A]',
-                'solution': 'text-[#B87333]',
-                'quote': 'text-[#D4A574]'
-            };
-            return texts[type] || 'text-[#A3A3A3]';
+        function getActiveTypeFilter() {
+            const activeChip = document.querySelector('.filter-chip.active');
+            return activeChip ? activeChip.dataset.type : '';
         }
 
         function updateSelectedCount() {
@@ -300,7 +466,7 @@
             document.getElementById('blend-selected-btn').disabled = sommelierSelectedIds.size === 0;
         }
 
-        function toggleSelect(id, content) {
+        function toggleSelect(id) {
             if (selectedIds.has(id)) {
                 selectedIds.delete(id);
             } else {
@@ -308,11 +474,11 @@
             }
             updateSelectedCount();
 
-            // Update card styling
             const card = document.querySelector(`[data-entry-id="${id}"]`);
             if (card) {
-                card.classList.toggle('ring-2', selectedIds.has(id));
-                card.classList.toggle('ring-still-copper', selectedIds.has(id));
+                card.classList.toggle('selected', selectedIds.has(id));
+                const checkbox = card.querySelector('input[type="checkbox"]');
+                if (checkbox) checkbox.checked = selectedIds.has(id);
             }
         }
 
@@ -324,64 +490,113 @@
             }
             updateSommelierSelectedCount();
 
-            // Update card styling
             const card = document.querySelector(`[data-sommelier-id="${id}"]`);
             if (card) {
-                card.classList.toggle('ring-2', sommelierSelectedIds.has(id));
-                card.classList.toggle('ring-still-copper', sommelierSelectedIds.has(id));
+                card.classList.toggle('selected', sommelierSelectedIds.has(id));
+                const checkbox = card.querySelector('input[type="checkbox"]');
+                if (checkbox) checkbox.checked = sommelierSelectedIds.has(id);
             }
+        }
+
+        function renderRelevanceDots(score) {
+            let html = '<div class="relevance-dots" title="Relevance: ' + score + '/5">';
+            for (let i = 1; i <= 5; i++) {
+                html += `<div class="relevance-dot ${i <= score ? 'filled' : ''}"></div>`;
+            }
+            html += '</div>';
+            return html;
         }
 
         function renderLibrary(entries) {
             const container = document.getElementById('library-container');
+            const emptyState = document.getElementById('empty-state');
+            const noResults = document.getElementById('no-results-state');
+
             container.innerHTML = '';
+            emptyState.classList.add('hidden');
+            noResults.classList.add('hidden');
 
             if (entries.length === 0) {
-                container.innerHTML = `
-                    <div class="col-span-full text-center py-12">
-                        <p class="text-still-muted">No stills found</p>
-                        <a href="/upload.html" class="text-still-copper hover:underline mt-2 inline-block">
-                            Upload content to build your Reserve
-                        </a>
-                    </div>
-                `;
+                const hasFilters = getActiveTypeFilter() ||
+                    document.getElementById('filter-persona').value ||
+                    document.getElementById('filter-search').value ||
+                    document.getElementById('filter-campaign').value ||
+                    document.getElementById('filter-topic').value ||
+                    document.getElementById('filter-relevance').value !== '1';
+
+                if (hasFilters) {
+                    noResults.classList.remove('hidden');
+                } else {
+                    emptyState.classList.remove('hidden');
+                }
                 return;
             }
 
             entries.forEach(entry => {
-                const borderClass = getTypeBorderClass(entry.entry_type);
-                const textClass = getTypeTextClass(entry.entry_type);
                 const isSelected = selectedIds.has(entry.id);
+                const colors = typeColors[entry.entry_type] || typeColors['data'];
 
-                const card = document.createElement('div');
-                card.className = `bg-still-card p-4 rounded-lg shadow-sm border-l-4 ${borderClass} cursor-pointer hover:bg-still-border transition ${isSelected ? 'ring-2 ring-still-copper' : ''}`;
+                // Get highest relevance score
+                let maxRelevance = 0;
+                let relevanceInfo = '';
+                if (entry.persona_relevance) {
+                    const scores = Object.entries(entry.persona_relevance);
+                    if (scores.length > 0) {
+                        maxRelevance = Math.max(...scores.map(([, v]) => v));
+                        relevanceInfo = scores.map(([k, v]) => `${k.split('_')[0]}: ${v}`).join(', ');
+                    }
+                }
+
+                const card = document.createElement('article');
+                card.className = `still-card p-5 cursor-pointer ${isSelected ? 'selected' : ''}`;
                 card.dataset.entryId = entry.id;
-
-                const relevance = entry.persona_relevance ? Object.entries(entry.persona_relevance).map(([k, v]) => `${k.split('_')[0]}: ${v}`).join(', ') : '';
+                card.dataset.type = entry.entry_type;
+                card.setAttribute('role', 'listitem');
 
                 card.innerHTML = `
-                    <div class="flex justify-between items-start mb-2">
-                        <span class="text-xs font-semibold ${textClass} uppercase">${entry.entry_type}</span>
-                        <input type="checkbox" ${isSelected ? 'checked' : ''}
-              class="rounded border-still-border input-premium" onclick="event.stopPropagation(); toggleSelect(${entry.id}, '${entry.content.replace(/'/g, "\\'")}')">
+                    <div class="flex justify-between items-start mb-3">
+                        <span class="badge text-xs font-semibold uppercase" style="background: ${colors.bg}; color: ${colors.text};">
+                            ${entry.entry_type}
+                        </span>
+                        <div class="flex items-center gap-3">
+                            ${maxRelevance > 0 ? renderRelevanceDots(maxRelevance) : ''}
+                            <input type="checkbox" ${isSelected ? 'checked' : ''}
+                                   class="checkbox-premium" aria-label="Select this still"
+                                   onclick="event.stopPropagation(); toggleSelect(${entry.id})">
+                        </div>
                     </div>
-                    <p class="text-still-text text-sm line-clamp-3">${escapeHtml(entry.content)}</p>
-                    <div class="mt-3 flex flex-wrap gap-1">
-                        ${entry.tags && entry.tags.length ? entry.tags.slice(0, 3).map(tag =>
-                            `<span class="text-xs px-2 py-0.5 bg-still-border text-still-muted rounded">${escapeHtml(tag)}</span>`
-                        ).join('') : ''}
-                    </div>
-                    <div class="mt-2 flex justify-between text-xs text-still-disabled">
+                    <p class="text-still-text text-sm leading-relaxed line-clamp-3 mb-4">${escapeHtml(entry.content)}</p>
+                    ${entry.tags && entry.tags.length ? `
+                        <div class="flex flex-wrap gap-1 mb-3">
+                            ${entry.tags.slice(0, 3).map(tag =>
+                                `<span class="text-xs px-2 py-0.5 rounded" style="background: var(--surface-elevated); color: var(--text-tertiary);">${escapeHtml(tag)}</span>`
+                            ).join('')}
+                        </div>
+                    ` : ''}
+                    ${entry.campaign_name ? `
+                        <div class="flex items-center gap-1 mb-2">
+                            <svg class="w-3 h-3 text-still-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                            </svg>
+                            <span class="text-xs text-still-muted">${escapeHtml(entry.campaign_name)}</span>
+                        </div>
+                    ` : ''}
+                    ${entry.topics && entry.topics.length ? `
+                        <div class="flex flex-wrap gap-1 mb-2">
+                            ${entry.topics.map(topic =>
+                                `<span class="text-xs px-2 py-0.5 rounded" style="background: rgba(212, 117, 43, 0.15); color: var(--copper-accessible);">${escapeHtml(topic)}</span>`
+                            ).join('')}
+                        </div>
+                    ` : ''}
+                    <div class="flex justify-between items-center text-xs text-still-disabled pt-3 border-t" style="border-color: var(--glass-border);">
                         <span>Used ${entry.times_used || 0}x</span>
-                        ${relevance ? `<span>${relevance}</span>` : ''}
+                        ${relevanceInfo ? `<span class="text-still-muted">${relevanceInfo}</span>` : ''}
                     </div>
                 `;
 
                 card.addEventListener('click', (e) => {
                     if (e.target.type !== 'checkbox') {
-                        toggleSelect(entry.id, entry.content);
-                        const checkbox = card.querySelector('input[type="checkbox"]');
-                        checkbox.checked = selectedIds.has(entry.id);
+                        toggleSelect(entry.id);
                     }
                 });
 
@@ -397,7 +612,7 @@
 
             if (results.length === 0) {
                 container.innerHTML = `
-                    <div class="col-span-full text-center py-6">
+                    <div class="col-span-full text-center py-8">
                         <p class="text-still-muted">No matching stills found. Try different search terms.</p>
                     </div>
                 `;
@@ -405,38 +620,40 @@
             }
 
             results.forEach(result => {
-                const borderClass = getTypeBorderClass(result.entry_type);
-                const textClass = getTypeTextClass(result.entry_type);
                 const isSelected = sommelierSelectedIds.has(result.id);
+                const colors = typeColors[result.entry_type] || typeColors['data'];
 
                 const card = document.createElement('div');
-                card.className = `bg-still-bg p-4 rounded-lg border-l-4 ${borderClass} cursor-pointer hover:bg-still-border transition ${isSelected ? 'ring-2 ring-still-copper' : ''}`;
+                card.className = `still-card p-5 cursor-pointer ${isSelected ? 'selected' : ''}`;
                 card.dataset.sommelierId = result.id;
-
-                // Relevance indicator
-                const relevanceStars = '★'.repeat(result.relevance_score) + '☆'.repeat(5 - result.relevance_score);
+                card.dataset.type = result.entry_type;
 
                 card.innerHTML = `
-                    <div class="flex justify-between items-start mb-2">
+                    <div class="flex justify-between items-start mb-3">
                         <div class="flex items-center gap-2">
-                            <span class="text-xs font-semibold ${textClass} uppercase">${result.entry_type}</span>
-                            <span class="text-still-copper text-xs">${relevanceStars}</span>
+                            <span class="badge text-xs font-semibold uppercase" style="background: ${colors.bg}; color: ${colors.text};">
+                                ${result.entry_type}
+                            </span>
+                            ${renderRelevanceDots(result.relevance_score)}
                         </div>
                         <input type="checkbox" ${isSelected ? 'checked' : ''}
-              class="rounded border-still-border input-premium" onclick="event.stopPropagation(); toggleSommelierSelect(${result.id})">
+                               class="checkbox-premium" onclick="event.stopPropagation(); toggleSommelierSelect(${result.id})">
                     </div>
-                    <p class="text-still-text text-sm line-clamp-3">${escapeHtml(result.content)}</p>
-                    <details class="mt-2">
-                        <summary class="text-still-copper text-xs cursor-pointer hover:underline">Why this still?</summary>
-                        <p class="mt-1 text-still-muted text-xs">${escapeHtml(result.why_relevant)}</p>
+                    <p class="text-still-text text-sm leading-relaxed line-clamp-3 mb-3">${escapeHtml(result.content)}</p>
+                    <details class="group">
+                        <summary class="text-copper-accessible text-xs cursor-pointer hover:underline flex items-center gap-1">
+                            <svg class="w-3 h-3 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                            Why this still?
+                        </summary>
+                        <p class="mt-2 text-still-muted text-xs pl-4">${escapeHtml(result.why_relevant)}</p>
                     </details>
                 `;
 
                 card.addEventListener('click', (e) => {
                     if (e.target.type !== 'checkbox' && e.target.tagName !== 'SUMMARY') {
                         toggleSommelierSelect(result.id);
-                        const checkbox = card.querySelector('input[type="checkbox"]');
-                        checkbox.checked = sommelierSelectedIds.has(result.id);
                     }
                 });
 
@@ -450,7 +667,13 @@
 
             const searchBtn = document.getElementById('sommelier-search-btn');
             searchBtn.disabled = true;
-            searchBtn.innerHTML = '<span class="animate-spin">⏳</span> Searching...';
+            searchBtn.innerHTML = `
+                <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Searching...
+            `;
 
             try {
                 const response = await Auth.fetchWithAuth('/api/sommelier/search', {
@@ -468,14 +691,18 @@
                     throw new Error(data.detail || 'Search failed');
                 }
             } catch (err) {
-                alert('Search error: ' + err.message);
+                showToast('Search error: ' + err.message, 'error');
             } finally {
                 searchBtn.disabled = false;
-                searchBtn.innerHTML = '<span>Find Stills</span>';
+                searchBtn.innerHTML = `
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    Find Stills
+                `;
             }
         }
 
-        // Load example queries
         async function loadExampleQueries() {
             try {
                 const response = await Auth.fetchWithAuth('/api/sommelier/examples');
@@ -483,8 +710,7 @@
 
                 const container = document.getElementById('example-queries');
                 container.innerHTML = data.examples.map(q =>
-                    `<button class="text-sm px-3 py-1 bg-still-border text-still-muted rounded-full hover:bg-still-copper hover:text-white transition"
-                             onclick="document.getElementById('sommelier-query').value='${escapeHtml(q)}'; searchSommelier();">
+                    `<button class="filter-chip" onclick="document.getElementById('sommelier-query').value='${escapeHtml(q)}'; searchSommelier();">
                         ${escapeHtml(q)}
                     </button>`
                 ).join('');
@@ -493,17 +719,16 @@
             }
         }
 
-        // Load personas dynamically
         async function loadPersonas() {
             try {
-                const response = await Auth.fetchWithAuth('/api/personas/all');
+                const response = await Auth.fetchWithAuth('/api/personas');
                 const data = await response.json();
 
                 const filterSelect = document.getElementById('filter-persona');
                 const genSelect = document.getElementById('gen-persona');
 
                 filterSelect.innerHTML = '<option value="">All Personas</option>';
-                genSelect.innerHTML = '';
+                genSelect.innerHTML = '<option value="">No persona - general audience</option>';
 
                 if (data.custom_personas && data.custom_personas.length > 0) {
                     const filterCustomGroup = document.createElement('optgroup');
@@ -512,15 +737,11 @@
                     genCustomGroup.label = 'Your Custom Personas';
 
                     data.custom_personas.forEach(p => {
-                        const filterOption = document.createElement('option');
-                        filterOption.value = p.id;
-                        filterOption.textContent = `${p.name} (${p.role})`;
-                        filterCustomGroup.appendChild(filterOption);
-
-                        const genOption = document.createElement('option');
-                        genOption.value = p.id;
-                        genOption.textContent = `${p.name} (${p.role})`;
-                        genCustomGroup.appendChild(genOption);
+                        const opt = document.createElement('option');
+                        opt.value = p.id;
+                        opt.textContent = `${p.name} (${p.role})`;
+                        filterCustomGroup.appendChild(opt);
+                        genCustomGroup.appendChild(opt.cloneNode(true));
                     });
                     filterSelect.appendChild(filterCustomGroup);
                     genSelect.appendChild(genCustomGroup);
@@ -533,15 +754,11 @@
                     genDefaultGroup.label = 'Default Personas';
 
                     data.default_personas.forEach(p => {
-                        const filterOption = document.createElement('option');
-                        filterOption.value = p.id;
-                        filterOption.textContent = p.title;
-                        filterDefaultGroup.appendChild(filterOption);
-
-                        const genOption = document.createElement('option');
-                        genOption.value = p.id;
-                        genOption.textContent = p.title;
-                        genDefaultGroup.appendChild(genOption);
+                        const opt = document.createElement('option');
+                        opt.value = p.id;
+                        opt.textContent = p.title;
+                        filterDefaultGroup.appendChild(opt);
+                        genDefaultGroup.appendChild(opt.cloneNode(true));
                     });
                     filterSelect.appendChild(filterDefaultGroup);
                     genSelect.appendChild(genDefaultGroup);
@@ -551,17 +768,85 @@
             }
         }
 
+        async function loadFilters() {
+            try {
+                const response = await Auth.fetchWithAuth('/api/library/filters');
+                const data = await response.json();
+
+                const campaignSelect = document.getElementById('filter-campaign');
+                const topicSelect = document.getElementById('filter-topic');
+
+                // Populate campaigns
+                campaignSelect.innerHTML = '<option value="">All Campaigns</option>';
+                data.campaigns.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c;
+                    opt.textContent = c;
+                    campaignSelect.appendChild(opt);
+                });
+
+                // Populate topics
+                topicSelect.innerHTML = '<option value="">All Topics</option>';
+                data.topics.forEach(t => {
+                    const opt = document.createElement('option');
+                    opt.value = t;
+                    opt.textContent = t;
+                    topicSelect.appendChild(opt);
+                });
+            } catch (err) {
+                console.error('Failed to load filters:', err);
+            }
+        }
+
+        function updateResultsCount(total, filtered) {
+            const countEl = document.getElementById('results-count');
+            const clearBtn = document.getElementById('clear-filters');
+
+            const hasFilters = getActiveTypeFilter() ||
+                document.getElementById('filter-persona').value ||
+                document.getElementById('filter-search').value ||
+                document.getElementById('filter-campaign').value ||
+                document.getElementById('filter-topic').value ||
+                document.getElementById('filter-relevance').value !== '1';
+
+            if (hasFilters) {
+                countEl.textContent = `Showing ${filtered} of ${total} stills`;
+                clearBtn.classList.remove('hidden');
+            } else {
+                countEl.textContent = `Showing ${total} stills`;
+                clearBtn.classList.add('hidden');
+            }
+        }
+
+        function clearAllFilters() {
+            document.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.type === '');
+            });
+            document.getElementById('filter-persona').value = '';
+            document.getElementById('filter-relevance').value = '1';
+            document.getElementById('filter-search').value = '';
+            document.getElementById('filter-campaign').value = '';
+            document.getElementById('filter-topic').value = '';
+            currentPage = 0;
+            loadLibrary();
+        }
+
         async function loadLibrary() {
-            const type = document.getElementById('filter-type').value;
+            const type = getActiveTypeFilter();
             const persona = document.getElementById('filter-persona').value;
             const minRelevance = document.getElementById('filter-relevance').value;
             const search = document.getElementById('filter-search').value;
+            const campaign = document.getElementById('filter-campaign').value;
+            const topic = document.getElementById('filter-topic').value;
 
             const params = new URLSearchParams();
             if (type) params.set('entry_type', type);
             if (persona) params.set('persona', persona);
             if (minRelevance) params.set('min_relevance', minRelevance);
             if (search) params.set('search', search);
+            if (campaign) params.set('campaign', campaign);
+            if (topic) params.set('topic', topic);
+            if (jobIdFilter) params.set('job_id', jobIdFilter);
             params.set('limit', pageSize);
             params.set('offset', currentPage * pageSize);
 
@@ -574,6 +859,7 @@
 
                 allEntries = data.entries;
                 renderLibrary(allEntries);
+                updateResultsCount(data.total, data.entries.length);
 
                 // Render pagination
                 const totalPages = Math.ceil(data.total / pageSize);
@@ -581,15 +867,43 @@
                 pagination.innerHTML = '';
 
                 if (totalPages > 1) {
+                    // Previous
+                    if (currentPage > 0) {
+                        const prevBtn = document.createElement('button');
+                        prevBtn.className = 'btn btn-ghost btn-sm';
+                        prevBtn.innerHTML = '&larr; Prev';
+                        prevBtn.onclick = () => { currentPage--; loadLibrary(); };
+                        pagination.appendChild(prevBtn);
+                    }
+
+                    // Page numbers
                     for (let i = 0; i < totalPages; i++) {
+                        if (totalPages > 7 && i > 1 && i < totalPages - 2 && Math.abs(i - currentPage) > 1) {
+                            if (i === 2 || i === totalPages - 3) {
+                                const dots = document.createElement('span');
+                                dots.className = 'px-2 text-still-muted';
+                                dots.textContent = '...';
+                                pagination.appendChild(dots);
+                            }
+                            continue;
+                        }
+
                         const btn = document.createElement('button');
                         btn.textContent = i + 1;
-                        btn.className = `px-3 py-1 rounded ${i === currentPage ? 'copper-gradient text-white' : 'bg-still-border text-still-text hover:bg-still-muted'}`;
-                        btn.onclick = () => {
-                            currentPage = i;
-                            loadLibrary();
-                        };
+                        btn.className = i === currentPage
+                            ? 'btn btn-primary btn-sm'
+                            : 'btn btn-ghost btn-sm';
+                        btn.onclick = () => { currentPage = i; loadLibrary(); };
                         pagination.appendChild(btn);
+                    }
+
+                    // Next
+                    if (currentPage < totalPages - 1) {
+                        const nextBtn = document.createElement('button');
+                        nextBtn.className = 'btn btn-ghost btn-sm';
+                        nextBtn.innerHTML = 'Next &rarr;';
+                        nextBtn.onclick = () => { currentPage++; loadLibrary(); };
+                        pagination.appendChild(nextBtn);
                     }
                 }
 
@@ -598,30 +912,60 @@
             }
         }
 
-        async function loadStats() {
-            try {
-                const response = await Auth.fetchWithAuth('/api/library/stats');
-                const data = await response.json();
+        function openGenerateModal() {
+            const previewList = document.getElementById('stills-preview-list');
+            previewList.innerHTML = '';
 
-                document.getElementById('library-stats').textContent =
-                    `${data.total_entries} total stills`;
-            } catch (err) {
-                console.error('Failed to load stats:', err);
-            }
+            const selectedEntries = allEntries.filter(e => selectedIds.has(e.id));
+            document.getElementById('modal-still-count').textContent = selectedIds.size;
+
+            selectedEntries.forEach(entry => {
+                const div = document.createElement('div');
+                div.className = 'py-1';
+                div.innerHTML = `<span class="text-still-muted">&bull;</span> ${escapeHtml(entry.content.substring(0, 80))}${entry.content.length > 80 ? '...' : ''}`;
+                previewList.appendChild(div);
+            });
+
+            document.getElementById('generate-modal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeGenerateModal() {
+            document.getElementById('generate-modal').classList.add('hidden');
+            document.body.style.overflow = '';
         }
 
         // Event listeners
-        document.getElementById('apply-filters').addEventListener('click', () => {
+        document.getElementById('filter-persona').addEventListener('change', () => {
             currentPage = 0;
             loadLibrary();
         });
 
-        document.getElementById('filter-search').addEventListener('keyup', (e) => {
-            if (e.key === 'Enter') {
+        document.getElementById('filter-relevance').addEventListener('change', () => {
+            currentPage = 0;
+            loadLibrary();
+        });
+
+        document.getElementById('filter-campaign').addEventListener('change', () => {
+            currentPage = 0;
+            loadLibrary();
+        });
+
+        document.getElementById('filter-topic').addEventListener('change', () => {
+            currentPage = 0;
+            loadLibrary();
+        });
+
+        // Debounced search
+        document.getElementById('filter-search').addEventListener('input', () => {
+            clearTimeout(filterDebounceTimer);
+            filterDebounceTimer = setTimeout(() => {
                 currentPage = 0;
                 loadLibrary();
-            }
+            }, 300);
         });
+
+        document.getElementById('clear-filters').addEventListener('click', clearAllFilters);
 
         document.getElementById('sommelier-search-btn').addEventListener('click', searchSommelier);
 
@@ -637,29 +981,13 @@
         });
 
         document.getElementById('blend-selected-btn').addEventListener('click', () => {
-            // Navigate to upload page with pre-selected stills
             const ids = Array.from(sommelierSelectedIds).join(',');
             window.location.href = `/upload.html?blend_stills=${ids}`;
         });
 
-        document.getElementById('generate-btn').addEventListener('click', () => {
-            const previewList = document.getElementById('stills-preview-list');
-            previewList.innerHTML = '';
+        document.getElementById('generate-btn').addEventListener('click', openGenerateModal);
 
-            const selectedEntries = allEntries.filter(e => selectedIds.has(e.id));
-            selectedEntries.forEach(entry => {
-                const div = document.createElement('div');
-                div.className = 'text-still-muted';
-                div.textContent = `• ${entry.content.substring(0, 60)}...`;
-                previewList.appendChild(div);
-            });
-
-            document.getElementById('generate-modal').classList.remove('hidden');
-        });
-
-        document.getElementById('cancel-generate').addEventListener('click', () => {
-            document.getElementById('generate-modal').classList.add('hidden');
-        });
+        document.getElementById('cancel-generate').addEventListener('click', closeGenerateModal);
 
         document.getElementById('confirm-generate').addEventListener('click', async () => {
             const persona = document.getElementById('gen-persona').value;
@@ -676,7 +1004,7 @@
             }
 
             if (assetTypes.length === 0) {
-                alert('Please select at least one content type');
+                showToast('Please select at least one content type', 'error');
                 return;
             }
 
@@ -700,7 +1028,7 @@
                     throw new Error(data.detail || 'Generation failed');
                 }
             } catch (err) {
-                alert('Error: ' + err.message);
+                showToast('Error: ' + err.message, 'error');
             }
         });
 
@@ -712,10 +1040,15 @@
             });
         }
 
+        // Escape key closes modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeGenerateModal();
+        });
+
         // Initial load
         loadPersonas();
+        loadFilters();
         loadLibrary();
-        loadStats();
         loadExampleQueries();
     </script>
 </body>

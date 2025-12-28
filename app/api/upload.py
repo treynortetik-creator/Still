@@ -15,6 +15,14 @@ from app.config import get_settings
 from app.database import get_db
 from app.models.job import JobResponse, JobStatus
 from app.api.auth import get_current_user_id
+from app.utils.security import sanitize_filename
+from app.utils.validation import (
+    validate_text_length,
+    validate_json_field,
+    validate_asset_types,
+    validate_asset_quantities,
+    validate_processing_mode,
+)
 
 router = APIRouter()
 settings = get_settings()
@@ -49,13 +57,32 @@ def get_file_type(filename: str, content_type: str) -> Optional[str]:
     return None
 
 
+def generate_campaign_from_filename(filename: str) -> str:
+    """Generate a campaign name from the filename.
+
+    Examples:
+        'marketing_strategy_2024.pdf' -> 'Marketing Strategy 2024'
+        'podcast-episode-15.mp3' -> 'Podcast Episode 15'
+        'Q4 Sales Training Video.mp4' -> 'Q4 Sales Training Video'
+    """
+    from pathlib import Path
+    # Remove extension
+    name = Path(filename).stem
+    # Replace underscores and hyphens with spaces
+    name = name.replace('_', ' ').replace('-', ' ')
+    # Title case
+    name = name.title()
+    # Limit length
+    return name[:200] if len(name) > 200 else name
+
+
 @router.post("/upload", response_model=JobResponse)
 @limiter.limit("10/hour")  # 10 uploads per hour per user
 async def upload_content(
     request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    target_persona: str = Form(...),
+    target_persona: Optional[str] = Form(default=None),
     asset_types: str = Form(default='["linkedin", "blog"]'),
     asset_quantities: str = Form(default='{"linkedin": 3, "blog": 1}'),
     processing_mode: str = Form(default="autopilot"),
@@ -89,15 +116,23 @@ async def upload_content(
             detail=f"File too large. Maximum size: {settings.upload_max_size_mb}MB"
         )
 
-    # Parse JSON fields
-    try:
-        asset_types_list = json.loads(asset_types)
-        asset_quantities_dict = json.loads(asset_quantities)
-    except json.JSONDecodeError:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid JSON in asset_types or asset_quantities"
-        )
+    # Validate optional text fields
+    campaign_name = validate_text_length(
+        campaign_name, "campaign_name", settings.max_campaign_name_chars
+    )
+    magic_words = validate_text_length(
+        magic_words, "magic_words", settings.max_magic_words_chars
+    )
+
+    # Validate processing mode
+    processing_mode = validate_processing_mode(processing_mode)
+
+    # Parse and validate JSON fields
+    asset_types_list = validate_json_field(asset_types, "asset_types", list)
+    asset_types_list = validate_asset_types(asset_types_list)
+
+    asset_quantities_dict = validate_json_field(asset_quantities, "asset_quantities", dict)
+    asset_quantities_dict = validate_asset_quantities(asset_quantities_dict, asset_types_list)
 
     # Create job ID
     job_id = str(uuid.uuid4())
@@ -106,8 +141,9 @@ async def upload_content(
     job_dir = settings.upload_dir / str(user_id) / job_id
     job_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save uploaded file
-    file_path = job_dir / file.filename
+    # Save uploaded file (sanitize filename to prevent path traversal)
+    safe_filename = sanitize_filename(file.filename)
+    file_path = job_dir / safe_filename
     async with aiofiles.open(file_path, "wb") as f:
         content = await file.read()
         await f.write(content)
@@ -158,7 +194,7 @@ async def upload_text(
     request: Request,
     background_tasks: BackgroundTasks,
     content: str = Form(...),
-    target_persona: str = Form(...),
+    target_persona: Optional[str] = Form(default=None),
     asset_types: str = Form(default='["linkedin", "blog"]'),
     asset_quantities: str = Form(default='{"linkedin": 3, "blog": 1}'),
     processing_mode: str = Form(default="autopilot"),
@@ -170,15 +206,39 @@ async def upload_text(
     """
     Upload text content directly (paste text instead of file).
     """
-    # Parse JSON fields
-    try:
-        asset_types_list = json.loads(asset_types)
-        asset_quantities_dict = json.loads(asset_quantities)
-    except json.JSONDecodeError:
+    # Validate text content length
+    if not content or not content.strip():
         raise HTTPException(
             status_code=400,
-            detail="Invalid JSON in asset_types or asset_quantities"
+            detail="Content is required"
         )
+
+    if len(content) > settings.max_text_content_chars:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Content exceeds maximum length of {settings.max_text_content_chars} characters"
+        )
+
+    # Validate optional text fields
+    campaign_name = validate_text_length(
+        campaign_name, "campaign_name", settings.max_campaign_name_chars
+    )
+    magic_words = validate_text_length(
+        magic_words, "magic_words", settings.max_magic_words_chars
+    )
+    content_name = validate_text_length(
+        content_name, "content_name", settings.max_content_name_chars
+    ) or "pasted_content.txt"
+
+    # Validate processing mode
+    processing_mode = validate_processing_mode(processing_mode)
+
+    # Parse and validate JSON fields
+    asset_types_list = validate_json_field(asset_types, "asset_types", list)
+    asset_types_list = validate_asset_types(asset_types_list)
+
+    asset_quantities_dict = validate_json_field(asset_quantities, "asset_quantities", dict)
+    asset_quantities_dict = validate_asset_quantities(asset_quantities_dict, asset_types_list)
 
     # Create job ID
     job_id = str(uuid.uuid4())
@@ -187,8 +247,9 @@ async def upload_text(
     job_dir = settings.upload_dir / str(user_id) / job_id
     job_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save text content
-    file_path = job_dir / content_name
+    # Save text content (sanitize filename to prevent path traversal)
+    safe_content_name = sanitize_filename(content_name)
+    file_path = job_dir / safe_content_name
     async with aiofiles.open(file_path, "w") as f:
         await f.write(content)
 
@@ -230,4 +291,121 @@ async def upload_text(
         job_id=job_id,
         status=JobStatus.UPLOADING,
         message="Text content uploaded successfully. Processing started."
+    )
+
+
+@router.post("/quick-distill", response_model=JobResponse)
+@limiter.limit("10/hour")
+async def quick_distill(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    target_persona: Optional[str] = Form(default=None),
+    campaign_name: Optional[str] = Form(default=None),
+    magic_words: Optional[str] = Form(default=None),
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Quick Distill: Extract stills from content without generating content.
+
+    Uploads a file, transcribes/extracts it, distills stills, and saves them
+    directly to the Reserve. Skips drafting, editing, and other content generation steps.
+    """
+    # Validate file type
+    file_type = get_file_type(file.filename, file.content_type)
+    if not file_type:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type. Allowed: {list(ALLOWED_EXTENSIONS.keys())}"
+        )
+
+    # Check file size
+    file.file.seek(0, 2)
+    file_size = file.file.tell()
+    file.file.seek(0)
+
+    max_size = settings.upload_max_size_mb * 1024 * 1024
+    if file_size > max_size:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large. Maximum size: {settings.upload_max_size_mb}MB"
+        )
+
+    # Validate optional text fields
+    campaign_name = validate_text_length(
+        campaign_name, "campaign_name", settings.max_campaign_name_chars
+    )
+    magic_words = validate_text_length(
+        magic_words, "magic_words", settings.max_magic_words_chars
+    )
+
+    # Auto-generate campaign_name from filename if not provided
+    if not campaign_name:
+        campaign_name = generate_campaign_from_filename(file.filename)
+
+    # Create job ID
+    job_id = str(uuid.uuid4())
+
+    # Create job directory (scoped by user_id)
+    job_dir = settings.upload_dir / str(user_id) / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+
+    # Save uploaded file (sanitize filename to prevent path traversal)
+    safe_filename = sanitize_filename(file.filename)
+    file_path = job_dir / safe_filename
+    async with aiofiles.open(file_path, "wb") as f:
+        content = await file.read()
+        await f.write(content)
+
+    # Use default persona if not provided
+    if not target_persona:
+        # Get the first available persona for the user
+        async with get_db() as db:
+            cursor = await db.execute(
+                "SELECT id FROM personas WHERE user_id = ? LIMIT 1",
+                (user_id,)
+            )
+            row = await cursor.fetchone()
+            if row:
+                target_persona = row["id"]
+            else:
+                target_persona = "general"  # Fallback
+
+    # Create job in database with quick_distill processing mode
+    async with get_db() as db:
+        await db.execute(
+            """
+            INSERT INTO jobs (
+                id, user_id, status, original_filename, file_type, file_size,
+                target_persona, asset_types, asset_quantities, processing_mode,
+                campaign_name, magic_words, current_step, progress
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                job_id,
+                user_id,
+                JobStatus.UPLOADING.value,
+                file.filename,
+                file_type,
+                file_size,
+                target_persona,
+                json.dumps([]),  # No asset types needed for Quick Distill
+                json.dumps({}),  # No quantities needed
+                "quick_distill",  # Special processing mode
+                campaign_name,
+                magic_words,
+                "Uploading file for Quick Distill",
+                5,
+            )
+        )
+        await db.commit()
+
+    # Start background processing
+    from app.services.pipeline import process_job
+    background_tasks.add_task(process_job, job_id)
+
+    return JobResponse(
+        job_id=job_id,
+        status=JobStatus.UPLOADING,
+        message="Quick Distill started. Stills will be saved to your Reserve."
     )

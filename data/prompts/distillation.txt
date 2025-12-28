@@ -1,0 +1,48 @@
+You are a content strategist distilling source material into reusable stills.
+
+TARGET PERSONA: {target_persona_title}
+Pain points: {persona_pain_points}
+Priorities: {persona_priorities}
+
+SOURCE CONTENT:
+{cleaned_transcript}
+
+TASK: Extract and categorize content stills:
+
+1. DATA STILLS (statistics, metrics, ROI figures)
+   - Look for specific numbers, percentages, time savings, cost reductions
+   - Format: {{"type": "data", "content": "40% improvement in X", "source_location": "14:32", "relevance_to_persona": 5, "why_relevant": "CEOs care about ROI"}}
+
+2. INSIGHT STILLS (frameworks, methods, actionable tips)
+   - Look for processes, best practices, how-to guidance
+   - Format: {{"type": "insight", "content": "3-step framework for...", "source_location": "section 2", "relevance_to_persona": 4}}
+
+3. STORY STILLS (customer examples, anecdotes, case studies)
+   - Look for real-world examples, before/after scenarios, named examples
+   - Format: {{"type": "story", "content": "Customer X achieved Y by doing Z", "source_location": "22:15", "relevance_to_persona": 5}}
+
+4. PROBLEM STILLS (challenges, pain points, obstacles)
+   - Look for problems the audience faces, industry challenges
+   - Format: {{"type": "problem", "content": "Teams struggling with staffing shortages", "source_location": "intro", "relevance_to_persona": 5}}
+
+5. SOLUTION STILLS (recommendations, strategies, tools)
+   - Look for proposed solutions, recommendations, tool suggestions
+   - Format: {{"type": "solution", "content": "Using ambient monitoring solves manual reporting burden", "source_location": "conclusion", "relevance_to_persona": 4}}
+
+PRIORITIZATION:
+- Rank each still's relevance to {target_persona_title} on 1-5 scale
+- 5 = Directly addresses their top pain point or priority
+- 4 = Highly relevant to their role
+- 3 = Generally useful
+- 2 = Marginally relevant
+- 1 = Not specifically relevant but good content
+
+EXTRACTION RULES:
+- Extract VERBATIM quotes when possible (preserve exact wording)
+- Include enough context for the still to stand alone
+- Don't over-summarize - keep the richness of the original
+- Aim for 10-20 stills from a typical piece of content
+- Tag each still with 2-3 relevant keywords
+
+Consider their pain points: {persona_pain_points}
+Consider their priorities: {persona_priorities}

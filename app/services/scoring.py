@@ -1,12 +1,12 @@
 """Quality scoring service - evaluates content quality across 4 dimensions."""
 import json
+import logging
 from typing import Tuple
-import google.generativeai as genai
 
-from app.config import get_settings, calculate_cost
-from app.utils.retry import retry_async, gemini_circuit_breaker
+from app.services.ai_client import call_llm_text, calculate_openrouter_cost
+from app.utils.json_parser import parse_llm_json
 
-settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 async def score_content(
@@ -25,9 +25,6 @@ async def score_content(
 
     Returns (scores_dict, cost) tuple.
     """
-    genai.configure(api_key=settings.gemini_api_key)
-    model = genai.GenerativeModel("gemini-2.0-flash")
-
     prompt = f"""Score this {content_type} content across 4 quality dimensions (0-100 each).
 
 CONTENT:
@@ -65,39 +62,25 @@ OUTPUT FORMAT (valid JSON):
   "engagement_potential": {{"score": 80, "reason": "Provides actionable insights"}}
 }}"""
 
-    async def do_score():
-        return model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(
-                response_mime_type="application/json",
-                max_output_tokens=1000,
-            )
-        )
-
-    # Use retry logic for API call
-    response = await retry_async(
-        do_score,
-        max_retries=2,
-        base_delay=1.0,
-        context="score_content",
+    # Use unified AI client
+    response_text, input_tokens, output_tokens, model_used = await call_llm_text(
+        prompt=prompt,
+        step="scoring",
+        max_tokens=1000,
+        response_format="json",
     )
 
     try:
-        result = json.loads(response.text)
-    except json.JSONDecodeError:
-        text = response.text
-        start = text.find("{")
-        end = text.rfind("}") + 1
-        if start >= 0 and end > start:
-            result = json.loads(text[start:end])
-        else:
-            # Return default scores if parsing fails
-            result = {
-                "hook_quality": {"score": 70, "reason": "Score pending"},
-                "brand_alignment": {"score": 70, "reason": "Score pending"},
-                "clarity": {"score": 70, "reason": "Score pending"},
-                "engagement_potential": {"score": 70, "reason": "Score pending"},
-            }
+        result = parse_llm_json(response_text, context="content scoring")
+    except ValueError as e:
+        logger.warning(f"Failed to parse content scoring: {e}")
+        # Return default scores if parsing fails
+        result = {
+            "hook_quality": {"score": 70, "reason": "Score pending"},
+            "brand_alignment": {"score": 70, "reason": "Score pending"},
+            "clarity": {"score": 70, "reason": "Score pending"},
+            "engagement_potential": {"score": 70, "reason": "Score pending"},
+        }
 
     # Calculate overall score
     scores = [
@@ -109,9 +92,7 @@ OUTPUT FORMAT (valid JSON):
     result["overall_score"] = round(sum(scores) / len(scores))
 
     # Calculate cost
-    input_tokens = response.usage_metadata.prompt_token_count
-    output_tokens = response.usage_metadata.candidates_token_count
-    cost = calculate_cost("gemini-2.0-flash", input_tokens, output_tokens)
+    cost = calculate_openrouter_cost(model_used, input_tokens, output_tokens)
 
     return result, cost
 
@@ -145,7 +126,7 @@ async def batch_score_content(
             scored_outputs.append(output)
         except Exception as e:
             # Don't fail the whole pipeline if scoring fails
-            print(f"Scoring failed for {content_type}: {e}")
+            logger.warning(f"Scoring failed for {content_type}: {e}")
             output["quality_scores"] = None
             scored_outputs.append(output)
 

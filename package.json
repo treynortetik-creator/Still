@@ -1,0 +1,27 @@
+{
+  "name": "content_creation_engine",
+  "version": "1.0.0",
+  "description": "AI-powered content repurposing platform that transforms long-form content (webinars, podcasts, PDFs) into multi-channel marketing campaigns.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/treynortetik-creator/content_creation_engine.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/treynortetik-creator/content_creation_engine/issues"
+  },
+  "homepage": "https://github.com/treynortetik-creator/content_creation_engine#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^25.0.3"
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "personas": [
+    {
+      "id": "general_audience",
+      "title": "General Audience",
+      "company_size": "Any",
+      "pain_points": [
+        "Information overload",
+        "Time constraints",
+        "Relevance to their needs"
+      ],
+      "language_level": "Professional - clear and accessible",
+      "priorities": [
+        "Clear communication",
+        "Actionable insights",
+        "Value and relevance"
+      ],
+      "content_preferences": {
+        "length": "Medium - balanced",
+        "data_density": "Moderate - mix of insights and evidence",
+        "tone": "Professional and engaging"
+      }
+    },
+    {
+      "id": "ceo_longterm_care",
+      "title": "CEO of Long-Term Care Facility",
+      "company_size": "1000+ beds",
+      "pain_points": [
+        "Staffing shortages",
+        "Resident retention",
+        "Regulatory compliance",
+        "Profitability pressure"
+      ],
+      "language_level": "Executive - high-level ROI focus",
+      "priorities": [
+        "Bottom line impact",
+        "Competitive advantage",
+        "Operational efficiency"
+      ],
+      "content_preferences": {
+        "length": "Short - time-constrained",
+        "data_density": "High - wants metrics immediately",
+        "tone": "Confident and outcome-focused"
+      }
+    },
+    {
+      "id": "don_memory_care",
+      "title": "Director of Nursing (Memory Care)",
+      "company_size": "100-300 beds",
+      "pain_points": [
+        "Resident safety",
+        "Staff training and retention",
+        "Family communication",
+        "Care quality documentation"
+      ],
+      "language_level": "Professional - clinical but accessible",
+      "priorities": [
+        "Resident outcomes",
+        "Staff empowerment",
+        "Family trust"
+      ],
+      "content_preferences": {
+        "length": "Medium - wants actionable detail",
+        "data_density": "Moderate - clinical evidence appreciated",
+        "tone": "Empathetic and supportive"
+      }
+    },
+    {
+      "id": "marketing_director",
+      "title": "Marketing Director (Senior Living)",
+      "company_size": "500+ beds across multiple communities",
+      "pain_points": [
+        "Lead generation",
+        "Brand differentiation",
+        "Content production at scale",
+        "ROI measurement"
+      ],
+      "language_level": "Professional - marketing-savvy",
+      "priorities": [
+        "Conversion rates",
+        "Content velocity",
+        "Brand consistency"
+      ],
+      "content_preferences": {
+        "length": "Long - wants comprehensive insight",
+        "data_density": "Moderate - case studies over raw stats",
+        "tone": "Creative but strategic"
+      }
+    }
+  ]
+}

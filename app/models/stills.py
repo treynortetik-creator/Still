@@ -1,22 +1,23 @@
-"""Atom-related Pydantic models."""
+"""Still-related Pydantic models."""
 from datetime import datetime
 from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field
 
 
-class AtomType(str, Enum):
-    """Types of content atoms."""
+class StillType(str, Enum):
+    """Types of content stills."""
     DATA = "data"
     INSIGHT = "insight"
     STORY = "story"
     PROBLEM = "problem"
     SOLUTION = "solution"
+    QUOTE = "quote"
 
 
-class AtomCreate(BaseModel):
-    """Model for creating an atom from atomization."""
-    atom_type: AtomType
+class StillCreate(BaseModel):
+    """Model for creating a still from distillation."""
+    still_type: StillType
     content: str
     source_location: Optional[str] = None
     source_file: Optional[str] = None
@@ -29,8 +30,8 @@ class AtomCreate(BaseModel):
     why_relevant: Optional[str] = None
 
 
-class Atom(AtomCreate):
-    """Full atom model with database fields."""
+class Still(StillCreate):
+    """Full still model with database fields."""
     id: str
     job_id: str
     user_id: int
@@ -39,7 +40,7 @@ class Atom(AtomCreate):
     last_used: Optional[datetime] = None
 
 
-class AtomResponse(BaseModel):
-    """Response model for atom queries."""
-    atoms: list[Atom]
+class StillResponse(BaseModel):
+    """Response model for still queries."""
+    stills: list[Still]
     total: int

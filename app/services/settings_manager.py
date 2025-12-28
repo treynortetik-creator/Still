@@ -13,13 +13,14 @@ def _ensure_settings_file():
     SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
     if not SETTINGS_FILE.exists():
         default_settings = {
-            "use_openrouter": False,
+            "use_openrouter": True,
             "models": {
-                "transcription": "gemini-2.0-flash",
-                "atomization": "gemini-2.0-flash",
-                "drafting": "anthropic/claude-3.5-sonnet",
-                "editing": "gemini-2.0-flash",
-                "factcheck": "gemini-2.5-flash"
+                "transcription": "google/gemini-2.5-flash",
+                "distillation": "google/gemini-2.5-flash",
+                "drafting": "google/gemini-3-flash-preview",
+                "editing": "google/gemini-2.5-flash",
+                "factcheck": "google/gemini-2.5-flash",
+                "workshop_ai_edit": "google/gemini-2.5-flash-preview"
             }
         }
         with open(SETTINGS_FILE, "w") as f:
@@ -55,14 +56,15 @@ def get_model_for_step(step: str) -> str:
     models = settings.get("models", {})
     
     defaults = {
-        "transcription": "gemini-2.0-flash",
-        "atomization": "gemini-2.0-flash",
-        "drafting": "anthropic/claude-3.5-sonnet",
-        "editing": "gemini-2.0-flash",
-        "factcheck": "gemini-2.5-flash"
+        "transcription": "google/gemini-2.5-flash",
+        "distillation": "google/gemini-2.5-flash",
+        "drafting": "google/gemini-3-flash-preview",
+        "editing": "google/gemini-2.5-flash",
+        "factcheck": "google/gemini-2.5-flash",
+        "workshop_ai_edit": "google/gemini-2.5-flash-preview"
     }
-    
-    return models.get(step, defaults.get(step, "gemini-2.0-flash"))
+
+    return models.get(step, defaults.get(step, "google/gemini-2.5-flash"))
 
 
 def is_openrouter_enabled() -> bool:

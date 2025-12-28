@@ -61,3 +61,20 @@ Thumbs.db
 # Local config
 .env.local
 .env.*.local
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+
+# Railway
+.railway/
+
+# Additional security
+*.pem
+*.key
+secrets.json
+credentials.json

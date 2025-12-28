@@ -242,7 +242,7 @@
             const select = document.getElementById('target-persona');
 
             try {
-                const response = await Auth.fetchWithAuth('/api/personas/all');
+                const response = await Auth.fetchWithAuth('/api/personas');
 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);

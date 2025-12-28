@@ -10,6 +10,14 @@ from app.utils.json_parser import parse_llm_json
 
 logger = logging.getLogger(__name__)
 
+# Default persona values when no persona is selected
+DEFAULT_PERSONA = {
+    "title": "General Professional Audience",
+    "priorities": ["actionable insights", "practical solutions", "valuable information"],
+    "pain_points": ["common business challenges", "efficiency", "growth"],
+    "content_preferences": {"tone": "Professional"},
+}
+
 
 async def get_user_context(user_id: int, content_type: str = None) -> str:
     """
@@ -75,9 +83,12 @@ async def draft_linkedin_posts(
 
     Returns (drafts_list, cost) tuple.
     """
-    persona = await get_persona_for_job(persona_id, user_id)
+    # Get persona or use defaults if not provided
+    persona = None
+    if persona_id:
+        persona = await get_persona_for_job(persona_id, user_id)
     if not persona:
-        raise ValueError(f"Persona not found: {persona_id}")
+        persona = DEFAULT_PERSONA
 
     # Select best stills for LinkedIn
     selected_stills = select_stills_for_content_type(stills, "linkedin", persona_id, count=count * 2)
@@ -156,9 +167,12 @@ async def draft_blog_post(
 
     Returns (draft, cost) tuple.
     """
-    persona = await get_persona_for_job(persona_id, user_id)
+    # Get persona or use defaults if not provided
+    persona = None
+    if persona_id:
+        persona = await get_persona_for_job(persona_id, user_id)
     if not persona:
-        raise ValueError(f"Persona not found: {persona_id}")
+        persona = DEFAULT_PERSONA
 
     # Group stills by type
     grouped = group_stills_by_type(stills)
@@ -240,9 +254,12 @@ async def draft_email(
 
     Returns (draft, cost) tuple.
     """
-    persona = await get_persona_for_job(persona_id, user_id)
+    # Get persona or use defaults if not provided
+    persona = None
+    if persona_id:
+        persona = await get_persona_for_job(persona_id, user_id)
     if not persona:
-        raise ValueError(f"Persona not found: {persona_id}")
+        persona = DEFAULT_PERSONA
 
     # Select stills for email
     selected_stills = select_stills_for_content_type(stills, "email", persona_id, count=4)
@@ -311,9 +328,12 @@ async def draft_email_sequence(
 
     Returns (emails_list, cost) tuple.
     """
-    persona = await get_persona_for_job(persona_id, user_id)
+    # Get persona or use defaults if not provided
+    persona = None
+    if persona_id:
+        persona = await get_persona_for_job(persona_id, user_id)
     if not persona:
-        raise ValueError(f"Persona not found: {persona_id}")
+        persona = DEFAULT_PERSONA
 
     # Group stills by type for comprehensive sequence
     grouped = group_stills_by_type(stills)

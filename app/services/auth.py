@@ -1,11 +1,12 @@
 """Authentication service - JWT token management and password hashing."""
-import os
+import hashlib
 from datetime import datetime, timedelta
 from typing import Optional
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 
 from app.config import get_settings
+from app.database import get_db
 
 settings = get_settings()
 
@@ -17,8 +18,10 @@ SECRET_KEY = settings.secret_key
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 7
 
-# Token blacklist (in-memory for MVP, use Redis in production)
-_token_blacklist: set = set()
+
+def _hash_token(token: str) -> str:
+    """Hash a token for storage (don't store raw tokens)."""
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -47,10 +50,19 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 
 def decode_access_token(token: str) -> Optional[dict]:
-    """Decode and validate a JWT token."""
+    """Decode and validate a JWT token (sync version - doesn't check blacklist)."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        return None
+
+
+async def decode_access_token_async(token: str) -> Optional[dict]:
+    """Decode and validate a JWT token with blacklist check."""
     try:
         # Check if token is blacklisted
-        if token in _token_blacklist:
+        if await is_token_blacklisted(token):
             return None
 
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -59,14 +71,49 @@ def decode_access_token(token: str) -> Optional[dict]:
         return None
 
 
-def blacklist_token(token: str):
-    """Add a token to the blacklist (for logout)."""
-    _token_blacklist.add(token)
+async def blacklist_token(token: str):
+    """Add a token to the database blacklist (for logout)."""
+    token_hash = _hash_token(token)
+
+    # Get token expiration from the token itself
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_exp": False})
+        expires_at = datetime.utcfromtimestamp(payload.get("exp", 0))
+    except JWTError:
+        # If we can't decode, set expiration to 7 days from now
+        expires_at = datetime.utcnow() + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
+
+    async with get_db() as db:
+        await db.execute(
+            """
+            INSERT OR REPLACE INTO revoked_tokens (token_hash, expires_at)
+            VALUES (?, ?)
+            """,
+            (token_hash, expires_at.isoformat())
+        )
+        await db.commit()
 
 
-def is_token_blacklisted(token: str) -> bool:
-    """Check if a token is blacklisted."""
-    return token in _token_blacklist
+async def is_token_blacklisted(token: str) -> bool:
+    """Check if a token is blacklisted in the database."""
+    token_hash = _hash_token(token)
+
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT 1 FROM revoked_tokens WHERE token_hash = ?",
+            (token_hash,)
+        )
+        return await cursor.fetchone() is not None
+
+
+async def cleanup_expired_tokens():
+    """Remove expired tokens from the blacklist."""
+    async with get_db() as db:
+        await db.execute(
+            "DELETE FROM revoked_tokens WHERE expires_at < ?",
+            (datetime.utcnow().isoformat(),)
+        )
+        await db.commit()
 
 
 def validate_email(email: str) -> bool:

@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="/static/images/Icon only.png">
-    <title>Login - Still</title>
+    <title>Sign In - Still</title>
+    <meta name="description" content="Sign in to your Still account to access AI-powered content repurposing.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -37,7 +38,33 @@
     </script>
     <link rel="stylesheet" href="/static/styles.css">
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        .auth-gradient-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.4;
+            pointer-events: none;
+        }
+        .auth-orb-1 {
+            width: 500px;
+            height: 500px;
+            background: rgba(212, 117, 43, 0.3);
+            top: -150px;
+            right: -100px;
+            animation: float-slow 20s ease-in-out infinite;
+        }
+        .auth-orb-2 {
+            width: 400px;
+            height: 400px;
+            background: rgba(233, 168, 114, 0.2);
+            bottom: -100px;
+            left: -100px;
+            animation: float-slow 25s ease-in-out infinite reverse;
+        }
+        @keyframes float-slow {
+            0%, 100% { transform: translateY(0) translateX(0); }
+            50% { transform: translateY(-30px) translateX(20px); }
+        }
     </style>
     <script>
         window.addEventListener('load', () => {
@@ -45,78 +72,90 @@
         });
     </script>
 </head>
-<body class="bg-still-bg min-h-screen flex items-center justify-center">
-    <!-- Theme Toggle (floating) -->
-    <div class="fixed top-4 right-4">
-        <button onclick="ThemeManager.toggle()" class="theme-toggle" title="Toggle light/dark mode">
-            <svg class="theme-icon-sun" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<body class="bg-still-bg min-h-screen flex items-center justify-center relative overflow-hidden">
+    <!-- Background gradient orbs -->
+    <div class="auth-gradient-orb auth-orb-1" aria-hidden="true"></div>
+    <div class="auth-gradient-orb auth-orb-2" aria-hidden="true"></div>
+
+    <!-- Theme Toggle -->
+    <div class="fixed top-4 right-4 z-10">
+        <button onclick="ThemeManager.toggle()" class="theme-toggle" title="Toggle light/dark mode" aria-label="Toggle theme">
+            <svg class="theme-icon-sun w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
             </svg>
-            <svg class="theme-icon-moon hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="theme-icon-moon hidden w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
             </svg>
         </button>
     </div>
 
-    <div class="max-w-md w-full mx-4">
+    <main class="max-w-md w-full mx-4 relative z-10">
         <!-- Logo/Header -->
-        <div class="text-center mb-8">
-            <a href="/" class="inline-block">
-                <img src="/static/images/Still Logo.svg" alt="Still" class="h-20 mx-auto">
+        <div class="text-center mb-10 animate-fade-in-up">
+            <a href="/" class="inline-block mb-6">
+                <img src="/static/images/Still Logo.svg" alt="Still" class="h-16 mx-auto">
             </a>
-            <p class="text-still-muted mt-4">Sign in to your account</p>
+            <h1 class="text-2xl font-bold text-still-text mb-2">Welcome back</h1>
+            <p class="text-still-muted">Sign in to continue to Still</p>
         </div>
 
         <!-- Login Form -->
-        <div class="bg-still-card rounded-lg shadow-sm p-8">
-            <form id="login-form" class="space-y-6">
+        <div class="card-premium p-8 animate-fade-in-up animate-delay-1">
+            <form id="login-form" class="space-y-6" novalidate>
                 <div>
-                    <label for="email" class="block text-sm font-medium text-still-text mb-1">
-                        Email address
-                    </label>
-                    <input type="email" id="email" name="email" required
-            class="w-full px-4 py-3 rounded-lg input-premium" placeholder="you@example.com">
+                    <label for="email" class="form-label form-label-required">Email address</label>
+                    <input type="email" id="email" name="email" required autocomplete="email"
+                           class="input-premium" placeholder="you@example.com"
+                           aria-required="true">
                 </div>
 
                 <div>
-                    <label for="password" class="block text-sm font-medium text-still-text mb-1">
-                        Password
-                    </label>
-                    <input type="password" id="password" name="password" required
-            class="w-full px-4 py-3 rounded-lg input-premium" placeholder="Enter your password">
+                    <label for="password" class="form-label form-label-required">Password</label>
+                    <input type="password" id="password" name="password" required autocomplete="current-password"
+                           class="input-premium" placeholder="Enter your password"
+                           aria-required="true">
                 </div>
 
                 <!-- Error Message -->
-                <div id="error-message" class="hidden p-3 bg-still-error/10 border border-still-error/30 rounded-lg text-still-error text-sm">
+                <div id="error-message" class="hidden p-4 rounded-lg border-l-4 border-l-still-error" style="background: var(--error-subtle);" role="alert">
+                    <div class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-still-error flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                        <p class="text-still-error text-sm" id="error-text"></p>
+                    </div>
                 </div>
 
-                <button type="submit" id="submit-btn"
-          class="btn btn-primary btn-lg w-full">
+                <button type="submit" id="submit-btn" class="btn btn-primary-glow btn-lg w-full">
                     Sign in
                 </button>
             </form>
 
-            <div class="mt-6 text-center text-sm text-still-muted">
-                Don't have an account?
-                <a href="/register.html" class="text-still-copper hover:underline font-medium">
-                    Create one
-                </a>
+            <div class="mt-8 pt-6 border-t text-center" style="border-color: var(--glass-border);">
+                <p class="text-sm text-still-muted">
+                    Don't have an account?
+                    <a href="/register.html" class="text-copper-accessible hover:text-still-amber font-semibold underline underline-offset-2 decoration-still-copper/30 hover:decoration-still-amber">
+                        Create one
+                    </a>
+                </p>
             </div>
         </div>
 
         <!-- Back to home -->
-        <div class="text-center mt-6">
-            <a href="/" class="text-still-muted hover:text-still-text text-sm">
-                &larr; Back to home
+        <div class="text-center mt-8 animate-fade-in-up animate-delay-2">
+            <a href="/" class="inline-flex items-center gap-2 text-still-muted hover:text-still-text text-sm transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                Back to home
             </a>
         </div>
-    </div>
+    </main>
 
     <script>
         // Check if already logged in
         const token = localStorage.getItem('auth_token');
         if (token) {
-            // Verify token is still valid
             fetch('/api/auth/me', {
                 headers: { 'Authorization': `Bearer ${token}` }
             }).then(res => {
@@ -139,7 +178,13 @@
             const password = document.getElementById('password').value;
 
             submitBtn.disabled = true;
-            submitBtn.textContent = 'Signing in...';
+            submitBtn.innerHTML = `
+                <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Signing in...
+            `;
             errorDiv.classList.add('hidden');
 
             try {
@@ -152,20 +197,17 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    // Store token and user info
                     localStorage.setItem('auth_token', data.access_token);
                     localStorage.setItem('user', JSON.stringify(data.user));
-
-                    // Redirect to upload page
                     window.location.href = '/upload.html';
                 } else {
                     throw new Error(data.detail || 'Login failed');
                 }
             } catch (err) {
-                errorDiv.textContent = err.message;
+                document.getElementById('error-text').textContent = err.message;
                 errorDiv.classList.remove('hidden');
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Sign in';
+                submitBtn.innerHTML = 'Sign in';
             }
         });
     </script>

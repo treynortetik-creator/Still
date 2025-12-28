@@ -1,13 +1,19 @@
 """Job management API endpoints."""
 import json
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import Optional
+
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.database import get_db
 from app.models.job import JobStatus, JobStatusResponse
 from app.api.auth import get_current_user_id
 
 router = APIRouter()
+
+# Rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 
 def estimate_time_remaining(status: str, progress: int) -> Optional[str]:
@@ -31,7 +37,9 @@ def estimate_time_remaining(status: str, progress: int) -> Optional[str]:
 
 
 @router.get("/job/{job_id}/status")
+@limiter.limit("1000/hour")
 async def get_job_status(
+    request: Request,
     job_id: str,
     user_id: int = Depends(get_current_user_id),
 ):
@@ -74,14 +82,16 @@ async def get_job_status(
 
 
 @router.get("/job/{job_id}/results")
+@limiter.limit("1000/hour")
 async def get_job_results(
+    request: Request,
     job_id: str,
     user_id: int = Depends(get_current_user_id),
 ):
     """
     Get the results of a completed job.
 
-    Returns all generated outputs, extracted atoms, and cost information.
+    Returns all generated outputs, extracted stills, and cost information.
     """
     async with get_db() as db:
         # Get job details (scoped to user)
@@ -104,7 +114,9 @@ async def get_job_results(
             """
             SELECT id, content_type, variation_number,
                    step1_draft, step2_edited, step3_final,
-                   atoms_used, citations, warnings
+                   atoms_used, citations, warnings, quality_scores,
+                   hook_variations, subject, preview_text,
+                   email_day, email_purpose, sequence_name
             FROM outputs WHERE job_id = ?
             ORDER BY content_type, variation_number
             """,
@@ -112,9 +124,33 @@ async def get_job_results(
         )
         output_rows = await cursor.fetchall()
 
+        # Collect output IDs for batch fetching image prompts
+        output_ids = [row["id"] for row in output_rows]
+
+        # Fetch all image prompts for these outputs in a single query (fixes N+1)
+        image_prompts_by_output = {}
+        if output_ids:
+            placeholders = ",".join("?" * len(output_ids))
+            prompt_cursor = await db.execute(
+                f"SELECT id, output_id, prompt_text, platform, dimensions, style_modifiers FROM image_prompts WHERE output_id IN ({placeholders})",
+                output_ids
+            )
+            prompt_rows = await prompt_cursor.fetchall()
+            for p in prompt_rows:
+                output_id = p["output_id"]
+                if output_id not in image_prompts_by_output:
+                    image_prompts_by_output[output_id] = []
+                image_prompts_by_output[output_id].append({
+                    "id": p["id"],
+                    "prompt_text": p["prompt_text"],
+                    "platform": p["platform"],
+                    "dimensions": p["dimensions"],
+                    "style_modifiers": p["style_modifiers"],
+                })
+
         outputs = []
         for row in output_rows:
-            outputs.append({
+            output_data = {
                 "id": row["id"],
                 "content_type": row["content_type"],
                 "variation_number": row["variation_number"],
@@ -124,25 +160,43 @@ async def get_job_results(
                 "atoms_used": json.loads(row["atoms_used"]) if row["atoms_used"] else [],
                 "citations": json.loads(row["citations"]) if row["citations"] else [],
                 "warnings": json.loads(row["warnings"]) if row["warnings"] else [],
-            })
+                "quality_scores": json.loads(row["quality_scores"]) if row["quality_scores"] else {},
+                "hook_variations": json.loads(row["hook_variations"]) if row["hook_variations"] else [],
+            }
+            # Add email sequence fields if present
+            if row["subject"]:
+                output_data["subject"] = row["subject"]
+            if row["preview_text"]:
+                output_data["preview_text"] = row["preview_text"]
+            if row["email_day"] is not None:
+                output_data["email_day"] = row["email_day"]
+            if row["email_purpose"]:
+                output_data["email_purpose"] = row["email_purpose"]
+            if row["sequence_name"]:
+                output_data["sequence_name"] = row["sequence_name"]
 
-        # Get atoms
+            # Get image prompts from the batch-fetched dictionary
+            output_data["image_prompts"] = image_prompts_by_output.get(row["id"], [])
+
+            outputs.append(output_data)
+
+        # Get stills
         cursor = await db.execute(
             """
-            SELECT id, atom_type, content, source_location,
+            SELECT id, still_type, content, source_location,
                    tags, persona_relevance, quote_attribution
-            FROM atoms WHERE job_id = ?
-            ORDER BY atom_type
+            FROM stills WHERE job_id = ?
+            ORDER BY still_type
             """,
             (job_id,)
         )
-        atom_rows = await cursor.fetchall()
+        still_rows = await cursor.fetchall()
 
-        atoms = []
-        for row in atom_rows:
-            atoms.append({
+        stills = []
+        for row in still_rows:
+            stills.append({
                 "id": row["id"],
-                "type": row["atom_type"],
+                "type": row["still_type"],
                 "content": row["content"],
                 "source_location": row["source_location"],
                 "tags": json.loads(row["tags"]) if row["tags"] else [],
@@ -158,7 +212,8 @@ async def get_job_results(
             "asset_types": json.loads(job["asset_types"]) if job["asset_types"] else [],
             "asset_quantities": json.loads(job["asset_quantities"]) if job["asset_quantities"] else {},
             "outputs": outputs,
-            "atoms": atoms,
+            "stills": stills,
+            "atoms": stills,  # Keep for backwards compatibility
             "cost_incurred": job["cost_incurred"],
             "created_at": job["created_at"],
             "completed_at": job["completed_at"],
@@ -167,7 +222,9 @@ async def get_job_results(
 
 
 @router.get("/jobs")
+@limiter.limit("1000/hour")
 async def list_jobs(
+    request: Request,
     status: Optional[str] = None,
     limit: int = 20,
     offset: int = 0,
@@ -230,7 +287,8 @@ async def list_jobs(
 
 
 @router.get("/usage")
-async def get_usage_stats(user_id: int = Depends(get_current_user_id)):
+@limiter.limit("1000/hour")
+async def get_usage_stats(request: Request, user_id: int = Depends(get_current_user_id)):
     """
     Get usage statistics and costs for the current user.
     """

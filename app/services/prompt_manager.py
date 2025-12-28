@@ -20,7 +20,7 @@ async def init_prompts_from_files():
 
     # Default prompts with their configurations
     default_prompts = {
-        "atomization": {
+        "distillation": {
             "model": "gemini-2.0-flash",
             "max_tokens": 8000,
             "variables": [

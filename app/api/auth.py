@@ -53,7 +53,7 @@ class UserResponse(BaseModel):
 
 
 @router.post("/register", response_model=TokenResponse)
-@limiter.limit("5/hour")  # 5 registrations per hour per IP
+@limiter.limit("500/hour")  # 500 registrations per hour per IP (high limit for E2E testing)
 async def register(request: Request, user_data: UserRegister):
     """
     Register a new user.

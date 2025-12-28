@@ -255,10 +255,10 @@
                 const isToday = dateStr === today;
 
                 html += `
-                    <div class="min-h-[100px] p-2 border-b border-r border-still-border ${isToday ? 'bg-still-copper/10' : 'bg-still-card'} hover:bg-still-border cursor-pointer"
+                    <div class="min-h-[100px] p-2 border-b border-r border-still-border ${isToday ? 'bg-still-copper/10' : 'bg-still-card'} hover:bg-still-border cursor-pointer transition-all duration-200"
                          onclick="showDayModal('${dateStr}')"
-                         ondragover="event.preventDefault(); this.classList.add('bg-still-copper/20')"
-                         ondragleave="this.classList.remove('bg-still-copper/20')"
+                         ondragover="event.preventDefault(); this.classList.add('calendar-drop-target')"
+                         ondragleave="this.classList.remove('calendar-drop-target')"
                          ondrop="handleDrop(event, '${dateStr}')">
                         <div class="flex justify-between items-start">
                             <span class="text-sm font-medium ${isToday ? 'text-still-copper' : 'text-still-text'}">${day}</span>
@@ -329,7 +329,7 @@
 
         function handleDrop(event, dateStr) {
             event.preventDefault();
-            event.currentTarget.classList.remove('bg-still-copper/20');
+            event.currentTarget.classList.remove('calendar-drop-target');
 
             if (dragData) {
                 openScheduleModal(dragData.outputId, dragData.preview, dragData.contentType, dateStr);

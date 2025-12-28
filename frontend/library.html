@@ -306,7 +306,7 @@
         // Load personas dynamically
         async function loadPersonas() {
             try {
-                const response = await Auth.fetchWithAuth('/api/personas/all');
+                const response = await Auth.fetchWithAuth('/api/personas');
                 const data = await response.json();
 
                 const filterSelect = document.getElementById('filter-persona');

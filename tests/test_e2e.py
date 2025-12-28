@@ -30,15 +30,15 @@ class TestConfig:
     test_password = "TestPassword123!"
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def event_loop():
     """Create event loop for async tests"""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
+    loop = asyncio.new_event_loop()
     yield loop
     loop.close()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 async def client():
     """Async HTTP client for API calls"""
     async with httpx.AsyncClient(base_url=BASE_URL, timeout=60.0) as client:
@@ -56,6 +56,7 @@ class TestUserJourney:
             json={
                 "email": TestConfig.test_email,
                 "password": TestConfig.test_password,
+                "confirm_password": TestConfig.test_password,
             }
         )
 
@@ -116,13 +117,14 @@ class TestUserJourney:
         headers = {"Authorization": f"Bearer {TestConfig.access_token}"}
 
         response = await client.post(
-            "/api/upload",
+            "/api/upload-text",
             data={
-                "raw_text": sample_content,
+                "content": sample_content,
                 "target_persona": "ceo_longterm_care",
                 "asset_types": json.dumps(["linkedin", "blog"]),
                 "asset_quantities": json.dumps({"linkedin": 2, "blog": 1}),
                 "magic_words": "SafelyYou, Q4, ROI, DON, CMS",
+                "content_name": "test_webinar.txt",
             },
             headers=headers,
         )
@@ -316,6 +318,7 @@ class TestEdgeCases:
             json={
                 "email": second_email,
                 "password": "TestPassword456!",
+                "confirm_password": "TestPassword456!",
             }
         )
 
@@ -378,6 +381,7 @@ class TestDataIntegrity:
             json={
                 "email": TestConfig.test_email,  # Already registered
                 "password": "AnotherPassword123!",
+                "confirm_password": "AnotherPassword123!",
             }
         )
 

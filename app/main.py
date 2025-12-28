@@ -49,8 +49,8 @@ def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSO
             "retry_after_seconds": retry_after,
             "reset_at": datetime.utcfromtimestamp(reset_time).isoformat() + "Z",
             "limits": {
-                "uploads": "10 per hour",
-                "api_calls": "100 per hour"
+                "uploads": "100 per hour",
+                "api_calls": "1000 per hour"
             }
         },
         headers={"Retry-After": str(retry_after)}
@@ -205,12 +205,6 @@ async def serve_swipes():
 async def serve_remix():
     """Serve content remix page."""
     return FileResponse(frontend_path / "remix.html")
-
-
-@app.get("/personas.html")
-async def serve_personas():
-    """Serve personas management page."""
-    return FileResponse(frontend_path / "personas.html")
 
 
 @app.get("/analytics.html")

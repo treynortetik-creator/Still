@@ -8,29 +8,34 @@
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <!-- API Keys Section -->
-    <div class="bg-white rounded-lg shadow">
-        <div class="px-6 py-4 border-b">
-            <h2 class="text-lg font-semibold">API Keys</h2>
-            <p class="text-sm text-gray-500">Configure your AI provider API keys</p>
+    <div class="admin-card border rounded-lg shadow">
+        <div class="px-6 py-4 border-b" style="border-color: var(--admin-border);">
+            <h2 class="text-lg font-semibold">API Configuration</h2>
+            <p class="text-sm" style="color: var(--admin-text-muted);">Configure your OpenRouter API key</p>
         </div>
         <div class="p-6">
+            <div class="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p class="text-sm text-green-800">
+                    <strong>All AI models are accessed through OpenRouter.</strong> This gives you access to
+                    Gemini, Claude, GPT, and many other models through a single API key.
+                    Get your key at <a href="https://openrouter.ai/keys" target="_blank" class="underline">openrouter.ai/keys</a>
+                </p>
+            </div>
             <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p class="text-sm text-blue-800">
                     <strong>Note:</strong> Keys entered here are for testing and last until the server restarts.
-                    For permanent storage, add them to <strong>Replit Secrets</strong> (Tools → Secrets) with these names:
-                    <code class="bg-blue-100 px-1 rounded">OPENROUTER_API_KEY</code>,
-                    <code class="bg-blue-100 px-1 rounded">GEMINI_API_KEY</code>,
-                    <code class="bg-blue-100 px-1 rounded">ANTHROPIC_API_KEY</code>
+                    For permanent storage, add to your <code class="bg-blue-100 px-1 rounded">.env</code> file:
+                    <code class="bg-blue-100 px-1 rounded">OPENROUTER_API_KEY=sk-or-...</code>
                 </p>
             </div>
         </div>
         <div class="px-6 pb-6 space-y-4">
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">OpenRouter API Key</label>
+                <label class="block text-sm font-medium mb-1" style="color: var(--admin-text);">OpenRouter API Key (Required)</label>
                 <div class="flex gap-2">
                     <input type="password" id="openrouter-key" placeholder="sk-or-..."
-                        class="flex-1 border border-gray-300 rounded px-3 py-2">
-                    <button onclick="saveApiKey('openrouter')" 
+                        class="flex-1 border rounded px-3 py-2 admin-card" style="border-color: var(--admin-border);">
+                    <button onclick="saveApiKey('openrouter')"
                         class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
                         Save
                     </button>
@@ -39,57 +44,14 @@
                     <span id="openrouter-status" class="text-sm"></span>
                 </div>
             </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Gemini API Key</label>
-                <div class="flex gap-2">
-                    <input type="password" id="gemini-key" placeholder="AIza..."
-                        class="flex-1 border border-gray-300 rounded px-3 py-2">
-                    <button onclick="saveApiKey('gemini')" 
-                        class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
-                        Save
-                    </button>
-                </div>
-                <div class="mt-1 flex items-center gap-2">
-                    <span id="gemini-status" class="text-sm"></span>
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Anthropic API Key</label>
-                <div class="flex gap-2">
-                    <input type="password" id="anthropic-key" placeholder="sk-ant-..."
-                        class="flex-1 border border-gray-300 rounded px-3 py-2">
-                    <button onclick="saveApiKey('anthropic')" 
-                        class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
-                        Save
-                    </button>
-                </div>
-                <div class="mt-1 flex items-center gap-2">
-                    <span id="anthropic-status" class="text-sm"></span>
-                </div>
-            </div>
-
-            <div class="pt-4 border-t">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <label class="text-sm font-medium text-gray-700">Use OpenRouter for Drafting</label>
-                        <p class="text-xs text-gray-500">Use OpenRouter instead of direct Anthropic API</p>
-                    </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="use-openrouter" class="sr-only peer" onchange="toggleOpenRouter()">
-                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                    </label>
-                </div>
-            </div>
         </div>
     </div>
 
     <!-- Model Selection Per Step -->
-    <div class="bg-white rounded-lg shadow">
-        <div class="px-6 py-4 border-b">
+    <div class="admin-card border rounded-lg shadow">
+        <div class="px-6 py-4 border-b" style="border-color: var(--admin-border);">
             <h2 class="text-lg font-semibold">Model Configuration</h2>
-            <p class="text-sm text-gray-500">Select AI models for each pipeline step</p>
+            <p class="text-sm" style="color: var(--admin-text-muted);">Select AI models for each pipeline step</p>
         </div>
         <div class="p-6 space-y-4">
             <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
@@ -100,77 +62,77 @@
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Transcription Model</label>
+                <label class="block text-sm font-medium mb-1" style="color: var(--admin-text);">Transcription Model</label>
                 <div class="flex gap-2">
-                    <select id="model-transcription" class="flex-1 border border-gray-300 rounded px-3 py-2">
+                    <select id="model-transcription" class="flex-1 border rounded px-3 py-2 admin-card" style="border-color: var(--admin-border);">
                         <option value="">-- Select a model --</option>
                     </select>
-                    <button onclick="loadOpenRouterModels('transcription')" 
-                        class="px-3 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 whitespace-nowrap">
+                    <button onclick="loadOpenRouterModels('transcription')"
+                        class="px-3 py-2 rounded whitespace-nowrap hover:opacity-80" style="background-color: var(--admin-border); color: var(--admin-text);">
                         Load
                     </button>
                 </div>
-                <p class="text-xs text-gray-500 mt-1">Used for audio/video transcription and PDF extraction</p>
+                <p class="text-xs mt-1" style="color: var(--admin-text-muted);">Used for audio/video transcription and PDF extraction</p>
                 <p id="status-transcription" class="text-xs mt-1"></p>
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Atomization Model</label>
+                <label class="block text-sm font-medium mb-1" style="color: var(--admin-text);">Atomization Model</label>
                 <div class="flex gap-2">
-                    <select id="model-atomization" class="flex-1 border border-gray-300 rounded px-3 py-2">
+                    <select id="model-atomization" class="flex-1 border rounded px-3 py-2 admin-card" style="border-color: var(--admin-border);">
                         <option value="">-- Select a model --</option>
                     </select>
-                    <button onclick="loadOpenRouterModels('atomization')" 
-                        class="px-3 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 whitespace-nowrap">
+                    <button onclick="loadOpenRouterModels('atomization')"
+                        class="px-3 py-2 rounded whitespace-nowrap hover:opacity-80" style="background-color: var(--admin-border); color: var(--admin-text);">
                         Load
                     </button>
                 </div>
-                <p class="text-xs text-gray-500 mt-1">Used to extract content atoms from transcripts</p>
+                <p class="text-xs mt-1" style="color: var(--admin-text-muted);">Used to extract content atoms from transcripts</p>
                 <p id="status-atomization" class="text-xs mt-1"></p>
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Drafting Model</label>
+                <label class="block text-sm font-medium mb-1" style="color: var(--admin-text);">Drafting Model</label>
                 <div class="flex gap-2">
-                    <select id="model-drafting" class="flex-1 border border-gray-300 rounded px-3 py-2">
+                    <select id="model-drafting" class="flex-1 border rounded px-3 py-2 admin-card" style="border-color: var(--admin-border);">
                         <option value="">-- Select a model --</option>
                     </select>
-                    <button onclick="loadOpenRouterModels('drafting')" 
-                        class="px-3 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 whitespace-nowrap">
+                    <button onclick="loadOpenRouterModels('drafting')"
+                        class="px-3 py-2 rounded whitespace-nowrap hover:opacity-80" style="background-color: var(--admin-border); color: var(--admin-text);">
                         Load
                     </button>
                 </div>
-                <p class="text-xs text-gray-500 mt-1">Primary content generation model</p>
+                <p class="text-xs mt-1" style="color: var(--admin-text-muted);">Primary content generation model</p>
                 <p id="status-drafting" class="text-xs mt-1"></p>
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Editing Model</label>
+                <label class="block text-sm font-medium mb-1" style="color: var(--admin-text);">Editing Model</label>
                 <div class="flex gap-2">
-                    <select id="model-editing" class="flex-1 border border-gray-300 rounded px-3 py-2">
+                    <select id="model-editing" class="flex-1 border rounded px-3 py-2 admin-card" style="border-color: var(--admin-border);">
                         <option value="">-- Select a model --</option>
                     </select>
-                    <button onclick="loadOpenRouterModels('editing')" 
-                        class="px-3 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 whitespace-nowrap">
+                    <button onclick="loadOpenRouterModels('editing')"
+                        class="px-3 py-2 rounded whitespace-nowrap hover:opacity-80" style="background-color: var(--admin-border); color: var(--admin-text);">
                         Load
                     </button>
                 </div>
-                <p class="text-xs text-gray-500 mt-1">Used to refine and polish generated content</p>
+                <p class="text-xs mt-1" style="color: var(--admin-text-muted);">Used to refine and polish generated content</p>
                 <p id="status-editing" class="text-xs mt-1"></p>
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Fact-checking Model</label>
+                <label class="block text-sm font-medium mb-1" style="color: var(--admin-text);">Fact-checking Model</label>
                 <div class="flex gap-2">
-                    <select id="model-factcheck" class="flex-1 border border-gray-300 rounded px-3 py-2">
+                    <select id="model-factcheck" class="flex-1 border rounded px-3 py-2 admin-card" style="border-color: var(--admin-border);">
                         <option value="">-- Select a model --</option>
                     </select>
-                    <button onclick="loadOpenRouterModels('factcheck')" 
-                        class="px-3 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 whitespace-nowrap">
+                    <button onclick="loadOpenRouterModels('factcheck')"
+                        class="px-3 py-2 rounded whitespace-nowrap hover:opacity-80" style="background-color: var(--admin-border); color: var(--admin-text);">
                         Load
                     </button>
                 </div>
-                <p class="text-xs text-gray-500 mt-1">Verifies claims against source material</p>
+                <p class="text-xs mt-1" style="color: var(--admin-text-muted);">Verifies claims against source material</p>
                 <p id="status-factcheck" class="text-xs mt-1"></p>
             </div>
 
@@ -178,6 +140,46 @@
                 <button onclick="saveModelConfig()" 
                     class="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
                     Save Model Configuration
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Editor Configuration -->
+    <div class="admin-card border rounded-lg shadow lg:col-span-2">
+        <div class="px-6 py-4 border-b" style="border-color: var(--admin-border);">
+            <h2 class="text-lg font-semibold">AI Workshop Editor</h2>
+            <p class="text-sm" style="color: var(--admin-text-muted);">Configure the AI editing assistant in the Workshop</p>
+        </div>
+        <div class="p-6 space-y-4">
+            <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+                <p class="text-sm text-blue-800">
+                    <strong>Workshop AI Editor:</strong> This prompt controls how the AI makes editing suggestions
+                    in the Workshop. It uses the user's brand voice profile automatically.
+                    Keep edits light and focused - the AI should refine, not rewrite.
+                </p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium mb-1" style="color: var(--admin-text);">System Prompt</label>
+                <textarea id="ai-editor-prompt" rows="12"
+                    class="w-full border rounded px-3 py-2 admin-card font-mono text-sm"
+                    style="border-color: var(--admin-border);"
+                    placeholder="Loading..."></textarea>
+                <p class="text-xs mt-1" style="color: var(--admin-text-muted);">
+                    This prompt defines the AI editor's persona and editing guidelines.
+                    Brand voice and persona context are added automatically.
+                </p>
+            </div>
+
+            <div class="flex gap-4 pt-2">
+                <button onclick="saveAIEditorConfig()"
+                    class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                    Save Configuration
+                </button>
+                <button onclick="resetAIEditorConfig()"
+                    class="px-4 py-2 border rounded hover:opacity-80" style="border-color: var(--admin-border); color: var(--admin-text);">
+                    Reset to Default
                 </button>
             </div>
         </div>
@@ -252,21 +254,12 @@ async function loadSettings() {
     try {
         const response = await fetch('/api/admin/settings');
         const data = await response.json();
-        
-        // API key status
-        document.getElementById('openrouter-status').innerHTML = data.api_keys.openrouter 
-            ? '<span class="text-green-600">Configured</span>' 
-            : '<span class="text-yellow-600">Not set</span>';
-        document.getElementById('gemini-status').innerHTML = data.api_keys.gemini 
-            ? '<span class="text-green-600">Configured</span>' 
-            : '<span class="text-yellow-600">Not set</span>';
-        document.getElementById('anthropic-status').innerHTML = data.api_keys.anthropic 
-            ? '<span class="text-green-600">Configured</span>' 
-            : '<span class="text-yellow-600">Not set</span>';
-        
-        // OpenRouter toggle
-        document.getElementById('use-openrouter').checked = data.use_openrouter;
-        
+
+        // API key status (only OpenRouter now)
+        document.getElementById('openrouter-status').innerHTML = data.api_keys.openrouter
+            ? '<span class="text-green-600">Configured</span>'
+            : '<span class="text-red-600">Not set - Required for all AI operations</span>';
+
         // Model selections - save them for later restoration
         if (data.models) {
             if (data.models.transcription) document.getElementById('model-transcription').dataset.savedValue = data.models.transcription;
@@ -275,7 +268,7 @@ async function loadSettings() {
             if (data.models.editing) document.getElementById('model-editing').dataset.savedValue = data.models.editing;
             if (data.models.factcheck) document.getElementById('model-factcheck').dataset.savedValue = data.models.factcheck;
         }
-        
+
     } catch (err) {
         console.error('Failed to load settings:', err);
     }
@@ -307,26 +300,6 @@ async function saveApiKey(provider) {
         }
     } catch (err) {
         showError('Failed to save API key');
-    }
-}
-
-async function toggleOpenRouter() {
-    const enabled = document.getElementById('use-openrouter').checked;
-    
-    try {
-        const response = await fetch('/api/admin/settings/openrouter', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ enabled })
-        });
-        
-        if (response.ok) {
-            showSuccess();
-        } else {
-            showError('Failed to update setting');
-        }
-    } catch (err) {
-        showError('Failed to update setting');
     }
 }
 
@@ -368,6 +341,59 @@ function showError(message) {
     toast.classList.remove('hidden');
     setTimeout(() => toast.classList.add('hidden'), 3000);
 }
+
+// AI Editor Config
+async function loadAIEditorConfig() {
+    try {
+        const response = await fetch('/api/admin/ai-editor-config');
+        const data = await response.json();
+        document.getElementById('ai-editor-prompt').value = data.system_prompt || '';
+    } catch (err) {
+        console.error('Failed to load AI editor config:', err);
+    }
+}
+
+async function saveAIEditorConfig() {
+    const systemPrompt = document.getElementById('ai-editor-prompt').value;
+
+    try {
+        const response = await fetch('/api/admin/ai-editor-config', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ system_prompt: systemPrompt })
+        });
+
+        if (response.ok) {
+            showSuccess();
+        } else {
+            showError('Failed to save AI editor configuration');
+        }
+    } catch (err) {
+        showError('Failed to save AI editor configuration');
+    }
+}
+
+async function resetAIEditorConfig() {
+    if (!confirm('Reset AI editor configuration to defaults?')) return;
+
+    try {
+        const response = await fetch('/api/admin/ai-editor-config/reset', {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            await loadAIEditorConfig();
+            showSuccess();
+        } else {
+            showError('Failed to reset configuration');
+        }
+    } catch (err) {
+        showError('Failed to reset configuration');
+    }
+}
+
+// Load AI editor config on page load
+loadAIEditorConfig();
 
 loadSettings();
 </script>

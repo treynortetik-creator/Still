@@ -3,15 +3,15 @@ import json
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-import google.generativeai as genai
 
-from app.config import get_settings, calculate_cost
 from app.api.auth import get_current_user_id
-from app.services.persona_manager import get_persona, list_personas
-from app.utils.retry import retry_async
+from app.database import get_db
+from app.services.persona_manager import get_persona, list_personas, load_personas
+from app.services.ai_client import call_llm_text
+from app.utils.json_parser import parse_llm_json
+import json
 
 router = APIRouter()
-settings = get_settings()
 
 
 class BrandVoicePreviewRequest(BaseModel):
@@ -29,12 +29,68 @@ class BrandVoicePreviewResponse(BaseModel):
 
 
 @router.get("/personas")
+async def get_default_personas(
+    user_id: int = Depends(get_current_user_id),
+):
+    """Get default personas only."""
+    personas = await list_personas()
+    return {"personas": personas}
+
+
+def _row_to_persona_dict(row) -> dict:
+    """Convert a database row to a persona dictionary."""
+    return {
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "name": row["name"],
+        "role": row["role"],
+        "title": f"{row['name']} ({row['role']})",
+        "industry": row["industry"],
+        "pain_points": json.loads(row["pain_points"]) if row["pain_points"] else [],
+        "goals": json.loads(row["goals"]) if row["goals"] else [],
+        "priorities": json.loads(row["goals"]) if row["goals"] else [],
+        "language_level": "Professional",
+        "tone_preferences": json.loads(row["tone_preferences"]) if row["tone_preferences"] else None,
+        "content_preferences": json.loads(row["content_preferences"]) if row["content_preferences"] else None,
+        "is_default": bool(row["is_default"]),
+        "is_custom": True,
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+@router.get("/personas/all")
 async def get_all_personas(
     user_id: int = Depends(get_current_user_id),
 ):
-    """Get all available personas."""
-    personas = await list_personas()
-    return {"personas": personas}
+    """
+    Get all personas (both default from JSON and custom from database).
+    This endpoint is used to populate persona dropdowns across the app.
+    """
+    # Get default personas from JSON
+    defaults_data = await load_personas()
+    default_personas = []
+    for p in defaults_data.get("personas", []):
+        persona = dict(p)
+        persona["is_default"] = True
+        persona["is_custom"] = False
+        default_personas.append(persona)
+
+    # Get custom personas from database
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT * FROM personas WHERE user_id = ? ORDER BY created_at DESC",
+            (user_id,)
+        )
+        rows = await cursor.fetchall()
+
+    custom_personas = [_row_to_persona_dict(row) for row in rows]
+
+    return {
+        "default_personas": default_personas,
+        "custom_personas": custom_personas,
+        "all_personas": custom_personas + default_personas,
+    }
 
 
 @router.get("/personas/{persona_id}")
@@ -43,7 +99,7 @@ async def get_persona_details(
     user_id: int = Depends(get_current_user_id),
 ):
     """Get details for a specific persona."""
-    persona = await get_persona(persona_id)
+    persona = await get_persona(persona_id, user_id=user_id)
     if not persona:
         raise HTTPException(status_code=404, detail="Persona not found")
     return persona
@@ -66,7 +122,8 @@ async def preview_brand_voice(
     if len(request.sample_text) > 2000:
         raise HTTPException(status_code=400, detail="Sample text must be less than 2000 characters")
 
-    persona = await get_persona(request.persona_id)
+    # Pass user_id to get_persona so it can find custom personas
+    persona = await get_persona(request.persona_id, user_id=user_id)
     if not persona:
         raise HTTPException(status_code=404, detail="Persona not found")
 
@@ -100,27 +157,15 @@ OUTPUT FORMAT (valid JSON):
   ]
 }}"""
 
-    genai.configure(api_key=settings.gemini_api_key)
-    model = genai.GenerativeModel("gemini-2.0-flash")
-
-    async def do_transform():
-        return model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(
-                response_mime_type="application/json",
-                max_output_tokens=1000,
-            )
-        )
-
     try:
-        response = await retry_async(
-            do_transform,
-            max_retries=2,
-            base_delay=1.0,
-            context="preview_brand_voice",
+        response_text, _, _, _ = await call_llm_text(
+            prompt=prompt,
+            step="drafting",
+            max_tokens=1000,
+            response_format="json",
         )
 
-        result = json.loads(response.text)
+        result = parse_llm_json(response_text, context="brand voice preview")
 
         return BrandVoicePreviewResponse(
             original_text=request.sample_text,

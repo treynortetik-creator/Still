@@ -16,7 +16,7 @@ async def test_database_initialization(test_db):
 
         assert "users" in tables
         assert "jobs" in tables
-        assert "atoms" in tables
+        assert "stills" in tables  # renamed from atoms
         assert "outputs" in tables
         assert "content_library" in tables
         assert "prompt_templates" in tables
@@ -63,12 +63,12 @@ async def test_create_job(test_db):
 
 
 @pytest.mark.asyncio
-async def test_create_atom(test_db):
-    """Test creating an atom."""
+async def test_create_still(test_db):
+    """Test creating a still (formerly atom)."""
     import uuid
 
     job_id = str(uuid.uuid4())
-    atom_id = str(uuid.uuid4())
+    still_id = str(uuid.uuid4())
 
     async with get_db() as db:
         # Create job first
@@ -77,14 +77,14 @@ async def test_create_atom(test_db):
             (job_id, 1, "complete")
         )
 
-        # Create atom
+        # Create still
         await db.execute(
             """
-            INSERT INTO atoms (id, job_id, user_id, atom_type, content, tags, persona_relevance)
+            INSERT INTO stills (id, job_id, user_id, still_type, content, tags, persona_relevance)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                atom_id,
+                still_id,
                 job_id,
                 1,
                 "data",
@@ -95,12 +95,12 @@ async def test_create_atom(test_db):
         )
         await db.commit()
 
-        cursor = await db.execute("SELECT * FROM atoms WHERE id = ?", (atom_id,))
-        atom = await cursor.fetchone()
+        cursor = await db.execute("SELECT * FROM stills WHERE id = ?", (still_id,))
+        still = await cursor.fetchone()
 
-        assert atom is not None
-        assert atom["atom_type"] == "data"
-        assert atom["content"] == "40% improvement"
+        assert still is not None
+        assert still["still_type"] == "data"
+        assert still["content"] == "40% improvement"
 
 
 @pytest.mark.asyncio
@@ -163,11 +163,11 @@ async def test_foreign_key_constraint(test_db):
     import sqlite3
 
     async with get_db() as db:
-        # Try to create atom with non-existent job_id
+        # Try to create still with non-existent job_id
         with pytest.raises(Exception):  # Should fail due to FK constraint
             await db.execute(
                 """
-                INSERT INTO atoms (id, job_id, user_id, atom_type, content)
+                INSERT INTO stills (id, job_id, user_id, still_type, content)
                 VALUES (?, ?, ?, ?, ?)
                 """,
                 (str(uuid.uuid4()), "nonexistent-job", 1, "data", "test")

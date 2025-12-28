@@ -2,19 +2,21 @@
 import json
 import os
 from datetime import datetime, timedelta
-from fastapi import APIRouter, HTTPException, Query, Body
+from fastapi import APIRouter, HTTPException, Query, Body, Depends
 from typing import Optional, Dict
 from pydantic import BaseModel
 import httpx
 
 from app.database import get_db
 from app.services import settings_manager
+from app.api.auth import verify_admin
+from app.services.ai_editor import get_editor_config, save_editor_config, DEFAULT_EDITOR_PROMPT
 
 router = APIRouter()
 
 
 @router.get("/dashboard")
-async def get_dashboard():
+async def get_dashboard(_: bool = Depends(verify_admin)):
     """
     Get admin dashboard overview.
     """
@@ -110,7 +112,7 @@ async def get_dashboard():
 
 
 @router.get("/prompts")
-async def list_prompts():
+async def list_prompts(_: bool = Depends(verify_admin)):
     """
     List all prompt templates.
     """
@@ -139,7 +141,7 @@ async def list_prompts():
 
 
 @router.get("/prompts/{template_name}")
-async def get_prompt(template_name: str):
+async def get_prompt(template_name: str, _: bool = Depends(verify_admin)):
     """
     Get a specific prompt template.
     """
@@ -174,6 +176,7 @@ async def update_prompt(
     prompt_content: str,
     model: Optional[str] = None,
     max_tokens: Optional[int] = None,
+    _: bool = Depends(verify_admin),
 ):
     """
     Update a prompt template.
@@ -218,7 +221,7 @@ async def update_prompt(
 
 
 @router.get("/clients")
-async def list_clients():
+async def list_clients(_: bool = Depends(verify_admin)):
     """
     List all clients/users.
     """
@@ -250,7 +253,7 @@ async def list_clients():
 
 
 @router.get("/clients/{client_id}")
-async def get_client(client_id: int):
+async def get_client(client_id: int, _: bool = Depends(verify_admin)):
     """
     Get detailed client information.
     """
@@ -313,6 +316,7 @@ async def get_costs(
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
     group_by: str = Query("day", description="Group by: day, user, or job"),
+    _: bool = Depends(verify_admin),
 ):
     """
     Get cost breakdown.
@@ -401,6 +405,7 @@ async def get_logs(
     level: Optional[str] = Query(None, description="Filter by level (error, warning, info)"),
     start_date: Optional[str] = Query(None),
     limit: int = Query(100),
+    _: bool = Depends(verify_admin),
 ):
     """
     Get job logs/errors.
@@ -459,8 +464,14 @@ class ModelConfig(BaseModel):
     factcheck: str
 
 
+class AIEditorConfigRequest(BaseModel):
+    """Request model for updating AI editor config."""
+    system_prompt: Optional[str] = None
+    model: Optional[str] = None
+
+
 @router.get("/settings")
-async def get_settings():
+async def get_settings(_: bool = Depends(verify_admin)):
     """Get current settings including API key status and model config."""
     settings = settings_manager.get_settings()
     api_keys = settings_manager.get_api_key_status()
@@ -473,7 +484,7 @@ async def get_settings():
 
 
 @router.post("/settings/apikey")
-async def save_api_key(request: ApiKeyRequest):
+async def save_api_key(request: ApiKeyRequest, _: bool = Depends(verify_admin)):
     """
     Save API key - stores in environment for current session.
     Note: For permanent storage, keys should be set in Replit Secrets.
@@ -494,14 +505,14 @@ async def save_api_key(request: ApiKeyRequest):
 
 
 @router.post("/settings/openrouter")
-async def toggle_openrouter(request: OpenRouterToggle):
+async def toggle_openrouter(request: OpenRouterToggle, _: bool = Depends(verify_admin)):
     """Toggle OpenRouter usage."""
     settings_manager.set_openrouter_enabled(request.enabled)
     return {"status": "ok", "use_openrouter": request.enabled}
 
 
 @router.post("/settings/models")
-async def save_model_config(config: ModelConfig):
+async def save_model_config(config: ModelConfig, _: bool = Depends(verify_admin)):
     """Save model configuration for each pipeline step."""
     settings_manager.set_model_config({
         "transcription": config.transcription,
@@ -513,30 +524,96 @@ async def save_model_config(config: ModelConfig):
     return {"status": "ok", "models": config.model_dump()}
 
 
+@router.get("/error-logs")
+async def get_error_logs(
+    job_id: Optional[str] = Query(None, description="Filter by job ID"),
+    limit: int = Query(50, description="Max number of logs to return"),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Get detailed error logs with stack traces for debugging.
+    """
+    async with get_db() as db:
+        # First check if the error_logs table exists
+        cursor = await db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='error_logs'"
+        )
+        table_exists = await cursor.fetchone()
+
+        if not table_exists:
+            # Create the table if it doesn't exist
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS error_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    job_id TEXT,
+                    user_id INTEGER,
+                    error_type TEXT,
+                    error_message TEXT,
+                    stack_trace TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            await db.commit()
+            return {"error_logs": [], "message": "Error logs table created"}
+
+        query = """
+            SELECT el.*, j.original_filename, u.email
+            FROM error_logs el
+            LEFT JOIN jobs j ON el.job_id = j.id
+            LEFT JOIN users u ON el.user_id = u.id
+            WHERE 1=1
+        """
+        params = []
+
+        if job_id:
+            query += " AND el.job_id = ?"
+            params.append(job_id)
+
+        query += " ORDER BY el.created_at DESC LIMIT ?"
+        params.append(limit)
+
+        cursor = await db.execute(query, params)
+        logs = []
+        for row in await cursor.fetchall():
+            logs.append({
+                "id": row["id"],
+                "job_id": row["job_id"],
+                "user_id": row["user_id"],
+                "error_type": row["error_type"],
+                "error_message": row["error_message"],
+                "stack_trace": row["stack_trace"],
+                "created_at": row["created_at"],
+                "filename": row["original_filename"] if "original_filename" in row.keys() else None,
+                "user_email": row["email"] if "email" in row.keys() else None,
+            })
+
+        return {"error_logs": logs}
+
+
 @router.get("/openrouter-models")
-async def get_openrouter_models():
+async def get_openrouter_models(_: bool = Depends(verify_admin)):
     """Fetch available models from OpenRouter."""
     openrouter_key = os.environ.get("OPENROUTER_API_KEY")
-    
+
     if not openrouter_key:
         raise HTTPException(status_code=400, detail="OpenRouter API key not configured")
-    
+
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 "https://openrouter.ai/api/v1/models",
                 headers={"Authorization": f"Bearer {openrouter_key}"}
             )
-            
+
             if response.status_code != 200:
                 raise HTTPException(
                     status_code=response.status_code,
                     detail="Failed to fetch OpenRouter models"
                 )
-            
+
             data = response.json()
             models = data.get("data", [])
-            
+
             # Format models for frontend (id and name)
             formatted_models = [
                 {
@@ -547,14 +624,220 @@ async def get_openrouter_models():
                 for model in models
                 if model.get("id")
             ]
-            
+
             # Sort by name
             formatted_models.sort(key=lambda x: x["name"])
-            
+
             return {"models": formatted_models}
-            
+
     except httpx.RequestError as e:
         raise HTTPException(
             status_code=500,
             detail=f"Failed to connect to OpenRouter: {str(e)}"
         )
+
+
+# ========== AI Model Configuration (Database-backed) ==========
+
+class AIModelConfigRequest(BaseModel):
+    """Request model for updating AI model config."""
+    model_id: str
+    display_name: Optional[str] = None
+    cost_per_1k_input: Optional[float] = 0.0
+    cost_per_1k_output: Optional[float] = 0.0
+    max_tokens: Optional[int] = 4096
+    is_active: Optional[bool] = True
+
+
+# Service names that can have models configured
+PIPELINE_SERVICES = ["transcription", "atomization", "drafting", "editing", "factcheck"]
+
+
+@router.get("/model-config")
+async def get_all_model_config(_: bool = Depends(verify_admin)):
+    """Get all AI model configurations from database."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            """
+            SELECT service_name, model_id, display_name, is_active,
+                   cost_per_1k_input, cost_per_1k_output, max_tokens,
+                   created_at, updated_at
+            FROM ai_model_config
+            ORDER BY service_name
+            """
+        )
+        rows = await cursor.fetchall()
+
+        configs = {}
+        for row in rows:
+            configs[row["service_name"]] = {
+                "model_id": row["model_id"],
+                "display_name": row["display_name"],
+                "is_active": bool(row["is_active"]),
+                "cost_per_1k_input": row["cost_per_1k_input"],
+                "cost_per_1k_output": row["cost_per_1k_output"],
+                "max_tokens": row["max_tokens"],
+                "updated_at": row["updated_at"],
+            }
+
+        # Add missing services with defaults
+        for service in PIPELINE_SERVICES:
+            if service not in configs:
+                configs[service] = {
+                    "model_id": "google/gemini-2.0-flash",
+                    "display_name": "Gemini 2.0 Flash",
+                    "is_active": True,
+                    "cost_per_1k_input": 0.0001,
+                    "cost_per_1k_output": 0.0004,
+                    "max_tokens": 4096,
+                    "updated_at": None,
+                }
+
+        return {"model_configs": configs, "services": PIPELINE_SERVICES}
+
+
+@router.put("/model-config/{service_name}")
+async def update_model_config(
+    service_name: str,
+    config: AIModelConfigRequest,
+    _: bool = Depends(verify_admin),
+):
+    """Update AI model configuration for a specific service."""
+    if service_name not in PIPELINE_SERVICES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid service name. Must be one of: {PIPELINE_SERVICES}"
+        )
+
+    async with get_db() as db:
+        # Check if exists
+        cursor = await db.execute(
+            "SELECT id FROM ai_model_config WHERE service_name = ?",
+            (service_name,)
+        )
+        exists = await cursor.fetchone()
+
+        if exists:
+            # Update
+            await db.execute(
+                """
+                UPDATE ai_model_config
+                SET model_id = ?, display_name = ?, cost_per_1k_input = ?,
+                    cost_per_1k_output = ?, max_tokens = ?, is_active = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE service_name = ?
+                """,
+                (
+                    config.model_id,
+                    config.display_name or config.model_id,
+                    config.cost_per_1k_input,
+                    config.cost_per_1k_output,
+                    config.max_tokens,
+                    1 if config.is_active else 0,
+                    service_name,
+                )
+            )
+        else:
+            # Insert
+            await db.execute(
+                """
+                INSERT INTO ai_model_config
+                (service_name, model_id, display_name, cost_per_1k_input,
+                 cost_per_1k_output, max_tokens, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    service_name,
+                    config.model_id,
+                    config.display_name or config.model_id,
+                    config.cost_per_1k_input,
+                    config.cost_per_1k_output,
+                    config.max_tokens,
+                    1 if config.is_active else 0,
+                )
+            )
+
+        await db.commit()
+
+        # Also update the settings file so it persists
+        current_models = settings_manager.get_settings().get("models", {})
+        current_models[service_name] = config.model_id
+        settings_manager.set_model_config(current_models)
+
+        return {
+            "message": f"Model config for {service_name} updated",
+            "service_name": service_name,
+            "model_id": config.model_id,
+        }
+
+
+@router.post("/model-config/init-defaults")
+async def init_default_model_configs(_: bool = Depends(verify_admin)):
+    """Initialize default model configurations for all services."""
+    default_model = "google/gemini-2.0-flash"
+
+    async with get_db() as db:
+        for service in PIPELINE_SERVICES:
+            # Check if exists
+            cursor = await db.execute(
+                "SELECT id FROM ai_model_config WHERE service_name = ?",
+                (service,)
+            )
+            if not await cursor.fetchone():
+                await db.execute(
+                    """
+                    INSERT INTO ai_model_config
+                    (service_name, model_id, display_name, cost_per_1k_input,
+                     cost_per_1k_output, max_tokens, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        service,
+                        default_model,
+                        "Gemini 2.0 Flash",
+                        0.0001,
+                        0.0004,
+                        4096,
+                        1,
+                    )
+                )
+
+        await db.commit()
+
+    return {"message": "Default model configs initialized", "services": PIPELINE_SERVICES}
+
+
+# ========== AI Editor Configuration ==========
+
+@router.get("/ai-editor-config")
+async def get_ai_editor_config(_: bool = Depends(verify_admin)):
+    """Get AI editor configuration."""
+    config = await get_editor_config()
+    return {
+        "system_prompt": config.get("system_prompt", DEFAULT_EDITOR_PROMPT),
+        "model": config.get("model", "google/gemini-2.5-flash-preview"),
+        "default_prompt": DEFAULT_EDITOR_PROMPT,
+    }
+
+
+@router.put("/ai-editor-config")
+async def update_ai_editor_config(
+    request: AIEditorConfigRequest,
+    _: bool = Depends(verify_admin),
+):
+    """Update AI editor configuration."""
+    if request.system_prompt is not None:
+        await save_editor_config("system_prompt", request.system_prompt)
+
+    if request.model is not None:
+        await save_editor_config("model", request.model)
+
+    return {"message": "AI editor configuration saved"}
+
+
+@router.post("/ai-editor-config/reset")
+async def reset_ai_editor_config(_: bool = Depends(verify_admin)):
+    """Reset AI editor configuration to defaults."""
+    await save_editor_config("system_prompt", DEFAULT_EDITOR_PROMPT)
+    await save_editor_config("model", "google/gemini-2.5-flash-preview")
+    return {"message": "AI editor configuration reset to defaults"}

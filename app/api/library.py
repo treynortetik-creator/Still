@@ -17,6 +17,8 @@ async def get_library(
     persona: Optional[str] = Query(None, description="Filter by persona relevance"),
     min_relevance: int = Query(1, description="Minimum relevance score (1-5)"),
     search: Optional[str] = Query(None, description="Search in content", max_length=200),
+    campaign: Optional[str] = Query(None, description="Filter by campaign name"),
+    topic: Optional[str] = Query(None, description="Filter by topic"),
     limit: int = Query(50, description="Number of results", ge=1, le=100),
     offset: int = Query(0, description="Offset for pagination", ge=0),
     user_id: int = Depends(get_current_user_id),
@@ -36,6 +38,14 @@ async def get_library(
         if search:
             query += " AND content LIKE ?"
             params.append(f"%{search}%")
+
+        if campaign:
+            query += " AND campaign_name = ?"
+            params.append(campaign)
+
+        if topic:
+            query += " AND topics LIKE ?"
+            params.append(f'%"{topic}"%')  # JSON array contains check
 
         query += " ORDER BY date_added DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
@@ -65,6 +75,8 @@ async def get_library(
                 "times_used": row["times_used"],
                 "last_used": row["last_used"],
                 "user_notes": row["user_notes"],
+                "campaign_name": row["campaign_name"],
+                "topics": json.loads(row["topics"]) if row["topics"] else [],
             })
 
         # Get total count
@@ -78,6 +90,14 @@ async def get_library(
         if search:
             count_query += " AND content LIKE ?"
             count_params.append(f"%{search}%")
+
+        if campaign:
+            count_query += " AND campaign_name = ?"
+            count_params.append(campaign)
+
+        if topic:
+            count_query += " AND topics LIKE ?"
+            count_params.append(f'%"{topic}"%')  # JSON array contains check
 
         cursor = await db.execute(count_query, count_params)
         total = (await cursor.fetchone())[0]
@@ -135,6 +155,46 @@ async def get_library_stats(user_id: int = Depends(get_current_user_id)):
             "total_entries": total,
             "by_type": type_counts,
             "most_used": most_used,
+        }
+
+
+@router.get("/library/filters")
+async def get_library_filters(user_id: int = Depends(get_current_user_id)):
+    """
+    Get available filter options for campaigns and topics.
+    Returns unique campaigns and topics for dropdown population.
+    """
+    async with get_db() as db:
+        # Get unique campaigns
+        cursor = await db.execute(
+            """
+            SELECT DISTINCT campaign_name
+            FROM content_library
+            WHERE user_id = ? AND campaign_name IS NOT NULL AND campaign_name != ''
+            ORDER BY campaign_name
+            """,
+            (user_id,)
+        )
+        campaigns = [row[0] for row in await cursor.fetchall()]
+
+        # Get unique topics (from JSON arrays)
+        cursor = await db.execute(
+            """
+            SELECT topics FROM content_library
+            WHERE user_id = ? AND topics IS NOT NULL AND topics != '[]'
+            """,
+            (user_id,)
+        )
+
+        all_topics = set()
+        for row in await cursor.fetchall():
+            if row[0]:
+                topics_list = json.loads(row[0])
+                all_topics.update(topics_list)
+
+        return {
+            "campaigns": campaigns,
+            "topics": sorted(list(all_topics))
         }
 
 

@@ -1,0 +1,367 @@
+"""Content Calendar API endpoints."""
+import json
+from datetime import datetime, timedelta
+from typing import Optional
+from collections import defaultdict
+from fastapi import APIRouter, HTTPException, Depends, Query
+
+from app.database import get_db
+from app.api.auth import get_current_user_id
+from app.models.calendar import (
+    ScheduleCreate,
+    ScheduleUpdate,
+    ScheduleResponse,
+    ScheduledItem,
+    UnscheduledOutput,
+    CalendarView,
+)
+
+router = APIRouter()
+
+
+@router.post("/calendar/schedule", response_model=ScheduleResponse)
+async def schedule_content(
+    data: ScheduleCreate,
+    user_id: int = Depends(get_current_user_id),
+):
+    """Schedule content for a specific date."""
+    # Validate platform
+    valid_platforms = {"linkedin", "blog", "email", "email_sequence"}
+    if data.platform not in valid_platforms:
+        raise HTTPException(status_code=400, detail=f"Invalid platform: {data.platform}")
+
+    async with get_db() as db:
+        # Verify output exists and belongs to user
+        cursor = await db.execute(
+            """
+            SELECT o.id, o.content_type, o.step3_final
+            FROM outputs o
+            JOIN jobs j ON o.job_id = j.id
+            WHERE o.id = ? AND j.user_id = ?
+            """,
+            (data.output_id, user_id)
+        )
+        output = await cursor.fetchone()
+        if not output:
+            raise HTTPException(status_code=404, detail="Output not found")
+
+        # Check if already scheduled for this platform
+        cursor = await db.execute(
+            "SELECT id FROM content_schedule WHERE output_id = ? AND platform = ?",
+            (data.output_id, data.platform)
+        )
+        if await cursor.fetchone():
+            raise HTTPException(
+                status_code=400,
+                detail="This content is already scheduled for this platform"
+            )
+
+        # Create schedule
+        await db.execute(
+            """
+            INSERT INTO content_schedule
+            (user_id, output_id, scheduled_date, scheduled_time, platform, notes)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                data.output_id,
+                data.scheduled_date,
+                data.scheduled_time,
+                data.platform,
+                data.notes
+            )
+        )
+        await db.commit()
+
+        # Get created schedule
+        cursor = await db.execute("SELECT last_insert_rowid()")
+        schedule_id = (await cursor.fetchone())[0]
+
+        cursor = await db.execute(
+            "SELECT * FROM content_schedule WHERE id = ?",
+            (schedule_id,)
+        )
+        schedule = await cursor.fetchone()
+
+        if not schedule:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to create schedule entry"
+            )
+
+    content_preview = (output["step3_final"] or "")[:100] + "..." if output["step3_final"] else ""
+
+    return ScheduleResponse(
+        id=schedule["id"],
+        output_id=schedule["output_id"],
+        scheduled_date=schedule["scheduled_date"],
+        scheduled_time=schedule["scheduled_time"],
+        platform=schedule["platform"],
+        status=schedule["status"],
+        notes=schedule["notes"],
+        content_preview=content_preview,
+        content_type=output["content_type"],
+        created_at=schedule["created_at"]
+    )
+
+
+@router.get("/calendar", response_model=CalendarView)
+async def get_calendar(
+    start_date: str = Query(..., description="Start date YYYY-MM-DD"),
+    end_date: str = Query(..., description="End date YYYY-MM-DD"),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Get calendar view for a date range with scheduled and unscheduled content."""
+    async with get_db() as db:
+        # Get scheduled content
+        cursor = await db.execute(
+            """
+            SELECT cs.id, cs.output_id, cs.scheduled_date, cs.scheduled_time,
+                   cs.platform, cs.status, cs.notes,
+                   o.content_type, o.step3_final
+            FROM content_schedule cs
+            JOIN outputs o ON cs.output_id = o.id
+            WHERE cs.user_id = ?
+            AND cs.scheduled_date >= ? AND cs.scheduled_date <= ?
+            ORDER BY cs.scheduled_date, cs.scheduled_time
+            """,
+            (user_id, start_date, end_date)
+        )
+        scheduled = await cursor.fetchall()
+
+        # Group by date
+        days = defaultdict(list)
+        for item in scheduled:
+            content_preview = (item["step3_final"] or "")[:100] + "..." if item["step3_final"] else ""
+            days[item["scheduled_date"]].append(ScheduledItem(
+                id=item["id"],
+                output_id=item["output_id"],
+                platform=item["platform"],
+                scheduled_time=item["scheduled_time"],
+                status=item["status"],
+                content_preview=content_preview,
+                content_type=item["content_type"],
+                notes=item["notes"]
+            ))
+
+        # Get unscheduled outputs (not scheduled on any platform)
+        cursor = await db.execute(
+            """
+            SELECT o.id, o.content_type, o.step3_final, o.job_id, o.created_at
+            FROM outputs o
+            JOIN jobs j ON o.job_id = j.id
+            WHERE j.user_id = ?
+            AND j.status = 'complete'
+            AND o.id NOT IN (
+                SELECT output_id FROM content_schedule WHERE user_id = ?
+            )
+            ORDER BY o.created_at DESC
+            LIMIT 50
+            """,
+            (user_id, user_id)
+        )
+        unscheduled_rows = await cursor.fetchall()
+
+        unscheduled = []
+        for row in unscheduled_rows:
+            content_preview = (row["step3_final"] or "")[:100] + "..." if row["step3_final"] else ""
+            unscheduled.append(UnscheduledOutput(
+                output_id=row["id"],
+                content_type=row["content_type"],
+                content_preview=content_preview,
+                job_id=row["job_id"],
+                created_at=row["created_at"]
+            ))
+
+    return CalendarView(
+        start_date=start_date,
+        end_date=end_date,
+        days=dict(days),
+        unscheduled=unscheduled,
+        total_scheduled=len(scheduled),
+        total_unscheduled=len(unscheduled)
+    )
+
+
+@router.get("/calendar/unscheduled")
+async def get_unscheduled_content(
+    limit: int = Query(50, ge=1, le=100),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Get outputs that haven't been scheduled yet."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            """
+            SELECT o.id, o.content_type, o.step3_final, o.job_id, o.created_at
+            FROM outputs o
+            JOIN jobs j ON o.job_id = j.id
+            WHERE j.user_id = ?
+            AND j.status = 'complete'
+            AND o.id NOT IN (
+                SELECT output_id FROM content_schedule WHERE user_id = ?
+            )
+            ORDER BY o.created_at DESC
+            LIMIT ?
+            """,
+            (user_id, user_id, limit)
+        )
+        rows = await cursor.fetchall()
+
+    outputs = []
+    for row in rows:
+        content_preview = (row["step3_final"] or "")[:100] + "..." if row["step3_final"] else ""
+        outputs.append({
+            "output_id": row["id"],
+            "content_type": row["content_type"],
+            "content_preview": content_preview,
+            "job_id": row["job_id"],
+            "created_at": row["created_at"]
+        })
+
+    return {"outputs": outputs, "total": len(outputs)}
+
+
+@router.get("/calendar/schedule/{schedule_id}", response_model=ScheduleResponse)
+async def get_schedule(
+    schedule_id: int,
+    user_id: int = Depends(get_current_user_id),
+):
+    """Get a specific schedule entry."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            """
+            SELECT cs.*, o.content_type, o.step3_final
+            FROM content_schedule cs
+            JOIN outputs o ON cs.output_id = o.id
+            WHERE cs.id = ? AND cs.user_id = ?
+            """,
+            (schedule_id, user_id)
+        )
+        schedule = await cursor.fetchone()
+
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+
+    content_preview = (schedule["step3_final"] or "")[:100] + "..." if schedule["step3_final"] else ""
+
+    return ScheduleResponse(
+        id=schedule["id"],
+        output_id=schedule["output_id"],
+        scheduled_date=schedule["scheduled_date"],
+        scheduled_time=schedule["scheduled_time"],
+        platform=schedule["platform"],
+        status=schedule["status"],
+        notes=schedule["notes"],
+        content_preview=content_preview,
+        content_type=schedule["content_type"],
+        created_at=schedule["created_at"]
+    )
+
+
+@router.put("/calendar/schedule/{schedule_id}", response_model=ScheduleResponse)
+async def update_schedule(
+    schedule_id: int,
+    data: ScheduleUpdate,
+    user_id: int = Depends(get_current_user_id),
+):
+    """Update a schedule entry (reschedule, change status, etc.)."""
+    async with get_db() as db:
+        # Check ownership
+        cursor = await db.execute(
+            "SELECT * FROM content_schedule WHERE id = ? AND user_id = ?",
+            (schedule_id, user_id)
+        )
+        schedule = await cursor.fetchone()
+        if not schedule:
+            raise HTTPException(status_code=404, detail="Schedule not found")
+
+        # Build update query
+        updates = []
+        values = []
+
+        if data.scheduled_date is not None:
+            updates.append("scheduled_date = ?")
+            values.append(data.scheduled_date)
+
+        if data.scheduled_time is not None:
+            updates.append("scheduled_time = ?")
+            values.append(data.scheduled_time)
+
+        if data.platform is not None:
+            valid_platforms = {"linkedin", "blog", "email", "email_sequence"}
+            if data.platform not in valid_platforms:
+                raise HTTPException(status_code=400, detail=f"Invalid platform: {data.platform}")
+            updates.append("platform = ?")
+            values.append(data.platform)
+
+        if data.status is not None:
+            valid_statuses = {"scheduled", "published", "cancelled"}
+            if data.status not in valid_statuses:
+                raise HTTPException(status_code=400, detail=f"Invalid status: {data.status}")
+            updates.append("status = ?")
+            values.append(data.status)
+
+        if data.notes is not None:
+            updates.append("notes = ?")
+            values.append(data.notes)
+
+        if updates:
+            updates.append("updated_at = CURRENT_TIMESTAMP")
+            values.append(schedule_id)
+            await db.execute(
+                f"UPDATE content_schedule SET {', '.join(updates)} WHERE id = ?",
+                values
+            )
+            await db.commit()
+
+        # Get updated schedule with content
+        cursor = await db.execute(
+            """
+            SELECT cs.*, o.content_type, o.step3_final
+            FROM content_schedule cs
+            JOIN outputs o ON cs.output_id = o.id
+            WHERE cs.id = ?
+            """,
+            (schedule_id,)
+        )
+        updated = await cursor.fetchone()
+
+    content_preview = (updated["step3_final"] or "")[:100] + "..." if updated["step3_final"] else ""
+
+    return ScheduleResponse(
+        id=updated["id"],
+        output_id=updated["output_id"],
+        scheduled_date=updated["scheduled_date"],
+        scheduled_time=updated["scheduled_time"],
+        platform=updated["platform"],
+        status=updated["status"],
+        notes=updated["notes"],
+        content_preview=content_preview,
+        content_type=updated["content_type"],
+        created_at=updated["created_at"]
+    )
+
+
+@router.delete("/calendar/schedule/{schedule_id}")
+async def delete_schedule(
+    schedule_id: int,
+    user_id: int = Depends(get_current_user_id),
+):
+    """Remove a content from the calendar."""
+    async with get_db() as db:
+        # Check ownership
+        cursor = await db.execute(
+            "SELECT id FROM content_schedule WHERE id = ? AND user_id = ?",
+            (schedule_id, user_id)
+        )
+        if not await cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Schedule not found")
+
+        await db.execute(
+            "DELETE FROM content_schedule WHERE id = ?",
+            (schedule_id,)
+        )
+        await db.commit()
+
+    return {"message": "Schedule removed"}

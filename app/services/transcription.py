@@ -1,32 +1,42 @@
-"""Transcription service using Gemini."""
-import os
-import json
+"""Transcription and document extraction service using OpenRouter."""
 import aiofiles
 from pathlib import Path
-from typing import Optional, Tuple
-import google.generativeai as genai
+from typing import Tuple
+from docx import Document
 
-from app.config import get_settings, calculate_cost
-from app.utils.retry import retry_async, gemini_circuit_breaker
-from app.services import settings_manager
-
-settings = get_settings()
+from app.services.ai_client import call_llm_text, call_llm_with_file, calculate_openrouter_cost
 
 
-def init_gemini():
-    """Initialize Gemini API client."""
-    api_key = settings.gemini_api_key or os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY not configured")
-    genai.configure(api_key=api_key)
+def extract_text_from_docx(file_path: Path) -> str:
+    """
+    Extract text content from a Word document (.docx).
 
+    Args:
+        file_path: Path to the .docx file
 
-async def _call_gemini_transcribe(model, content, prompt) -> tuple:
-    """Helper to call Gemini for transcription with retry support."""
-    response = await gemini_circuit_breaker.call(
-        lambda: model.generate_content([content, prompt])
-    )
-    return response
+    Returns:
+        Extracted text content with preserved paragraph structure
+    """
+    doc = Document(file_path)
+    paragraphs = []
+
+    for para in doc.paragraphs:
+        text = para.text.strip()
+        if text:
+            paragraphs.append(text)
+
+    # Also extract text from tables
+    for table in doc.tables:
+        for row in table.rows:
+            row_text = []
+            for cell in row.cells:
+                cell_text = cell.text.strip()
+                if cell_text:
+                    row_text.append(cell_text)
+            if row_text:
+                paragraphs.append(" | ".join(row_text))
+
+    return "\n\n".join(paragraphs)
 
 
 async def transcribe_file(
@@ -40,45 +50,32 @@ async def transcribe_file(
     Transcribe audio/video file or extract text from document.
 
     Args:
+        file_path: Path to the file
+        file_type: Type of file (audio, video, document)
+        job_id: Optional job ID for tracking
+        user_id: Optional user ID for tracking
         magic_words: Optional comma-separated list of domain vocabulary
                     (brand names, acronyms, technical terms) to recognize accurately.
 
     Returns (transcript, cost) tuple.
     """
-    init_gemini()
-
-    file_size = file_path.stat().st_size
-    file_size_mb = file_size / (1024 * 1024)
-
-    # Read file content
-    if file_type == "document":
-        # For text files, just read the content
-        if file_path.suffix.lower() in [".txt", ".md"]:
-            async with aiofiles.open(file_path, "r", errors="ignore") as f:
-                transcript = await f.read()
-            return transcript, 0.0
-
-    # Prepare file for Gemini
-    mime_types = {
-        ".mp4": "video/mp4",
-        ".mov": "video/quicktime",
-        ".avi": "video/x-msvideo",
-        ".webm": "video/webm",
-        ".mkv": "video/x-matroska",
-        ".mp3": "audio/mpeg",
-        ".wav": "audio/wav",
-        ".m4a": "audio/x-m4a",
-        ".ogg": "audio/ogg",
-        ".flac": "audio/flac",
-        ".pdf": "application/pdf",
-        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    }
-
     ext = file_path.suffix.lower()
-    mime_type = mime_types.get(ext, "application/octet-stream")
 
-    model_name = settings_manager.get_model_for_step("transcription")
-    model = genai.GenerativeModel(model_name)
+    # For plain text files, just read directly (no API cost)
+    if ext in [".txt", ".md"]:
+        async with aiofiles.open(file_path, "r", errors="ignore") as f:
+            content = await f.read()
+        return content, 0.0
+
+    # For Word documents, extract text directly (no API cost)
+    # Gemini doesn't support .docx files directly
+    if ext in [".docx", ".doc"]:
+        try:
+            content = extract_text_from_docx(file_path)
+            if content.strip():
+                return content, 0.0
+        except Exception as e:
+            raise ValueError(f"Failed to extract text from Word document: {e}")
 
     # Build prompt with optional magic words
     vocabulary_section = ""
@@ -104,39 +101,18 @@ Instructions:
 
 Output the full transcript only, no additional commentary."""
 
-    async def do_transcribe():
-        if file_size_mb > 20:
-            # Use file upload for large files
-            uploaded_file = genai.upload_file(path=str(file_path))
-            return model.generate_content([uploaded_file, prompt])
-        else:
-            # Read file directly for smaller files
-            async with aiofiles.open(file_path, "rb") as f:
-                file_content = await f.read()
-
-            return model.generate_content([
-                {"mime_type": mime_type, "data": file_content},
-                prompt
-            ])
-
-    # Use retry logic for API call
-    response = await retry_async(
-        do_transcribe,
-        max_retries=3,
-        base_delay=2.0,
+    # Call LLM with file
+    response_text, input_tokens, output_tokens, model = await call_llm_with_file(
+        file_path=file_path,
+        prompt=prompt,
+        step="transcription",
+        max_tokens=8192,
         job_id=job_id,
         user_id=user_id,
-        context="transcribe_file",
     )
 
-    transcript = response.text
-
-    # Calculate cost
-    input_tokens = response.usage_metadata.prompt_token_count
-    output_tokens = response.usage_metadata.candidates_token_count
-    cost = calculate_cost(model_name, input_tokens, output_tokens)
-
-    return transcript, cost
+    cost = calculate_openrouter_cost(model, input_tokens, output_tokens)
+    return response_text, cost
 
 
 async def cleanup_transcript(
@@ -149,11 +125,6 @@ async def cleanup_transcript(
 
     Returns (cleaned_transcript, cost) tuple.
     """
-    init_gemini()
-
-    model_name = settings_manager.get_model_for_step("transcription")
-    model = genai.GenerativeModel(model_name)
-
     prompt = f"""Clean up this transcript while preserving all meaningful content.
 
 TRANSCRIPT:
@@ -174,27 +145,16 @@ OUTPUT REQUIREMENTS:
 - Do not summarize - keep all content
 - Maintain the original meaning and flow"""
 
-    async def do_cleanup():
-        return model.generate_content(prompt)
-
-    # Use retry logic for API call
-    response = await retry_async(
-        do_cleanup,
-        max_retries=3,
-        base_delay=2.0,
+    response_text, input_tokens, output_tokens, model = await call_llm_text(
+        prompt=prompt,
+        step="transcription",
+        max_tokens=8192,
         job_id=job_id,
         user_id=user_id,
-        context="cleanup_transcript",
     )
 
-    cleaned = response.text
-
-    # Calculate cost
-    input_tokens = response.usage_metadata.prompt_token_count
-    output_tokens = response.usage_metadata.candidates_token_count
-    cost = calculate_cost(model_name, input_tokens, output_tokens)
-
-    return cleaned, cost
+    cost = calculate_openrouter_cost(model, input_tokens, output_tokens)
+    return response_text, cost
 
 
 async def extract_document_content(
@@ -212,10 +172,6 @@ async def extract_document_content(
 
     Returns (extracted_content, cost) tuple.
     """
-    init_gemini()
-
-    file_size = file_path.stat().st_size
-    file_size_mb = file_size / (1024 * 1024)
     ext = file_path.suffix.lower()
 
     # For plain text files, just read directly (no API cost)
@@ -224,23 +180,19 @@ async def extract_document_content(
             content = await f.read()
         return content, 0.0
 
-    # MIME types for documents
-    mime_types = {
-        ".pdf": "application/pdf",
-        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        ".png": "image/png",
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".gif": "image/gif",
-        ".webp": "image/webp",
-    }
+    # For Word documents, extract text directly (no API cost for basic extraction)
+    # Gemini doesn't support .docx files directly
+    if ext in [".docx", ".doc"]:
+        try:
+            content = extract_text_from_docx(file_path)
+            if content.strip():
+                return content, 0.0
+        except Exception as e:
+            # If extraction fails, we'll try sending to AI as fallback
+            # but for .docx this will likely fail too
+            raise ValueError(f"Failed to extract text from Word document: {e}")
 
-    mime_type = mime_types.get(ext, "application/octet-stream")
-
-    model_name = settings_manager.get_model_for_step("transcription")
-    model = genai.GenerativeModel(model_name)
-
-    # Build extraction prompt with image analysis
+    # Build extraction prompt with image analysis (for PDFs and images)
     prompt = """Extract all content from this document comprehensively.
 
 EXTRACTION INSTRUCTIONS:
@@ -273,36 +225,15 @@ EXTRACTION INSTRUCTIONS:
 
 Extract the complete document content now:"""
 
-    async def do_extract():
-        if file_size_mb > 20:
-            # Use file upload for large files
-            uploaded_file = genai.upload_file(path=str(file_path))
-            return model.generate_content([uploaded_file, prompt])
-        else:
-            # Read file directly for smaller files
-            async with aiofiles.open(file_path, "rb") as f:
-                file_content = await f.read()
-
-            return model.generate_content([
-                {"mime_type": mime_type, "data": file_content},
-                prompt
-            ])
-
-    # Use retry logic for API call
-    response = await retry_async(
-        do_extract,
-        max_retries=3,
-        base_delay=2.0,
+    # Call LLM with file (for PDFs and images that support multimodal)
+    response_text, input_tokens, output_tokens, model = await call_llm_with_file(
+        file_path=file_path,
+        prompt=prompt,
+        step="transcription",
+        max_tokens=8192,
         job_id=job_id,
         user_id=user_id,
-        context="extract_document_content",
     )
 
-    extracted_content = response.text
-
-    # Calculate cost
-    input_tokens = response.usage_metadata.prompt_token_count
-    output_tokens = response.usage_metadata.candidates_token_count
-    cost = calculate_cost(model_name, input_tokens, output_tokens)
-
-    return extracted_content, cost
+    cost = calculate_openrouter_cost(model, input_tokens, output_tokens)
+    return response_text, cost

@@ -1,18 +1,17 @@
 """Fact-checking service - Step 3 of the pipeline."""
 import json
 from typing import Tuple
-import google.generativeai as genai
 
-from app.config import get_settings, calculate_cost
+from app.services.ai_client import call_llm_text, calculate_openrouter_cost
 from app.services.prompt_manager import get_rendered_prompt
-from app.utils.retry import retry_async, gemini_circuit_breaker
-
-settings = get_settings()
+from app.utils.json_parser import parse_llm_json
 
 
 async def factcheck_content(
     edited_content: str,
     original_transcript: str,
+    job_id: str = None,
+    user_id: int = None,
 ) -> Tuple[dict, float]:
     """
     Fact-check content against source material.
@@ -22,7 +21,7 @@ async def factcheck_content(
     Returns (factcheck_result, cost) tuple.
     """
     variables = {
-        "original_transcript": original_transcript[:15000],  # Limit transcript size
+        "original_transcript": original_transcript[:100000],  # Limit transcript size (Gemini Flash supports 1M tokens)
         "edited_draft_from_step2": edited_content,
     }
 
@@ -50,41 +49,33 @@ OUTPUT FORMAT (valid JSON):
   "disclaimer": "This content was AI-generated from [source]. Please review before publication."
 }"""
 
-    genai.configure(api_key=settings.gemini_api_key)
-    model = genai.GenerativeModel(config["model"])
-
-    async def do_factcheck():
-        return model.generate_content(
-            full_prompt,
-            generation_config=genai.GenerationConfig(
-                response_mime_type="application/json",
-                max_output_tokens=config["max_tokens"],
-            )
-        )
-
-    # Use retry logic for API call
-    response = await retry_async(
-        do_factcheck,
-        max_retries=3,
-        base_delay=2.0,
-        context="factcheck_content",
+    # Call LLM via unified client
+    response_text, input_tokens, output_tokens, model = await call_llm_text(
+        prompt=full_prompt,
+        step="factcheck",
+        max_tokens=config.get("max_tokens", 4096),
+        response_format="json",
+        job_id=job_id,
+        user_id=user_id,
     )
 
+    # Use robust JSON parser that handles common LLM output issues
     try:
-        result = json.loads(response.text)
-    except json.JSONDecodeError:
-        text = response.text
-        start = text.find("{")
-        end = text.rfind("}") + 1
-        if start >= 0 and end > start:
-            result = json.loads(text[start:end])
-        else:
-            raise ValueError("Failed to parse factcheck response as JSON")
+        result = parse_llm_json(response_text, context="factcheck response")
+    except ValueError as e:
+        # If parsing still fails, return a minimal result with the original content
+        result = {
+            "final_content": edited_content,
+            "citations_added": [],
+            "fact_check_notes": [{"issue": f"Could not parse LLM response: {str(e)}", "severity": "medium"}],
+            "warnings": ["Fact-check incomplete due to parsing error"],
+            "unverified_claims": [],
+            "compliance_status": {},
+            "disclaimer": "This content was AI-generated. Please review before publication."
+        }
 
     # Calculate cost
-    input_tokens = response.usage_metadata.prompt_token_count
-    output_tokens = response.usage_metadata.candidates_token_count
-    cost = calculate_cost(config["model"], input_tokens, output_tokens)
+    cost = calculate_openrouter_cost(model, input_tokens, output_tokens)
 
     return result, cost
 
@@ -92,6 +83,8 @@ OUTPUT FORMAT (valid JSON):
 async def batch_factcheck_content(
     edited_drafts: list[dict],
     original_transcript: str,
+    job_id: str = None,
+    user_id: int = None,
 ) -> Tuple[list[dict], float]:
     """
     Fact-check multiple edited drafts.
@@ -108,7 +101,9 @@ async def batch_factcheck_content(
             factchecked_results.append(draft)
             continue
 
-        result, cost = await factcheck_content(content, original_transcript)
+        result, cost = await factcheck_content(
+            content, original_transcript, job_id, user_id
+        )
         total_cost += cost
 
         factchecked_draft = {

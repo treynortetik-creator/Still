@@ -10,7 +10,7 @@ class JobStatus(str, Enum):
     UPLOADING = "uploading"
     TRANSCRIBING = "transcribing"
     CLEANING = "cleaning"
-    ATOMIZING = "atomizing"
+    DISTILLING = "distilling"
     DRAFTING = "drafting"
     EDITING = "editing"
     FACTCHECKING = "factchecking"
@@ -20,7 +20,7 @@ class JobStatus(str, Enum):
 
 class JobCreate(BaseModel):
     """Request model for creating a new job."""
-    target_persona: str = Field(..., description="ID of the target persona")
+    target_persona: Optional[str] = Field(default=None, description="ID of the target persona (optional)")
     asset_types: list[str] = Field(
         default=["linkedin"],
         description="Types of assets to generate (linkedin, blog, email)"

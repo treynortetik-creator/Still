@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Error Logs{% endblock %}
+{% block nav_error_logs %}active{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-8">
+    <h1 class="text-2xl font-bold">Error Logs</h1>
+    <button onclick="loadErrorLogs()" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition">
+        Refresh
+    </button>
+</div>
+
+<!-- Filter -->
+<div class="admin-card border rounded-lg shadow p-4 mb-6">
+    <div class="flex gap-4 items-center">
+        <div>
+            <label class="block text-sm mb-1" style="color: var(--admin-text-muted);">Filter by Job ID</label>
+            <input type="text" id="job-id-filter" placeholder="Enter job ID..."
+                class="px-3 py-2 rounded admin-card w-64" style="border: 1px solid var(--admin-border);">
+        </div>
+        <div>
+            <label class="block text-sm mb-1" style="color: var(--admin-text-muted);">Limit</label>
+            <select id="limit-filter" class="px-3 py-2 rounded admin-card" style="border: 1px solid var(--admin-border);">
+                <option value="25">25</option>
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+            </select>
+        </div>
+        <div class="pt-5">
+            <button onclick="loadErrorLogs()" class="px-4 py-2 rounded hover:opacity-90 transition" style="border: 1px solid var(--admin-border);">
+                Apply Filter
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Error Logs Table -->
+<div class="admin-card border rounded-lg shadow overflow-hidden">
+    <table class="min-w-full" style="border-color: var(--admin-border);">
+        <thead style="background-color: var(--admin-border);">
+            <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium uppercase" style="color: var(--admin-text-muted);">Time</th>
+                <th class="px-4 py-3 text-left text-xs font-medium uppercase" style="color: var(--admin-text-muted);">Job ID</th>
+                <th class="px-4 py-3 text-left text-xs font-medium uppercase" style="color: var(--admin-text-muted);">File</th>
+                <th class="px-4 py-3 text-left text-xs font-medium uppercase" style="color: var(--admin-text-muted);">Error Type</th>
+                <th class="px-4 py-3 text-left text-xs font-medium uppercase" style="color: var(--admin-text-muted);">Message</th>
+                <th class="px-4 py-3 text-left text-xs font-medium uppercase" style="color: var(--admin-text-muted);">Actions</th>
+            </tr>
+        </thead>
+        <tbody id="error-logs-table" style="border-color: var(--admin-border);">
+            <tr>
+                <td colspan="6" class="px-4 py-4 text-center" style="color: var(--admin-text-muted);">Loading...</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Stack Trace Modal -->
+<div id="stack-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="admin-card border rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+        <div class="px-6 py-4 flex justify-between items-center" style="border-bottom: 1px solid var(--admin-border);">
+            <h2 class="text-xl font-semibold" id="modal-title">Error Details</h2>
+            <button onclick="closeModal()" class="hover:opacity-90" style="color: var(--admin-text-muted);">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div class="p-6 overflow-y-auto flex-1">
+            <div class="mb-4">
+                <h3 class="text-sm font-medium mb-1" style="color: var(--admin-text-muted);">Error Message</h3>
+                <p id="modal-message" class="bg-red-50 p-3 rounded"></p>
+            </div>
+            <div>
+                <h3 class="text-sm font-medium mb-1" style="color: var(--admin-text-muted);">Stack Trace</h3>
+                <pre id="modal-stack" class="text-sm p-4 rounded overflow-x-auto whitespace-pre-wrap font-mono" style="background-color: var(--admin-border);"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let errorLogs = [];
+
+async function loadErrorLogs() {
+    try {
+        const jobId = document.getElementById('job-id-filter').value;
+        const limit = document.getElementById('limit-filter').value;
+
+        let url = `/api/admin/error-logs?limit=${limit}`;
+        if (jobId) {
+            url += `&job_id=${encodeURIComponent(jobId)}`;
+        }
+
+        const response = await fetch(url);
+        const data = await response.json();
+        errorLogs = data.error_logs;
+
+        const tbody = document.getElementById('error-logs-table');
+
+        if (errorLogs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-4 text-center" style="color: var(--admin-text-muted);">No error logs found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = errorLogs.map((log, index) => `
+            <tr class="hover:opacity-90">
+                <td class="px-4 py-3 text-sm whitespace-nowrap">
+                    ${new Date(log.created_at).toLocaleString()}
+                </td>
+                <td class="px-4 py-3 text-sm font-mono" style="color: var(--admin-text-muted);">
+                    ${log.job_id ? log.job_id.substring(0, 8) + '...' : '-'}
+                </td>
+                <td class="px-4 py-3 text-sm">
+                    ${log.filename || '-'}
+                </td>
+                <td class="px-4 py-3">
+                    <span class="px-2 py-1 text-xs rounded bg-red-100 text-red-700">${log.error_type || 'unknown'}</span>
+                </td>
+                <td class="px-4 py-3 text-sm max-w-md truncate" title="${escapeHtml(log.error_message)}">
+                    ${escapeHtml(log.error_message ? log.error_message.substring(0, 80) + (log.error_message.length > 80 ? '...' : '') : '-')}
+                </td>
+                <td class="px-4 py-3">
+                    <button onclick="showDetails(${index})" class="text-indigo-600 hover:underline text-sm">
+                        View Details
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        console.error('Failed to load error logs:', err);
+        document.getElementById('error-logs-table').innerHTML =
+            '<tr><td colspan="6" class="px-4 py-4 text-center text-red-600">Failed to load error logs</td></tr>';
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function showDetails(index) {
+    const log = errorLogs[index];
+    document.getElementById('modal-title').textContent = `Error: ${log.error_type || 'Unknown'}`;
+    document.getElementById('modal-message').textContent = log.error_message || 'No message';
+    document.getElementById('modal-stack').textContent = log.stack_trace || 'No stack trace available';
+    document.getElementById('stack-modal').classList.remove('hidden');
+}
+
+function closeModal() {
+    document.getElementById('stack-modal').classList.add('hidden');
+}
+
+// Close on escape
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModal();
+});
+
+// Initial load
+loadErrorLogs();
+</script>
+{% endblock %}

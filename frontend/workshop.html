@@ -166,6 +166,12 @@
                         <button onclick="copyAsMarkdown()" id="btn-markdown" class="px-4 py-2 border border-still-border text-still-muted rounded-lg hover:text-still-text hover:border-still-muted">
                             Copy as Markdown
                         </button>
+                        <button onclick="toggleStillsSidebar()" id="btn-stills" class="px-4 py-2 border border-still-border text-still-muted rounded-lg hover:text-still-text hover:border-still-muted">
+                            Source Stills
+                        </button>
+                        <button onclick="toggleAIEditor()" id="btn-ai-editor" class="px-4 py-2 border border-still-copper text-still-copper rounded-lg hover:bg-still-copper/10">
+                            AI Editor
+                        </button>
                         <button onclick="confirmDelete()" class="px-4 py-2 border border-still-error text-still-error rounded-lg hover:bg-still-error/10 ml-auto">
                             Delete
                         </button>
@@ -173,11 +179,11 @@
                 </div>
 
                 <!-- Sidebar - Source Stills -->
-                <div id="stills-sidebar" class="w-80 hidden lg:block">
+                <div id="stills-sidebar" class="w-80 hidden flex-shrink-0">
                     <div class="bg-still-card border border-still-border rounded-lg p-4">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="font-semibold text-still-text">Source Stills</h3>
-                            <button onclick="toggleSidebar()" class="text-still-muted hover:text-still-text">
+                            <button onclick="toggleStillsSidebar()" class="text-still-muted hover:text-still-text">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                 </svg>
@@ -185,6 +191,89 @@
                         </div>
                         <div id="stills-list" class="space-y-3 max-h-96 overflow-y-auto">
                             <!-- Stills will be rendered here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Editor Sidebar -->
+                <div id="ai-editor-sidebar" class="w-96 hidden flex-shrink-0">
+                    <div class="bg-still-card border border-still-border rounded-lg p-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-semibold text-still-text">AI Editor</h3>
+                            <button onclick="toggleAIEditor()" class="text-still-muted hover:text-still-text">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Persona Selector -->
+                        <div class="mb-4">
+                            <label class="block text-sm text-still-muted mb-1">Target Persona</label>
+                            <select id="ai-persona-select" class="w-full bg-still-bg border border-still-border rounded px-3 py-2 text-still-text">
+                                <option value="">Use default</option>
+                            </select>
+                        </div>
+
+                        <!-- Quick Actions -->
+                        <div class="mb-4">
+                            <label class="block text-sm text-still-muted mb-2">Quick Actions</label>
+                            <div class="flex flex-wrap gap-2">
+                                <button onclick="quickAIEdit('shorten')" class="px-3 py-1 text-xs bg-still-bg border border-still-border rounded hover:border-still-copper">
+                                    Shorten
+                                </button>
+                                <button onclick="quickAIEdit('expand')" class="px-3 py-1 text-xs bg-still-bg border border-still-border rounded hover:border-still-copper">
+                                    Expand
+                                </button>
+                                <button onclick="quickAIEdit('simplify')" class="px-3 py-1 text-xs bg-still-bg border border-still-border rounded hover:border-still-copper">
+                                    Simplify
+                                </button>
+                                <button onclick="quickAIEdit('punchier')" class="px-3 py-1 text-xs bg-still-bg border border-still-border rounded hover:border-still-copper">
+                                    Punchier
+                                </button>
+                                <button onclick="quickAIEdit('fix grammar')" class="px-3 py-1 text-xs bg-still-bg border border-still-border rounded hover:border-still-copper">
+                                    Fix Grammar
+                                </button>
+                                <button onclick="quickAIEdit('improve hook')" class="px-3 py-1 text-xs bg-still-bg border border-still-border rounded hover:border-still-copper">
+                                    Better Hook
+                                </button>
+                                <button onclick="quickAIEdit('stronger CTA')" class="px-3 py-1 text-xs bg-still-bg border border-still-border rounded hover:border-still-copper">
+                                    Stronger CTA
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Custom Prompt -->
+                        <div class="mb-4">
+                            <label class="block text-sm text-still-muted mb-1">Custom Request</label>
+                            <textarea id="ai-edit-prompt" rows="2"
+                                class="w-full bg-still-bg border border-still-border rounded px-3 py-2 text-still-text text-sm"
+                                placeholder="e.g., Make it more conversational..."></textarea>
+                            <button onclick="requestAIEdit()" id="ai-edit-btn"
+                                class="w-full mt-2 px-4 py-2 bg-still-copper text-white rounded hover:opacity-90 disabled:opacity-50">
+                                Get AI Suggestions
+                            </button>
+                        </div>
+
+                        <!-- Loading State -->
+                        <div id="ai-loading" class="hidden text-center py-4">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-still-copper mx-auto"></div>
+                            <p class="mt-2 text-sm text-still-muted">Analyzing content...</p>
+                        </div>
+
+                        <!-- Suggestions List -->
+                        <div id="ai-suggestions" class="space-y-3 max-h-80 overflow-y-auto">
+                            <!-- Suggestions will be rendered here -->
+                        </div>
+
+                        <!-- Bulk Actions -->
+                        <div id="ai-bulk-actions" class="hidden flex gap-2 mt-4 pt-4 border-t border-still-border">
+                            <button onclick="acceptAllSuggestions()" class="flex-1 px-3 py-1.5 bg-still-green/20 text-still-green text-sm rounded hover:bg-still-green/30">
+                                Accept All
+                            </button>
+                            <button onclick="rejectAllSuggestions()" class="flex-1 px-3 py-1.5 bg-still-error/20 text-still-error text-sm rounded hover:bg-still-error/30">
+                                Reject All
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -215,6 +304,10 @@
         let currentFilter = 'all';
         let saveTimeout = null;
         let emailSequenceData = {}; // Stores parsed email sequence content by day
+
+        // AI Editor State
+        let aiSuggestions = [];
+        let personasList = [];
 
         // Character limits by content type
         const charLimits = {
@@ -376,6 +469,9 @@
 
                 // Set up auto-save
                 document.getElementById('content-editor').addEventListener('input', handleEditorInput);
+
+                // Clear AI suggestions when opening new content
+                clearAIEditorState();
 
             } catch (err) {
                 console.error('Error opening editor:', err);
@@ -633,9 +729,22 @@
             }
         }
 
-        // Toggle sidebar
-        function toggleSidebar() {
-            document.getElementById('stills-sidebar').classList.toggle('hidden');
+        // Toggle stills sidebar
+        function toggleStillsSidebar() {
+            const sidebar = document.getElementById('stills-sidebar');
+            const btn = document.getElementById('btn-stills');
+            const isHidden = sidebar.classList.contains('hidden');
+
+            sidebar.classList.toggle('hidden');
+
+            // Update button styling when panel is open
+            if (isHidden) {
+                btn.classList.add('bg-still-border/50', 'border-still-muted', 'text-still-text');
+                btn.classList.remove('text-still-muted');
+            } else {
+                btn.classList.remove('bg-still-border/50', 'border-still-muted', 'text-still-text');
+                btn.classList.add('text-still-muted');
+            }
         }
 
         // Close editor
@@ -699,6 +808,278 @@
                 closeEditor();
             }
         });
+
+        // ========== AI Editor Functions ==========
+
+        // Load personas for dropdown
+        async function loadPersonas() {
+            try {
+                const response = await Auth.fetchWithAuth('/api/personas/all');
+                if (response.ok) {
+                    const data = await response.json();
+                    personasList = data.all_personas || [];
+                    populatePersonaDropdown();
+                }
+            } catch (err) {
+                console.error('Failed to load personas:', err);
+            }
+        }
+
+        function populatePersonaDropdown() {
+            const select = document.getElementById('ai-persona-select');
+            select.innerHTML = '<option value="">Use default</option>';
+
+            personasList.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = p.title || p.name;
+                select.appendChild(option);
+            });
+        }
+
+        // Toggle AI editor sidebar
+        function toggleAIEditor() {
+            const sidebar = document.getElementById('ai-editor-sidebar');
+            const btn = document.getElementById('btn-ai-editor');
+            const isHidden = sidebar.classList.contains('hidden');
+
+            sidebar.classList.toggle('hidden');
+
+            // Update button styling when panel is open
+            if (isHidden) {
+                btn.classList.add('bg-still-copper/20');
+            } else {
+                btn.classList.remove('bg-still-copper/20');
+            }
+
+            // Load personas if not already loaded
+            if (personasList.length === 0) {
+                loadPersonas();
+            }
+        }
+
+        // Quick edit shortcuts
+        function quickAIEdit(action) {
+            document.getElementById('ai-edit-prompt').value = action;
+            requestAIEdit();
+        }
+
+        // Request AI edit suggestions
+        async function requestAIEdit() {
+            const prompt = document.getElementById('ai-edit-prompt').value.trim();
+            if (!prompt) {
+                showToast('Please enter an editing request', 'error');
+                return;
+            }
+
+            const content = document.getElementById('content-editor').value;
+            if (!content) {
+                showToast('No content to edit', 'error');
+                return;
+            }
+
+            const personaId = document.getElementById('ai-persona-select').value;
+
+            // Show loading
+            document.getElementById('ai-loading').classList.remove('hidden');
+            document.getElementById('ai-suggestions').innerHTML = '';
+            document.getElementById('ai-bulk-actions').classList.add('hidden');
+            document.getElementById('ai-edit-btn').disabled = true;
+
+            try {
+                const response = await Auth.fetchWithAuth(`/api/workshop/${currentOutput.id}/ai-edit`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        content: content,
+                        prompt: prompt,
+                        persona_id: personaId || null,
+                        content_type: currentOutput.content_type
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'AI editing failed');
+                }
+
+                const data = await response.json();
+                aiSuggestions = data.suggestions || [];
+
+                renderAISuggestions(data);
+
+                if (aiSuggestions.length > 0) {
+                    document.getElementById('ai-bulk-actions').classList.remove('hidden');
+                    showToast(`${aiSuggestions.length} suggestion(s) found`);
+                } else {
+                    showToast('No suggestions - content looks good!');
+                }
+
+            } catch (err) {
+                console.error('AI edit error:', err);
+                showToast(err.message || 'AI editing failed', 'error');
+            } finally {
+                document.getElementById('ai-loading').classList.add('hidden');
+                document.getElementById('ai-edit-btn').disabled = false;
+            }
+        }
+
+        // Render AI suggestions as expandable blocks
+        function renderAISuggestions(data) {
+            const container = document.getElementById('ai-suggestions');
+
+            if (!aiSuggestions || aiSuggestions.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-4 text-still-muted">
+                        <p class="text-sm">${data.summary || 'No suggestions'}</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Summary
+            let html = data.summary ? `
+                <div class="p-2 bg-still-bg rounded text-sm text-still-muted mb-3">
+                    ${escapeHtml(data.summary)}
+                </div>
+            ` : '';
+
+            // Suggestion blocks
+            aiSuggestions.forEach((s, idx) => {
+                const typeColors = {
+                    grammar: 'bg-blue-900/30 text-blue-400',
+                    clarity: 'bg-purple-900/30 text-purple-400',
+                    impact: 'bg-amber-900/30 text-amber-400',
+                    tone: 'bg-green-900/30 text-green-400',
+                    structure: 'bg-pink-900/30 text-pink-400'
+                };
+                const typeClass = typeColors[s.type] || 'bg-still-border text-still-muted';
+
+                html += `
+                    <div class="suggestion-block bg-still-bg rounded-lg p-3 border border-still-border" data-idx="${idx}">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="px-2 py-0.5 ${typeClass} text-xs rounded">${s.type}</span>
+                            <div class="flex gap-1">
+                                <button onclick="acceptSuggestion(${idx})" class="p-1 text-still-green hover:bg-still-green/20 rounded" title="Accept">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                </button>
+                                <button onclick="rejectSuggestion(${idx})" class="p-1 text-still-error hover:bg-still-error/20 rounded" title="Reject">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="text-xs text-still-muted mb-2">${escapeHtml(s.explanation)}</div>
+                        <div class="space-y-2">
+                            <div class="p-2 bg-still-error/10 rounded text-sm">
+                                <span class="text-still-error line-through">${escapeHtml(s.original_text)}</span>
+                            </div>
+                            <div class="p-2 bg-still-green/10 rounded text-sm">
+                                <span class="text-still-green">${escapeHtml(s.suggested_text)}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // Accept a single suggestion
+        function acceptSuggestion(idx) {
+            const suggestion = aiSuggestions[idx];
+            if (!suggestion) return;
+
+            const editor = document.getElementById('content-editor');
+            const content = editor.value;
+
+            // Replace the original text with the suggested text
+            const newContent = content.replace(suggestion.original_text, suggestion.suggested_text);
+
+            if (newContent !== content) {
+                editor.value = newContent;
+                handleEditorInput();
+                showToast('Suggestion applied');
+            } else {
+                showToast('Could not find text to replace', 'error');
+            }
+
+            // Remove this suggestion from the list
+            removeSuggestion(idx);
+        }
+
+        // Reject a single suggestion
+        function rejectSuggestion(idx) {
+            removeSuggestion(idx);
+            showToast('Suggestion rejected');
+        }
+
+        // Remove suggestion from list
+        function removeSuggestion(idx) {
+            aiSuggestions.splice(idx, 1);
+            renderAISuggestions({ suggestions: aiSuggestions, summary: '' });
+
+            if (aiSuggestions.length === 0) {
+                document.getElementById('ai-bulk-actions').classList.add('hidden');
+            }
+        }
+
+        // Accept all suggestions
+        function acceptAllSuggestions() {
+            const editor = document.getElementById('content-editor');
+            let content = editor.value;
+            let appliedCount = 0;
+
+            // Apply all suggestions
+            aiSuggestions.forEach(s => {
+                const newContent = content.replace(s.original_text, s.suggested_text);
+                if (newContent !== content) {
+                    content = newContent;
+                    appliedCount++;
+                }
+            });
+
+            editor.value = content;
+            handleEditorInput();
+
+            // Clear suggestions
+            aiSuggestions = [];
+            renderAISuggestions({ suggestions: [], summary: '' });
+            document.getElementById('ai-bulk-actions').classList.add('hidden');
+
+            showToast(`Applied ${appliedCount} suggestion(s)`);
+        }
+
+        // Reject all suggestions
+        function rejectAllSuggestions() {
+            aiSuggestions = [];
+            renderAISuggestions({ suggestions: [], summary: '' });
+            document.getElementById('ai-bulk-actions').classList.add('hidden');
+            showToast('All suggestions rejected');
+        }
+
+        // Clear AI state and close panels when opening new content
+        function clearAIEditorState() {
+            aiSuggestions = [];
+            document.getElementById('ai-suggestions').innerHTML = '';
+            document.getElementById('ai-bulk-actions').classList.add('hidden');
+            document.getElementById('ai-edit-prompt').value = '';
+
+            // Close both sidebars and reset button states
+            document.getElementById('stills-sidebar').classList.add('hidden');
+            document.getElementById('ai-editor-sidebar').classList.add('hidden');
+
+            // Reset stills button
+            const stillsBtn = document.getElementById('btn-stills');
+            stillsBtn.classList.remove('bg-still-border/50', 'border-still-muted', 'text-still-text');
+            stillsBtn.classList.add('text-still-muted');
+
+            // Reset AI editor button
+            document.getElementById('btn-ai-editor').classList.remove('bg-still-copper/20');
+        }
     </script>
 </body>
 </html>
