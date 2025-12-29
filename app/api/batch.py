@@ -15,6 +15,7 @@ from slowapi.util import get_remote_address
 
 from app.config import get_settings
 from app.database import get_db
+from app.db_utils import execute, fetchone, fetchall
 from app.models.job import JobStatus
 from app.models.batch import BatchResponse, BatchStatusResponse, BatchJobStatus, BatchListResponse, BatchListItem
 from app.api.auth import get_current_user_id
@@ -128,7 +129,8 @@ async def upload_batch(
                 await f.write(content)
 
             # Create job record
-            await db.execute(
+            await execute(
+                db,
                 """
                 INSERT INTO jobs (
                     id, user_id, status, original_filename, file_type, file_size,
@@ -163,7 +165,8 @@ async def upload_batch(
             "magic_words": magic_words,
         }
 
-        await db.execute(
+        await execute(
+            db,
             """
             INSERT INTO batches (id, user_id, status, job_ids, total_jobs, settings, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -178,7 +181,8 @@ async def upload_batch(
                 datetime.utcnow().isoformat(),
             )
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
     # Start batch processor
     from app.services.batch_processor import process_batch
@@ -199,11 +203,11 @@ async def get_batch_status(
     """Get status of a batch with all job statuses."""
     async with get_db() as db:
         # Get batch
-        cursor = await db.execute(
+        batch = await fetchone(
+            db,
             "SELECT * FROM batches WHERE id = ? AND user_id = ?",
             (batch_id, user_id)
         )
-        batch = await cursor.fetchone()
 
         if not batch:
             raise HTTPException(status_code=404, detail="Batch not found")
@@ -212,12 +216,11 @@ async def get_batch_status(
 
         # Get all jobs in a single query (avoid N+1)
         if job_ids:
-            placeholders = ",".join("?" * len(job_ids))
-            cursor = await db.execute(
-                f"SELECT id, original_filename, status, progress, current_step, error_message FROM jobs WHERE id IN ({placeholders})",
-                job_ids
+            job_rows = await fetchall(
+                db,
+                f"SELECT id, original_filename, status, progress, current_step, error_message FROM jobs WHERE id IN ({','.join('?' * len(job_ids))})",
+                tuple(job_ids)
             )
-            job_rows = await cursor.fetchall()
             jobs = [
                 BatchJobStatus(
                     job_id=job["id"],
@@ -252,11 +255,11 @@ async def download_batch_zip(
 ):
     """Download all completed outputs as a single ZIP file."""
     async with get_db() as db:
-        cursor = await db.execute(
+        batch = await fetchone(
+            db,
             "SELECT job_ids, status FROM batches WHERE id = ? AND user_id = ?",
             (batch_id, user_id)
         )
-        batch = await cursor.fetchone()
 
         if not batch:
             raise HTTPException(status_code=404, detail="Batch not found")
@@ -267,26 +270,25 @@ async def download_batch_zip(
         if not job_ids:
             raise HTTPException(status_code=404, detail="No jobs in batch")
 
-        placeholders = ",".join("?" * len(job_ids))
-        cursor = await db.execute(
-            f"SELECT id, original_filename, status FROM jobs WHERE id IN ({placeholders}) AND user_id = ? AND status = 'complete'",
+        job_rows = await fetchall(
+            db,
+            f"SELECT id, original_filename, status FROM jobs WHERE id IN ({','.join('?' * len(job_ids))}) AND user_id = ? AND status = 'complete'",
             (*job_ids, user_id)
         )
-        completed_jobs = {job["id"]: job for job in await cursor.fetchall()}
+        completed_jobs = {job["id"]: job for job in job_rows}
 
         # Batch fetch all outputs for completed jobs
         if completed_jobs:
             completed_job_ids = list(completed_jobs.keys())
-            output_placeholders = ",".join("?" * len(completed_job_ids))
-            cursor = await db.execute(
+            all_outputs = await fetchall(
+                db,
                 f"""
                 SELECT job_id, content_type, variation_number, step3_final, step2_edited, step1_draft,
                        subject, hook_variations
-                FROM outputs WHERE job_id IN ({output_placeholders})
+                FROM outputs WHERE job_id IN ({','.join('?' * len(completed_job_ids))})
                 """,
-                completed_job_ids
+                tuple(completed_job_ids)
             )
-            all_outputs = await cursor.fetchall()
 
             # Group outputs by job_id
             outputs_by_job = {}
@@ -351,7 +353,8 @@ async def list_batches(
 ):
     """List all batches for the current user."""
     async with get_db() as db:
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             """
             SELECT id, status, total_jobs, completed_jobs, failed_jobs,
                    created_at, completed_at, total_cost
@@ -362,14 +365,14 @@ async def list_batches(
             """,
             (user_id, limit, offset)
         )
-        rows = await cursor.fetchall()
 
         # Get total count
-        cursor = await db.execute(
-            "SELECT COUNT(*) FROM batches WHERE user_id = ?",
+        count_row = await fetchone(
+            db,
+            "SELECT COUNT(*) as cnt FROM batches WHERE user_id = ?",
             (user_id,)
         )
-        total = (await cursor.fetchone())[0]
+        total = count_row["cnt"] if count_row else 0
 
     batches = [
         BatchListItem(

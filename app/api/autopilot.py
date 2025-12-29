@@ -4,9 +4,13 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from typing import Optional
 
+from app.config import get_settings
 from app.api.auth import get_current_user_id
 from app.database import get_db
+from app.db_utils import execute, fetchone, fetchall
 from app.utils.background_tasks import create_background_task
+
+settings = get_settings()
 from app.models.autopilot import (
     SourceCreate,
     SourceUpdate,
@@ -49,21 +53,23 @@ async def create_source(
     """Add a new monitored source."""
     async with get_db() as db:
         # Check for duplicate URL
-        cursor = await db.execute(
+        existing = await fetchone(
+            db,
             "SELECT id FROM autopilot_sources WHERE user_id = ? AND source_url = ?",
             (user_id, source.source_url),
         )
-        if await cursor.fetchone():
+        if existing:
             raise HTTPException(status_code=400, detail="Source URL already exists")
 
         # Insert source
-        cursor = await db.execute(
-            """
-            INSERT INTO autopilot_sources
-            (user_id, source_type, source_url, source_name, check_frequency, target_persona, asset_types)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
+        if settings.use_postgres:
+            row = await db.fetchrow(
+                """
+                INSERT INTO autopilot_sources
+                (user_id, source_type, source_url, source_name, check_frequency, target_persona, asset_types)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                RETURNING *
+                """,
                 user_id,
                 source.source_type,
                 source.source_url,
@@ -71,16 +77,32 @@ async def create_source(
                 source.check_frequency,
                 source.target_persona,
                 json.dumps(source.asset_types),
-            ),
-        )
-        source_id = cursor.lastrowid
-        await db.commit()
+            )
+        else:
+            cursor = await db.execute(
+                """
+                INSERT INTO autopilot_sources
+                (user_id, source_type, source_url, source_name, check_frequency, target_persona, asset_types)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    source.source_type,
+                    source.source_url,
+                    source.source_name,
+                    source.check_frequency,
+                    source.target_persona,
+                    json.dumps(source.asset_types),
+                ),
+            )
+            source_id = cursor.lastrowid
+            await db.commit()
 
-        # Fetch created source
-        cursor = await db.execute(
-            "SELECT * FROM autopilot_sources WHERE id = ?", (source_id,)
-        )
-        row = await cursor.fetchone()
+            # Fetch created source
+            row = await fetchone(
+                db,
+                "SELECT * FROM autopilot_sources WHERE id = ?", (source_id,)
+            )
 
     return parse_source_row(row)
 
@@ -91,7 +113,8 @@ async def list_sources(
 ):
     """List all monitored sources for the user."""
     async with get_db() as db:
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             """
             SELECT * FROM autopilot_sources
             WHERE user_id = ?
@@ -99,7 +122,6 @@ async def list_sources(
             """,
             (user_id,),
         )
-        rows = await cursor.fetchall()
 
     sources = [parse_source_row(row) for row in rows]
     return SourceListResponse(sources=sources, total=len(sources))
@@ -112,11 +134,11 @@ async def get_source(
 ):
     """Get a specific source."""
     async with get_db() as db:
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             "SELECT * FROM autopilot_sources WHERE id = ? AND user_id = ?",
             (source_id, user_id),
         )
-        row = await cursor.fetchone()
 
     if not row:
         raise HTTPException(status_code=404, detail="Source not found")
@@ -133,11 +155,11 @@ async def update_source(
     """Update a monitored source."""
     async with get_db() as db:
         # Verify ownership
-        cursor = await db.execute(
+        existing = await fetchone(
+            db,
             "SELECT * FROM autopilot_sources WHERE id = ? AND user_id = ?",
             (source_id, user_id),
         )
-        existing = await cursor.fetchone()
         if not existing:
             raise HTTPException(status_code=404, detail="Source not found")
 
@@ -171,17 +193,19 @@ async def update_source(
 
         if updates:
             params.append(source_id)
-            await db.execute(
+            await execute(
+                db,
                 f"UPDATE autopilot_sources SET {', '.join(updates)} WHERE id = ?",
                 tuple(params),
             )
-            await db.commit()
+            if not settings.use_postgres:
+                await db.commit()
 
         # Fetch updated source
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             "SELECT * FROM autopilot_sources WHERE id = ?", (source_id,)
         )
-        row = await cursor.fetchone()
 
     return parse_source_row(row)
 
@@ -194,21 +218,24 @@ async def delete_source(
     """Delete a monitored source."""
     async with get_db() as db:
         # Verify ownership
-        cursor = await db.execute(
+        existing = await fetchone(
+            db,
             "SELECT id FROM autopilot_sources WHERE id = ? AND user_id = ?",
             (source_id, user_id),
         )
-        if not await cursor.fetchone():
+        if not existing:
             raise HTTPException(status_code=404, detail="Source not found")
 
         # Delete associated items first
-        await db.execute(
+        await execute(
+            db,
             "DELETE FROM autopilot_items WHERE source_id = ?", (source_id,)
         )
 
         # Delete source
-        await db.execute("DELETE FROM autopilot_sources WHERE id = ?", (source_id,))
-        await db.commit()
+        await execute(db, "DELETE FROM autopilot_sources WHERE id = ?", (source_id,))
+        if not settings.use_postgres:
+            await db.commit()
 
     return {"message": "Source deleted successfully"}
 
@@ -222,11 +249,11 @@ async def manual_check_source(
     """Manually trigger a check for a source."""
     async with get_db() as db:
         # Verify ownership
-        cursor = await db.execute(
+        source = await fetchone(
+            db,
             "SELECT id, source_name FROM autopilot_sources WHERE id = ? AND user_id = ?",
             (source_id, user_id),
         )
-        source = await cursor.fetchone()
         if not source:
             raise HTTPException(status_code=404, detail="Source not found")
 
@@ -258,22 +285,25 @@ async def get_source_items(
     """Get recent items from a source."""
     async with get_db() as db:
         # Verify ownership
-        cursor = await db.execute(
+        existing = await fetchone(
+            db,
             "SELECT id FROM autopilot_sources WHERE id = ? AND user_id = ?",
             (source_id, user_id),
         )
-        if not await cursor.fetchone():
+        if not existing:
             raise HTTPException(status_code=404, detail="Source not found")
 
         # Get total count
-        cursor = await db.execute(
+        count_row = await fetchone(
+            db,
             "SELECT COUNT(*) as count FROM autopilot_items WHERE source_id = ?",
             (source_id,),
         )
-        total = (await cursor.fetchone())["count"]
+        total = count_row["count"] if count_row else 0
 
         # Get items
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             """
             SELECT * FROM autopilot_items
             WHERE source_id = ?
@@ -282,7 +312,6 @@ async def get_source_items(
             """,
             (source_id, limit, offset),
         )
-        rows = await cursor.fetchall()
 
     items = [
         AutopilotItem(
@@ -309,14 +338,16 @@ async def get_autopilot_stats(
     """Get autopilot statistics for the user."""
     async with get_db() as db:
         # Active sources
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             "SELECT COUNT(*) as count FROM autopilot_sources WHERE user_id = ? AND is_active = 1",
             (user_id,),
         )
-        active_sources = (await cursor.fetchone())["count"]
+        active_sources = row["count"] if row else 0
 
         # Pending items
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             """
             SELECT COUNT(*) as count FROM autopilot_items ai
             JOIN autopilot_sources s ON ai.source_id = s.id
@@ -324,23 +355,37 @@ async def get_autopilot_stats(
             """,
             (user_id,),
         )
-        pending_items = (await cursor.fetchone())["count"]
+        pending_items = row["count"] if row else 0
 
-        # Items processed today
-        cursor = await db.execute(
-            """
-            SELECT COUNT(*) as count FROM autopilot_items ai
-            JOIN autopilot_sources s ON ai.source_id = s.id
-            WHERE s.user_id = ?
-            AND ai.processing_status = 'complete'
-            AND DATE(ai.created_at) = DATE('now')
-            """,
-            (user_id,),
-        )
-        items_today = (await cursor.fetchone())["count"]
+        # Items processed today - use CURRENT_DATE for PostgreSQL compatibility
+        if settings.use_postgres:
+            row = await db.fetchrow(
+                """
+                SELECT COUNT(*) as count FROM autopilot_items ai
+                JOIN autopilot_sources s ON ai.source_id = s.id
+                WHERE s.user_id = $1
+                AND ai.processing_status = 'complete'
+                AND DATE(ai.created_at) = CURRENT_DATE
+                """,
+                user_id,
+            )
+        else:
+            row = await fetchone(
+                db,
+                """
+                SELECT COUNT(*) as count FROM autopilot_items ai
+                JOIN autopilot_sources s ON ai.source_id = s.id
+                WHERE s.user_id = ?
+                AND ai.processing_status = 'complete'
+                AND DATE(ai.created_at) = DATE('now')
+                """,
+                (user_id,),
+            )
+        items_today = row["count"] if row else 0
 
         # Total items processed
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             """
             SELECT COUNT(*) as count FROM autopilot_items ai
             JOIN autopilot_sources s ON ai.source_id = s.id
@@ -348,14 +393,15 @@ async def get_autopilot_stats(
             """,
             (user_id,),
         )
-        items_total = (await cursor.fetchone())["count"]
+        items_total = row["count"] if row else 0
 
         # Sources with errors
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             "SELECT COUNT(*) as count FROM autopilot_sources WHERE user_id = ? AND error_count > 0",
             (user_id,),
         )
-        sources_with_errors = (await cursor.fetchone())["count"]
+        sources_with_errors = row["count"] if row else 0
 
     return AutopilotStats(
         active_sources=active_sources,
@@ -374,7 +420,8 @@ async def skip_item(
     """Skip processing an autopilot item."""
     async with get_db() as db:
         # Verify ownership
-        cursor = await db.execute(
+        existing = await fetchone(
+            db,
             """
             SELECT ai.id FROM autopilot_items ai
             JOIN autopilot_sources s ON ai.source_id = s.id
@@ -382,14 +429,16 @@ async def skip_item(
             """,
             (item_id, user_id),
         )
-        if not await cursor.fetchone():
+        if not existing:
             raise HTTPException(status_code=404, detail="Item not found")
 
-        await db.execute(
+        await execute(
+            db,
             "UPDATE autopilot_items SET processing_status = 'skipped' WHERE id = ?",
             (item_id,),
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
     return {"message": "Item skipped"}
 
@@ -402,7 +451,8 @@ async def process_item(
     """Manually trigger processing of an autopilot item."""
     async with get_db() as db:
         # Verify ownership and status
-        cursor = await db.execute(
+        item = await fetchone(
+            db,
             """
             SELECT ai.* FROM autopilot_items ai
             JOIN autopilot_sources s ON ai.source_id = s.id
@@ -410,7 +460,6 @@ async def process_item(
             """,
             (item_id, user_id),
         )
-        item = await cursor.fetchone()
         if not item:
             raise HTTPException(
                 status_code=404,
@@ -418,11 +467,13 @@ async def process_item(
             )
 
         # Reset to pending
-        await db.execute(
+        await execute(
+            db,
             "UPDATE autopilot_items SET processing_status = 'pending' WHERE id = ?",
             (item_id,),
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
     # Create job and process
     from app.services.autopilot import create_job_from_feed_item

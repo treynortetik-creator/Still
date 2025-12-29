@@ -5,8 +5,12 @@ from typing import Optional
 from collections import defaultdict
 from fastapi import APIRouter, HTTPException, Depends, Query
 
+from app.config import get_settings
 from app.database import get_db
+from app.db_utils import execute, fetchone, fetchall
 from app.api.auth import get_current_user_id
+
+settings = get_settings()
 from app.models.calendar import (
     ScheduleCreate,
     ScheduleUpdate,
@@ -32,7 +36,8 @@ async def schedule_content(
 
     async with get_db() as db:
         # Verify output exists and belongs to user
-        cursor = await db.execute(
+        output = await fetchone(
+            db,
             """
             SELECT o.id, o.content_type, o.step3_final
             FROM outputs o
@@ -41,29 +46,30 @@ async def schedule_content(
             """,
             (data.output_id, user_id)
         )
-        output = await cursor.fetchone()
         if not output:
             raise HTTPException(status_code=404, detail="Output not found")
 
         # Check if already scheduled for this platform
-        cursor = await db.execute(
+        existing = await fetchone(
+            db,
             "SELECT id FROM content_schedule WHERE output_id = ? AND platform = ?",
             (data.output_id, data.platform)
         )
-        if await cursor.fetchone():
+        if existing:
             raise HTTPException(
                 status_code=400,
                 detail="This content is already scheduled for this platform"
             )
 
         # Create schedule
-        await db.execute(
-            """
-            INSERT INTO content_schedule
-            (user_id, output_id, scheduled_date, scheduled_time, platform, notes)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
+        if settings.use_postgres:
+            row = await db.fetchrow(
+                """
+                INSERT INTO content_schedule
+                (user_id, output_id, scheduled_date, scheduled_time, platform, notes)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                RETURNING *
+                """,
                 user_id,
                 data.output_id,
                 data.scheduled_date,
@@ -71,18 +77,35 @@ async def schedule_content(
                 data.platform,
                 data.notes
             )
-        )
-        await db.commit()
+            schedule = dict(row)
+        else:
+            await execute(
+                db,
+                """
+                INSERT INTO content_schedule
+                (user_id, output_id, scheduled_date, scheduled_time, platform, notes)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    data.output_id,
+                    data.scheduled_date,
+                    data.scheduled_time,
+                    data.platform,
+                    data.notes
+                )
+            )
+            await db.commit()
 
-        # Get created schedule
-        cursor = await db.execute("SELECT last_insert_rowid()")
-        schedule_id = (await cursor.fetchone())[0]
+            # Get created schedule
+            cursor = await db.execute("SELECT last_insert_rowid()")
+            schedule_id = (await cursor.fetchone())[0]
 
-        cursor = await db.execute(
-            "SELECT * FROM content_schedule WHERE id = ?",
-            (schedule_id,)
-        )
-        schedule = await cursor.fetchone()
+            schedule = await fetchone(
+                db,
+                "SELECT * FROM content_schedule WHERE id = ?",
+                (schedule_id,)
+            )
 
         if not schedule:
             raise HTTPException(
@@ -115,7 +138,8 @@ async def get_calendar(
     """Get calendar view for a date range with scheduled and unscheduled content."""
     async with get_db() as db:
         # Get scheduled content
-        cursor = await db.execute(
+        scheduled = await fetchall(
+            db,
             """
             SELECT cs.id, cs.output_id, cs.scheduled_date, cs.scheduled_time,
                    cs.platform, cs.status, cs.notes,
@@ -128,7 +152,6 @@ async def get_calendar(
             """,
             (user_id, start_date, end_date)
         )
-        scheduled = await cursor.fetchall()
 
         # Group by date
         days = defaultdict(list)
@@ -146,7 +169,8 @@ async def get_calendar(
             ))
 
         # Get unscheduled outputs (not scheduled on any platform)
-        cursor = await db.execute(
+        unscheduled_rows = await fetchall(
+            db,
             """
             SELECT o.id, o.content_type, o.step3_final, o.job_id, o.created_at
             FROM outputs o
@@ -161,7 +185,6 @@ async def get_calendar(
             """,
             (user_id, user_id)
         )
-        unscheduled_rows = await cursor.fetchall()
 
         unscheduled = []
         for row in unscheduled_rows:
@@ -191,7 +214,8 @@ async def get_unscheduled_content(
 ):
     """Get outputs that haven't been scheduled yet."""
     async with get_db() as db:
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             """
             SELECT o.id, o.content_type, o.step3_final, o.job_id, o.created_at
             FROM outputs o
@@ -206,7 +230,6 @@ async def get_unscheduled_content(
             """,
             (user_id, user_id, limit)
         )
-        rows = await cursor.fetchall()
 
     outputs = []
     for row in rows:
@@ -229,7 +252,8 @@ async def get_schedule(
 ):
     """Get a specific schedule entry."""
     async with get_db() as db:
-        cursor = await db.execute(
+        schedule = await fetchone(
+            db,
             """
             SELECT cs.*, o.content_type, o.step3_final
             FROM content_schedule cs
@@ -238,7 +262,6 @@ async def get_schedule(
             """,
             (schedule_id, user_id)
         )
-        schedule = await cursor.fetchone()
 
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
@@ -268,11 +291,11 @@ async def update_schedule(
     """Update a schedule entry (reschedule, change status, etc.)."""
     async with get_db() as db:
         # Check ownership
-        cursor = await db.execute(
+        schedule = await fetchone(
+            db,
             "SELECT * FROM content_schedule WHERE id = ? AND user_id = ?",
             (schedule_id, user_id)
         )
-        schedule = await cursor.fetchone()
         if not schedule:
             raise HTTPException(status_code=404, detail="Schedule not found")
 
@@ -309,14 +332,17 @@ async def update_schedule(
         if updates:
             updates.append("updated_at = CURRENT_TIMESTAMP")
             values.append(schedule_id)
-            await db.execute(
+            await execute(
+                db,
                 f"UPDATE content_schedule SET {', '.join(updates)} WHERE id = ?",
-                values
+                tuple(values)
             )
-            await db.commit()
+            if not settings.use_postgres:
+                await db.commit()
 
         # Get updated schedule with content
-        cursor = await db.execute(
+        updated = await fetchone(
+            db,
             """
             SELECT cs.*, o.content_type, o.step3_final
             FROM content_schedule cs
@@ -325,7 +351,6 @@ async def update_schedule(
             """,
             (schedule_id,)
         )
-        updated = await cursor.fetchone()
 
     content_preview = (updated["step3_final"] or "")[:100] + "..." if updated["step3_final"] else ""
 
@@ -351,17 +376,20 @@ async def delete_schedule(
     """Remove a content from the calendar."""
     async with get_db() as db:
         # Check ownership
-        cursor = await db.execute(
+        existing = await fetchone(
+            db,
             "SELECT id FROM content_schedule WHERE id = ? AND user_id = ?",
             (schedule_id, user_id)
         )
-        if not await cursor.fetchone():
+        if not existing:
             raise HTTPException(status_code=404, detail="Schedule not found")
 
-        await db.execute(
+        await execute(
+            db,
             "DELETE FROM content_schedule WHERE id = ?",
             (schedule_id,)
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
     return {"message": "Schedule removed"}

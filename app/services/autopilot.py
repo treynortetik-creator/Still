@@ -7,10 +7,13 @@ import httpx
 from datetime import datetime, timedelta
 from typing import Optional
 
+from app.config import get_settings
 from app.database import get_db
+from app.db_utils import execute, fetchone, fetchall
 from app.utils.background_tasks import create_background_task
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 from app.models.job import JobStatus
 
 # Frequency mappings in minutes
@@ -112,11 +115,11 @@ async def check_source(source_id: int) -> dict:
     """
     async with get_db() as db:
         # Get source config
-        cursor = await db.execute(
+        source = await fetchone(
+            db,
             "SELECT * FROM autopilot_sources WHERE id = ? AND is_active = 1",
             (source_id,)
         )
-        source = await cursor.fetchone()
 
         if not source:
             return {'source_id': source_id, 'new_items': 0, 'error': 'Source not found or inactive'}
@@ -132,7 +135,8 @@ async def check_source(source_id: int) -> dict:
 
         if result['status'] == 'error':
             # Update error tracking
-            await db.execute(
+            await execute(
+                db,
                 """
                 UPDATE autopilot_sources
                 SET last_error = ?, error_count = error_count + 1, last_checked = CURRENT_TIMESTAMP
@@ -140,22 +144,25 @@ async def check_source(source_id: int) -> dict:
                 """,
                 (result['error'], source_id)
             )
-            await db.commit()
+            if not settings.use_postgres:
+                await db.commit()
             return {'source_id': source_id, 'new_items': 0, 'error': result['error']}
 
         # Process new items
         new_items = 0
         for item in result['items']:
             # Check if we've already seen this item
-            cursor = await db.execute(
+            existing = await fetchone(
+                db,
                 "SELECT id FROM autopilot_items WHERE source_id = ? AND item_guid = ?",
                 (source_id, item['guid'])
             )
-            if await cursor.fetchone():
+            if existing:
                 continue  # Already have this item
 
             # Store the feed item
-            await db.execute(
+            await execute(
+                db,
                 """
                 INSERT INTO autopilot_items
                 (source_id, user_id, item_guid, item_title, item_url, item_published)
@@ -176,7 +183,8 @@ async def check_source(source_id: int) -> dict:
         frequency_minutes = FREQUENCY_MINUTES.get(source['check_frequency'], 1440)
         next_check = datetime.utcnow() + timedelta(minutes=frequency_minutes)
 
-        await db.execute(
+        await execute(
+            db,
             """
             UPDATE autopilot_sources
             SET last_checked = CURRENT_TIMESTAMP,
@@ -188,7 +196,8 @@ async def check_source(source_id: int) -> dict:
             """,
             (next_check.isoformat(), new_items, source_id)
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
         return {'source_id': source_id, 'new_items': new_items}
 
@@ -201,7 +210,8 @@ async def create_job_from_feed_item(item_id: int) -> Optional[str]:
     """
     async with get_db() as db:
         # Get feed item with source config
-        cursor = await db.execute(
+        item = await fetchone(
+            db,
             """
             SELECT ai.*, s.user_id, s.target_persona, s.asset_types, s.source_name
             FROM autopilot_items ai
@@ -210,7 +220,6 @@ async def create_job_from_feed_item(item_id: int) -> Optional[str]:
             """,
             (item_id,)
         )
-        item = await cursor.fetchone()
 
         if not item:
             return None
@@ -227,7 +236,8 @@ async def create_job_from_feed_item(item_id: int) -> Optional[str]:
 
         # Create job record
         # Store the URL as the content to be fetched
-        await db.execute(
+        await execute(
+            db,
             """
             INSERT INTO jobs (
                 id, user_id, status, original_filename, file_type,
@@ -257,12 +267,14 @@ async def create_job_from_feed_item(item_id: int) -> Optional[str]:
         )
 
         # Update feed item status
-        await db.execute(
+        await execute(
+            db,
             "UPDATE autopilot_items SET job_id = ?, processing_status = 'processing' WHERE id = ?",
             (job_id, item_id)
         )
 
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
     return job_id
 
@@ -275,7 +287,8 @@ async def process_pending_items(limit: int = 5) -> int:
     """
     async with get_db() as db:
         # Get pending items from active sources
-        cursor = await db.execute(
+        items = await fetchall(
+            db,
             """
             SELECT ai.id
             FROM autopilot_items ai
@@ -287,7 +300,6 @@ async def process_pending_items(limit: int = 5) -> int:
             """,
             (limit,)
         )
-        items = await cursor.fetchall()
 
     jobs_created = 0
     for item in items:
@@ -305,11 +317,13 @@ async def process_pending_items(limit: int = 5) -> int:
             logger.error(f"Failed to create job for item {item['id']}: {e}")
             # Mark as failed
             async with get_db() as db:
-                await db.execute(
+                await execute(
+                    db,
                     "UPDATE autopilot_items SET processing_status = 'failed' WHERE id = ?",
                     (item['id'],)
                 )
-                await db.commit()
+                if not settings.use_postgres:
+                    await db.commit()
 
     return jobs_created
 
@@ -322,15 +336,16 @@ async def check_due_sources() -> int:
     """
     async with get_db() as db:
         # Find sources due for checking
-        cursor = await db.execute(
+        sources = await fetchall(
+            db,
             """
             SELECT id, source_name FROM autopilot_sources
             WHERE is_active = 1
             AND (next_check IS NULL OR next_check <= CURRENT_TIMESTAMP)
             LIMIT 5
-            """
+            """,
+            ()
         )
-        sources = await cursor.fetchall()
 
     checked = 0
     for source in sources:

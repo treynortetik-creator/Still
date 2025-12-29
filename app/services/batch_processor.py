@@ -6,6 +6,7 @@ from datetime import datetime
 
 from app.database import get_db
 from app.config import get_settings
+from app.db_utils import execute, fetchone, fetchall
 
 logger = logging.getLogger(__name__)
 from app.services.pipeline import process_job
@@ -22,11 +23,11 @@ async def process_batch(batch_id: str):
     """
     # Get job IDs from batch
     async with get_db() as db:
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             "SELECT job_ids, user_id FROM batches WHERE id = ?",
             (batch_id,)
         )
-        row = await cursor.fetchone()
         if not row:
             return
 
@@ -52,14 +53,16 @@ async def process_batch(batch_id: str):
                 )
                 # Mark job as failed if not already
                 async with get_db() as db:
-                    await db.execute(
+                    await execute(
+                        db,
                         """
                         UPDATE jobs SET status = 'failed', error_message = ?
                         WHERE id = ? AND status != 'complete' AND status != 'failed'
                         """,
                         (str(e), job_id)
                     )
-                    await db.commit()
+                    if not settings.use_postgres:
+                        await db.commit()
             finally:
                 # Update batch progress after each job completes
                 await update_batch_progress(batch_id)
@@ -77,45 +80,46 @@ async def process_batch(batch_id: str):
 async def update_batch_status(batch_id: str, status: str):
     """Update the batch status."""
     async with get_db() as db:
-        await db.execute(
+        await execute(
+            db,
             "UPDATE batches SET status = ? WHERE id = ?",
             (status, batch_id)
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
 
 async def update_batch_progress(batch_id: str):
     """Update batch completion counts based on job statuses."""
     async with get_db() as db:
         # Get batch info
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             "SELECT job_ids FROM batches WHERE id = ?",
             (batch_id,)
         )
-        row = await cursor.fetchone()
         if not row:
             return
 
         job_ids = json.loads(row["job_ids"])
 
         # Count completed and failed jobs
-        placeholders = ",".join("?" * len(job_ids))
-
-        cursor = await db.execute(
+        stats = await fetchone(
+            db,
             f"""
             SELECT
                 SUM(CASE WHEN status = 'complete' THEN 1 ELSE 0 END) as completed,
                 SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
                 SUM(COALESCE(cost_incurred, 0)) as total_cost
             FROM jobs
-            WHERE id IN ({placeholders})
+            WHERE id IN ({','.join('?' * len(job_ids))})
             """,
-            job_ids
+            tuple(job_ids)
         )
-        stats = await cursor.fetchone()
 
         # Update batch
-        await db.execute(
+        await execute(
+            db,
             """
             UPDATE batches
             SET completed_jobs = ?, failed_jobs = ?, total_cost = ?
@@ -128,17 +132,18 @@ async def update_batch_progress(batch_id: str):
                 batch_id
             )
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
 
 async def finalize_batch(batch_id: str):
     """Mark batch as complete or partial based on job outcomes."""
     async with get_db() as db:
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             "SELECT total_jobs, completed_jobs, failed_jobs FROM batches WHERE id = ?",
             (batch_id,)
         )
-        row = await cursor.fetchone()
         if not row:
             return
 
@@ -155,7 +160,8 @@ async def finalize_batch(batch_id: str):
             status = "complete"
 
         # Update batch with final status and completion time
-        await db.execute(
+        await execute(
+            db,
             """
             UPDATE batches
             SET status = ?, completed_at = ?
@@ -163,14 +169,15 @@ async def finalize_batch(batch_id: str):
             """,
             (status, datetime.utcnow().isoformat(), batch_id)
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
         # Get user_id for webhook
-        cursor = await db.execute(
+        batch_row = await fetchone(
+            db,
             "SELECT user_id FROM batches WHERE id = ?",
             (batch_id,)
         )
-        batch_row = await cursor.fetchone()
 
     # Trigger webhook for batch completion
     if batch_row:
