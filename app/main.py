@@ -13,7 +13,7 @@ from slowapi.errors import RateLimitExceeded
 from datetime import datetime
 
 from app.config import get_settings
-from app.database import init_db
+from app.database import init_db, close_postgres_pool
 from app.api import upload, jobs, library, admin, auth, personas, export, feedback, edit
 from app.api import admin_views, swipes, memory, brand_voice, remix, custom_personas, batch, analytics
 from app.api import webhooks, calendar, autopilot, sommelier, workshop
@@ -67,7 +67,8 @@ async def lifespan(app: FastAPI):
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     settings.prompts_dir.mkdir(parents=True, exist_ok=True)
     settings.clients_dir.mkdir(parents=True, exist_ok=True)
-    settings.database_dir.mkdir(parents=True, exist_ok=True)
+    if not settings.use_postgres:
+        settings.database_dir.mkdir(parents=True, exist_ok=True)
 
     # Initialize database
     await init_db()
@@ -89,6 +90,11 @@ async def lifespan(app: FastAPI):
 
     # Stop autopilot scheduler
     await stop_scheduler()
+
+    # Close PostgreSQL connection pool
+    if settings.use_postgres:
+        await close_postgres_pool()
+        print("PostgreSQL pool closed")
 
 
 app = FastAPI(
