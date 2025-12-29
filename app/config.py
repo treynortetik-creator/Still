@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
 
     # Database
-    database_url: str = "sqlite+aiosqlite:///./database/contentmultiplier.db"
+    database_url: str = ""  # PostgreSQL connection string from Supabase (set via DATABASE_URL env var)
 
     # Application
     debug: bool = False  # Default to False for security
@@ -111,11 +111,16 @@ class Settings(BaseSettings):
 
     @property
     def database_dir(self) -> Path:
-        # Railway volume mount path for persistent database
+        # Railway volume mount path for persistent database (only used for SQLite fallback)
         railway_volume = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH")
         if railway_volume:
             return Path(railway_volume) / "database"
         return self.base_dir / "database"
+
+    @property
+    def use_postgres(self) -> bool:
+        """Check if PostgreSQL is configured (vs SQLite fallback)."""
+        return bool(self.database_url and self.database_url.startswith("postgresql"))
 
     class Config:
         env_file = ".env"
