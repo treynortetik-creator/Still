@@ -12,6 +12,7 @@ import httpx
 
 from app.database import get_db
 from app.config import get_settings
+from app.db_utils import execute, fetchone, fetchall
 from app.utils.background_tasks import create_background_task
 
 logger = logging.getLogger(__name__)
@@ -45,7 +46,8 @@ async def trigger_webhook_event(event_type: str, user_id: int, data: dict):
     """
     async with get_db() as db:
         # Get all active webhooks for this user that subscribe to this event
-        cursor = await db.execute(
+        webhooks = await fetchall(
+            db,
             """
             SELECT id, url, secret_key, trigger_events
             FROM webhooks
@@ -53,7 +55,6 @@ async def trigger_webhook_event(event_type: str, user_id: int, data: dict):
             """,
             (user_id,)
         )
-        webhooks = await cursor.fetchall()
 
         for webhook in webhooks:
             trigger_events = json.loads(webhook["trigger_events"])
@@ -68,19 +69,31 @@ async def trigger_webhook_event(event_type: str, user_id: int, data: dict):
                 "data": data
             }
 
-            # Create delivery record
-            await db.execute(
-                """
-                INSERT INTO webhook_deliveries (webhook_id, event_type, payload, attempts)
-                VALUES (?, ?, ?, 0)
-                """,
-                (webhook["id"], event_type, json.dumps(payload))
-            )
-            await db.commit()
+            # Create delivery record and get ID
+            if settings.use_postgres:
+                row = await db.fetchrow(
+                    """
+                    INSERT INTO webhook_deliveries (webhook_id, event_type, payload, attempts)
+                    VALUES ($1, $2, $3, 0)
+                    RETURNING id
+                    """,
+                    webhook["id"], event_type, json.dumps(payload)
+                )
+                delivery_id = row["id"]
+            else:
+                await execute(
+                    db,
+                    """
+                    INSERT INTO webhook_deliveries (webhook_id, event_type, payload, attempts)
+                    VALUES (?, ?, ?, 0)
+                    """,
+                    (webhook["id"], event_type, json.dumps(payload))
+                )
+                await db.commit()
 
-            # Get the delivery ID
-            cursor = await db.execute("SELECT last_insert_rowid()")
-            delivery_id = (await cursor.fetchone())[0]
+                # Get the delivery ID
+                cursor = await db.execute("SELECT last_insert_rowid()")
+                delivery_id = (await cursor.fetchone())[0]
 
             # Trigger async delivery (fire and forget)
             create_background_task(
@@ -126,7 +139,8 @@ async def deliver_webhook(
 
                 # Update delivery record
                 async with get_db() as db:
-                    await db.execute(
+                    await execute(
+                        db,
                         """
                         UPDATE webhook_deliveries
                         SET response_status = ?, response_body = ?, attempts = ?
@@ -134,7 +148,8 @@ async def deliver_webhook(
                         """,
                         (response.status_code, response.text[:1000], attempt + 1, delivery_id)
                     )
-                    await db.commit()
+                    if not settings.use_postgres:
+                        await db.commit()
 
                 # Success if 2xx status
                 if 200 <= response.status_code < 300:
@@ -148,7 +163,8 @@ async def deliver_webhook(
                 exc_info=True
             )
             async with get_db() as db:
-                await db.execute(
+                await execute(
+                    db,
                     """
                     UPDATE webhook_deliveries
                     SET response_body = ?, attempts = ?
@@ -156,7 +172,8 @@ async def deliver_webhook(
                     """,
                     (f"Request error: {type(e).__name__}: {str(e)}", attempt + 1, delivery_id)
                 )
-                await db.commit()
+                if not settings.use_postgres:
+                    await db.commit()
 
         # Wait before retry (with exponential backoff)
         if attempt < settings.webhook_max_retries - 1:
@@ -174,11 +191,11 @@ async def test_webhook(webhook_id: int, user_id: int) -> dict:
     """
     async with get_db() as db:
         # Get the webhook
-        cursor = await db.execute(
+        webhook = await fetchone(
+            db,
             "SELECT url, secret_key FROM webhooks WHERE id = ? AND user_id = ?",
             (webhook_id, user_id)
         )
-        webhook = await cursor.fetchone()
 
         if not webhook:
             return {"success": False, "message": "Webhook not found"}
@@ -237,7 +254,8 @@ async def get_job_webhook_payload(job_id: str) -> dict:
     """Build webhook payload for job completion."""
     async with get_db() as db:
         # Get job details
-        cursor = await db.execute(
+        job = await fetchone(
+            db,
             """
             SELECT id, user_id, status, original_filename, file_type,
                    target_persona, asset_types, cost_incurred,
@@ -246,7 +264,6 @@ async def get_job_webhook_payload(job_id: str) -> dict:
             """,
             (job_id,)
         )
-        job = await cursor.fetchone()
 
         if not job:
             return {}
@@ -269,17 +286,18 @@ async def get_content_webhook_payload(job_id: str) -> dict:
     """Build webhook payload for content generation with full output data."""
     async with get_db() as db:
         # Get job details
-        cursor = await db.execute(
+        job = await fetchone(
+            db,
             "SELECT user_id, completed_at FROM jobs WHERE id = ?",
             (job_id,)
         )
-        job = await cursor.fetchone()
 
         if not job:
             return {}
 
         # Get outputs
-        cursor = await db.execute(
+        outputs = await fetchall(
+            db,
             """
             SELECT id, content_type, variation_number, step3_final,
                    quality_scores, hook_variations, subject, preview_text
@@ -287,7 +305,6 @@ async def get_content_webhook_payload(job_id: str) -> dict:
             """,
             (job_id,)
         )
-        outputs = await cursor.fetchall()
 
         output_list = []
         for output in outputs:
@@ -303,11 +320,12 @@ async def get_content_webhook_payload(job_id: str) -> dict:
             })
 
         # Get still count
-        cursor = await db.execute(
+        still_row = await fetchone(
+            db,
             "SELECT COUNT(*) as count FROM stills WHERE job_id = ?",
             (job_id,)
         )
-        still_count = (await cursor.fetchone())["count"]
+        still_count = still_row["count"]
 
         return {
             "job_id": job_id,
@@ -321,7 +339,8 @@ async def get_content_webhook_payload(job_id: str) -> dict:
 async def get_batch_webhook_payload(batch_id: str) -> dict:
     """Build webhook payload for batch completion."""
     async with get_db() as db:
-        cursor = await db.execute(
+        batch = await fetchone(
+            db,
             """
             SELECT id, user_id, status, total_jobs, completed_jobs,
                    failed_jobs, total_cost, created_at, completed_at
@@ -329,7 +348,6 @@ async def get_batch_webhook_payload(batch_id: str) -> dict:
             """,
             (batch_id,)
         )
-        batch = await cursor.fetchone()
 
         if not batch:
             return {}

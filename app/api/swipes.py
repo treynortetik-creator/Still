@@ -5,8 +5,12 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 
+from app.config import get_settings
 from app.database import get_db
+from app.db_utils import execute, fetchone, fetchall
 from app.api.auth import get_current_user_id
+
+settings = get_settings()
 from app.services.swipe_analyzer import (
     analyze_swipe_collection,
     get_style_dna,
@@ -57,8 +61,7 @@ async def list_swipes(
         query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
 
-        cursor = await db.execute(query, params)
-        rows = await cursor.fetchall()
+        rows = await fetchall(db, query, tuple(params))
 
         swipes = []
         for row in rows:
@@ -80,11 +83,11 @@ async def list_swipes(
             swipes.append(swipe)
 
         # Get total count
-        count_cursor = await db.execute(
+        count_row = await fetchone(
+            db,
             "SELECT COUNT(*) as count FROM swipe_files WHERE user_id = ?",
             (user_id,)
         )
-        count_row = await count_cursor.fetchone()
         total = count_row["count"]
 
         return {
@@ -105,12 +108,13 @@ async def create_swipe(
         raise HTTPException(status_code=400, detail="Content must be at least 10 characters")
 
     async with get_db() as db:
-        cursor = await db.execute(
-            """
-            INSERT INTO swipe_files (user_id, content, source_url, source_type, title, tags, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
+        if settings.use_postgres:
+            row = await db.fetchrow(
+                """
+                INSERT INTO swipe_files (user_id, content, source_url, source_type, title, tags, notes)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                RETURNING id
+                """,
                 user_id,
                 data.content.strip(),
                 data.source_url,
@@ -119,9 +123,25 @@ async def create_swipe(
                 json.dumps(data.tags) if data.tags else None,
                 data.notes,
             )
-        )
-        await db.commit()
-        swipe_id = cursor.lastrowid
+            swipe_id = row["id"]
+        else:
+            cursor = await db.execute(
+                """
+                INSERT INTO swipe_files (user_id, content, source_url, source_type, title, tags, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    data.content.strip(),
+                    data.source_url,
+                    data.source_type or "general",
+                    data.title,
+                    json.dumps(data.tags) if data.tags else None,
+                    data.notes,
+                )
+            )
+            await db.commit()
+            swipe_id = cursor.lastrowid
 
         return {
             "id": swipe_id,
@@ -136,11 +156,11 @@ async def get_swipe(
 ):
     """Get a specific swipe file entry."""
     async with get_db() as db:
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             "SELECT * FROM swipe_files WHERE id = ? AND user_id = ?",
             (swipe_id, user_id)
         )
-        row = await cursor.fetchone()
 
         if not row:
             raise HTTPException(status_code=404, detail="Swipe not found")
@@ -166,11 +186,12 @@ async def update_swipe(
     """Update a swipe file entry."""
     async with get_db() as db:
         # Check ownership
-        cursor = await db.execute(
+        existing = await fetchone(
+            db,
             "SELECT id FROM swipe_files WHERE id = ? AND user_id = ?",
             (swipe_id, user_id)
         )
-        if not await cursor.fetchone():
+        if not existing:
             raise HTTPException(status_code=404, detail="Swipe not found")
 
         # Build update query dynamically
@@ -200,11 +221,13 @@ async def update_swipe(
             raise HTTPException(status_code=400, detail="No fields to update")
 
         params.append(swipe_id)
-        await db.execute(
+        await execute(
+            db,
             f"UPDATE swipe_files SET {', '.join(updates)} WHERE id = ?",
-            params
+            tuple(params)
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
         return {"message": "Swipe updated successfully"}
 
@@ -216,14 +239,22 @@ async def delete_swipe(
 ):
     """Delete a swipe file entry."""
     async with get_db() as db:
-        cursor = await db.execute(
+        result = await execute(
+            db,
             "DELETE FROM swipe_files WHERE id = ? AND user_id = ?",
             (swipe_id, user_id)
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Swipe not found")
+        # Check if any rows were affected
+        if settings.use_postgres:
+            # PostgreSQL returns command tag like "DELETE 1"
+            if result == "DELETE 0":
+                raise HTTPException(status_code=404, detail="Swipe not found")
+        else:
+            if result == 0:
+                raise HTTPException(status_code=404, detail="Swipe not found")
 
         return {"message": "Swipe deleted successfully"}
 
@@ -235,14 +266,16 @@ async def get_swipe_stats(
     """Get statistics about user's swipe collection."""
     async with get_db() as db:
         # Total count
-        cursor = await db.execute(
+        count_row = await fetchone(
+            db,
             "SELECT COUNT(*) as count FROM swipe_files WHERE user_id = ?",
             (user_id,)
         )
-        total = (await cursor.fetchone())["count"]
+        total = count_row["count"]
 
         # Count by source type
-        cursor = await db.execute(
+        type_rows = await fetchall(
+            db,
             """
             SELECT source_type, COUNT(*) as count
             FROM swipe_files
@@ -251,15 +284,16 @@ async def get_swipe_stats(
             """,
             (user_id,)
         )
-        by_type = {row["source_type"]: row["count"] for row in await cursor.fetchall()}
+        by_type = {row["source_type"]: row["count"] for row in type_rows}
 
         # Get all tags and count occurrences
-        cursor = await db.execute(
+        tag_rows = await fetchall(
+            db,
             "SELECT tags FROM swipe_files WHERE user_id = ? AND tags IS NOT NULL",
             (user_id,)
         )
         tag_counts = {}
-        for row in await cursor.fetchall():
+        for row in tag_rows:
             tags = json.loads(row["tags"]) if row["tags"] else []
             for tag in tags:
                 tag_counts[tag] = tag_counts.get(tag, 0) + 1

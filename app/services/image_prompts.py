@@ -3,9 +3,11 @@ import json
 import logging
 from typing import Tuple, Optional
 
+from app.config import get_settings
 from app.services.ai_client import call_llm_text, calculate_openrouter_cost
 from app.utils.json_parser import parse_llm_json
 
+settings = get_settings()
 logger = logging.getLogger(__name__)
 
 # Platform-specific dimensions for images
@@ -162,10 +164,12 @@ async def save_image_prompts_to_db(output_id: int, prompts: list[dict]) -> None:
         return
 
     from app.database import get_db
+    from app.db_utils import execute
 
     async with get_db() as db:
         for prompt in prompts:
-            await db.execute(
+            await execute(
+                db,
                 """
                 INSERT INTO image_prompts (output_id, prompt_text, platform, dimensions, style_modifiers)
                 VALUES (?, ?, ?, ?, ?)
@@ -178,7 +182,8 @@ async def save_image_prompts_to_db(output_id: int, prompts: list[dict]) -> None:
                     prompt.get("style_modifiers"),
                 )
             )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
 
 async def get_image_prompts_for_output(output_id: int) -> list[dict]:
@@ -192,13 +197,14 @@ async def get_image_prompts_for_output(output_id: int) -> list[dict]:
         List of prompt dictionaries
     """
     from app.database import get_db
+    from app.db_utils import fetchall
 
     async with get_db() as db:
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             "SELECT * FROM image_prompts WHERE output_id = ?",
             (output_id,)
         )
-        rows = await cursor.fetchall()
 
     return [
         {

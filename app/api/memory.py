@@ -4,8 +4,12 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, List
 
+from app.config import get_settings
 from app.database import get_db
+from app.db_utils import execute, fetchone, fetchall
 from app.api.auth import get_current_user_id
+
+settings = get_settings()
 
 router = APIRouter()
 
@@ -54,8 +58,7 @@ async def list_rules(
 
         query += " ORDER BY priority DESC, created_at DESC"
 
-        cursor = await db.execute(query, params)
-        rows = await cursor.fetchall()
+        rows = await fetchall(db, query, tuple(params))
 
         rules = []
         for row in rows:
@@ -90,15 +93,26 @@ async def create_rule(
         raise HTTPException(status_code=400, detail="Rule text must be at least 3 characters")
 
     async with get_db() as db:
-        cursor = await db.execute(
-            """
-            INSERT INTO memory_rules (user_id, rule_type, rule_text, priority)
-            VALUES (?, ?, ?, ?)
-            """,
-            (user_id, data.rule_type, data.rule_text.strip(), data.priority or 0)
-        )
-        await db.commit()
-        rule_id = cursor.lastrowid
+        if settings.use_postgres:
+            row = await db.fetchrow(
+                """
+                INSERT INTO memory_rules (user_id, rule_type, rule_text, priority)
+                VALUES ($1, $2, $3, $4)
+                RETURNING id
+                """,
+                user_id, data.rule_type, data.rule_text.strip(), data.priority or 0
+            )
+            rule_id = row["id"]
+        else:
+            cursor = await db.execute(
+                """
+                INSERT INTO memory_rules (user_id, rule_type, rule_text, priority)
+                VALUES (?, ?, ?, ?)
+                """,
+                (user_id, data.rule_type, data.rule_text.strip(), data.priority or 0)
+            )
+            await db.commit()
+            rule_id = cursor.lastrowid
 
         return {
             "id": rule_id,
@@ -115,11 +129,12 @@ async def update_rule(
     """Update a memory rule."""
     async with get_db() as db:
         # Check ownership
-        cursor = await db.execute(
+        existing = await fetchone(
+            db,
             "SELECT id FROM memory_rules WHERE id = ? AND user_id = ?",
             (rule_id, user_id)
         )
-        if not await cursor.fetchone():
+        if not existing:
             raise HTTPException(status_code=404, detail="Rule not found")
 
         # Build update query
@@ -145,11 +160,13 @@ async def update_rule(
             raise HTTPException(status_code=400, detail="No fields to update")
 
         params.append(rule_id)
-        await db.execute(
+        await execute(
+            db,
             f"UPDATE memory_rules SET {', '.join(updates)} WHERE id = ?",
-            params
+            tuple(params)
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
         return {"message": "Rule updated"}
 
@@ -161,14 +178,21 @@ async def delete_rule(
 ):
     """Delete a memory rule."""
     async with get_db() as db:
-        cursor = await db.execute(
+        result = await execute(
+            db,
             "DELETE FROM memory_rules WHERE id = ? AND user_id = ?",
             (rule_id, user_id)
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Rule not found")
+        # Check if any rows were affected
+        if settings.use_postgres:
+            if result == "DELETE 0":
+                raise HTTPException(status_code=404, detail="Rule not found")
+        else:
+            if result == 0:
+                raise HTTPException(status_code=404, detail="Rule not found")
 
         return {"message": "Rule deleted"}
 
@@ -180,21 +204,23 @@ async def toggle_rule(
 ):
     """Toggle a rule's active status."""
     async with get_db() as db:
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             "SELECT is_active FROM memory_rules WHERE id = ? AND user_id = ?",
             (rule_id, user_id)
         )
-        row = await cursor.fetchone()
 
         if not row:
             raise HTTPException(status_code=404, detail="Rule not found")
 
         new_status = 0 if row["is_active"] else 1
-        await db.execute(
+        await execute(
+            db,
             "UPDATE memory_rules SET is_active = ? WHERE id = ?",
             (new_status, rule_id)
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
         return {
             "is_active": bool(new_status),
@@ -226,7 +252,8 @@ async def get_memory_rules_context(user_id: int) -> str:
     Called by drafting service to get user's persistent preferences.
     """
     async with get_db() as db:
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             """
             SELECT rule_type, rule_text
             FROM memory_rules
@@ -235,7 +262,6 @@ async def get_memory_rules_context(user_id: int) -> str:
             """,
             (user_id,)
         )
-        rows = await cursor.fetchall()
 
         if not rows:
             return ""

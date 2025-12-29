@@ -7,11 +7,14 @@ from typing import Optional, Dict
 from pydantic import BaseModel
 import httpx
 
+from app.config import get_settings
 from app.database import get_db
+from app.db_utils import execute, fetchone, fetchall
 from app.services import settings_manager
 from app.api.auth import verify_admin
 from app.services.ai_editor import get_editor_config, save_editor_config, DEFAULT_EDITOR_PROMPT
 
+app_settings = get_settings()
 router = APIRouter()
 
 
@@ -22,70 +25,58 @@ async def get_dashboard(_: bool = Depends(verify_admin)):
     """
     async with get_db() as db:
         # Active jobs
-        cursor = await db.execute(
-            """
-            SELECT COUNT(*) FROM jobs
-            WHERE status NOT IN ('complete', 'failed')
-            """
-        )
-        active_jobs = (await cursor.fetchone())[0]
+        row = await fetchone(db, "SELECT COUNT(*) as cnt FROM jobs WHERE status NOT IN ('complete', 'failed')", ())
+        active_jobs = row["cnt"]
 
         # Jobs completed today
         today = datetime.now().strftime("%Y-%m-%d")
-        cursor = await db.execute(
-            """
-            SELECT COUNT(*) FROM jobs
-            WHERE status = 'complete'
-            AND date(completed_at) = ?
-            """,
+        row = await fetchone(
+            db,
+            "SELECT COUNT(*) as cnt FROM jobs WHERE status = 'complete' AND date(completed_at) = ?",
             (today,)
         )
-        completed_today = (await cursor.fetchone())[0]
+        completed_today = row["cnt"]
 
         # Total cost today
-        cursor = await db.execute(
-            """
-            SELECT COALESCE(SUM(cost_incurred), 0) FROM jobs
-            WHERE date(created_at) = ?
-            """,
+        row = await fetchone(
+            db,
+            "SELECT COALESCE(SUM(cost_incurred), 0) as total FROM jobs WHERE date(created_at) = ?",
             (today,)
         )
-        cost_today = (await cursor.fetchone())[0]
+        cost_today = row["total"]
 
         # Total cost this week
         week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-        cursor = await db.execute(
-            """
-            SELECT COALESCE(SUM(cost_incurred), 0) FROM jobs
-            WHERE date(created_at) >= ?
-            """,
+        row = await fetchone(
+            db,
+            "SELECT COALESCE(SUM(cost_incurred), 0) as total FROM jobs WHERE date(created_at) >= ?",
             (week_ago,)
         )
-        cost_week = (await cursor.fetchone())[0]
+        cost_week = row["total"]
 
         # Total cost this month
         month_start = datetime.now().replace(day=1).strftime("%Y-%m-%d")
-        cursor = await db.execute(
-            """
-            SELECT COALESCE(SUM(cost_incurred), 0) FROM jobs
-            WHERE date(created_at) >= ?
-            """,
+        row = await fetchone(
+            db,
+            "SELECT COALESCE(SUM(cost_incurred), 0) as total FROM jobs WHERE date(created_at) >= ?",
             (month_start,)
         )
-        cost_month = (await cursor.fetchone())[0]
+        cost_month = row["total"]
 
         # Library size
-        cursor = await db.execute("SELECT COUNT(*) FROM content_library")
-        library_size = (await cursor.fetchone())[0]
+        row = await fetchone(db, "SELECT COUNT(*) as cnt FROM content_library", ())
+        library_size = row["cnt"]
 
         # Recent activity
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             """
             SELECT id, status, original_filename, created_at, completed_at
             FROM jobs
             ORDER BY created_at DESC
             LIMIT 10
-            """
+            """,
+            ()
         )
         recent_jobs = [
             {
@@ -95,7 +86,7 @@ async def get_dashboard(_: bool = Depends(verify_admin)):
                 "created_at": row["created_at"],
                 "completed_at": row["completed_at"],
             }
-            for row in await cursor.fetchall()
+            for row in rows
         ]
 
         return {
@@ -117,12 +108,14 @@ async def list_prompts(_: bool = Depends(verify_admin)):
     List all prompt templates.
     """
     async with get_db() as db:
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             """
             SELECT id, template_name, model, max_tokens, variables, version, updated_at
             FROM prompt_templates
             ORDER BY template_name
-            """
+            """,
+            ()
         )
         prompts = [
             {
@@ -134,7 +127,7 @@ async def list_prompts(_: bool = Depends(verify_admin)):
                 "version": row["version"],
                 "updated_at": row["updated_at"],
             }
-            for row in await cursor.fetchall()
+            for row in rows
         ]
 
         return {"prompts": prompts}
@@ -146,13 +139,11 @@ async def get_prompt(template_name: str, _: bool = Depends(verify_admin)):
     Get a specific prompt template.
     """
     async with get_db() as db:
-        cursor = await db.execute(
-            """
-            SELECT * FROM prompt_templates WHERE template_name = ?
-            """,
+        row = await fetchone(
+            db,
+            "SELECT * FROM prompt_templates WHERE template_name = ?",
             (template_name,)
         )
-        row = await cursor.fetchone()
 
         if not row:
             raise HTTPException(status_code=404, detail="Template not found")
@@ -183,11 +174,11 @@ async def update_prompt(
     """
     async with get_db() as db:
         # Check if exists
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             "SELECT id, version FROM prompt_templates WHERE template_name = ?",
             (template_name,)
         )
-        row = await cursor.fetchone()
 
         if not row:
             raise HTTPException(status_code=404, detail="Template not found")
@@ -207,15 +198,17 @@ async def update_prompt(
 
         params.append(template_name)
 
-        await db.execute(
+        await execute(
+            db,
             f"""
             UPDATE prompt_templates
             SET {", ".join(update_fields)}
             WHERE template_name = ?
             """,
-            params
+            tuple(params)
         )
-        await db.commit()
+        if not app_settings.use_postgres:
+            await db.commit()
 
         return {"message": "Template updated", "version": new_version}
 
@@ -226,7 +219,8 @@ async def list_clients(_: bool = Depends(verify_admin)):
     List all clients/users.
     """
     async with get_db() as db:
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             """
             SELECT u.id, u.email, u.subscription_tier, u.created_at,
                    COUNT(j.id) as job_count,
@@ -235,7 +229,8 @@ async def list_clients(_: bool = Depends(verify_admin)):
             LEFT JOIN jobs j ON u.id = j.user_id
             GROUP BY u.id
             ORDER BY u.created_at DESC
-            """
+            """,
+            ()
         )
         clients = [
             {
@@ -246,7 +241,7 @@ async def list_clients(_: bool = Depends(verify_admin)):
                 "job_count": row["job_count"],
                 "total_cost": round(row["total_cost"], 4),
             }
-            for row in await cursor.fetchall()
+            for row in rows
         ]
 
         return {"clients": clients}
@@ -259,17 +254,18 @@ async def get_client(client_id: int, _: bool = Depends(verify_admin)):
     """
     async with get_db() as db:
         # Get user info
-        cursor = await db.execute(
+        user = await fetchone(
+            db,
             "SELECT * FROM users WHERE id = ?",
             (client_id,)
         )
-        user = await cursor.fetchone()
 
         if not user:
             raise HTTPException(status_code=404, detail="Client not found")
 
         # Get job history
-        cursor = await db.execute(
+        job_rows = await fetchall(
+            db,
             """
             SELECT id, status, original_filename, created_at, completed_at, cost_incurred
             FROM jobs
@@ -279,10 +275,11 @@ async def get_client(client_id: int, _: bool = Depends(verify_admin)):
             """,
             (client_id,)
         )
-        jobs = [dict(row) for row in await cursor.fetchall()]
+        jobs = [dict(row) for row in job_rows]
 
         # Get library stats
-        cursor = await db.execute(
+        stat_rows = await fetchall(
+            db,
             """
             SELECT entry_type, COUNT(*) as count
             FROM content_library
@@ -291,14 +288,15 @@ async def get_client(client_id: int, _: bool = Depends(verify_admin)):
             """,
             (client_id,)
         )
-        library_stats = {row["entry_type"]: row["count"] for row in await cursor.fetchall()}
+        library_stats = {row["entry_type"]: row["count"] for row in stat_rows}
 
         # Total cost
-        cursor = await db.execute(
-            "SELECT COALESCE(SUM(cost_incurred), 0) FROM jobs WHERE user_id = ?",
+        cost_row = await fetchone(
+            db,
+            "SELECT COALESCE(SUM(cost_incurred), 0) as total FROM jobs WHERE user_id = ?",
             (client_id,)
         )
-        total_cost = (await cursor.fetchone())[0]
+        total_cost = cost_row["total"]
 
         return {
             "id": user["id"],
@@ -339,10 +337,10 @@ async def get_costs(
 
             query += " GROUP BY date(created_at) ORDER BY date DESC"
 
-            cursor = await db.execute(query, params)
+            rows = await fetchall(db, query, tuple(params))
             results = [
                 {"date": row["date"], "cost": round(row["cost"], 4)}
-                for row in await cursor.fetchall()
+                for row in rows
             ]
 
         elif group_by == "user":
@@ -363,10 +361,10 @@ async def get_costs(
 
             query += " GROUP BY u.id ORDER BY cost DESC"
 
-            cursor = await db.execute(query, params)
+            rows = await fetchall(db, query, tuple(params))
             results = [
                 {"user": row["email"], "cost": round(row["cost"], 4)}
-                for row in await cursor.fetchall()
+                for row in rows
             ]
 
         else:  # group_by == "job"
@@ -386,7 +384,7 @@ async def get_costs(
 
             query += " ORDER BY created_at DESC LIMIT 100"
 
-            cursor = await db.execute(query, params)
+            rows = await fetchall(db, query, tuple(params))
             results = [
                 {
                     "job_id": row["id"],
@@ -394,7 +392,7 @@ async def get_costs(
                     "cost": round(row["cost_incurred"], 4),
                     "created_at": row["created_at"],
                 }
-                for row in await cursor.fetchall()
+                for row in rows
             ]
 
         return {"costs": results, "group_by": group_by}
@@ -431,7 +429,7 @@ async def get_logs(
         query += " ORDER BY created_at DESC LIMIT ?"
         params.append(limit)
 
-        cursor = await db.execute(query, params)
+        rows = await fetchall(db, query, tuple(params))
         logs = [
             {
                 "job_id": row["id"],
@@ -440,7 +438,7 @@ async def get_logs(
                 "created_at": row["created_at"],
                 "completed_at": row["completed_at"],
             }
-            for row in await cursor.fetchall()
+            for row in rows
         ]
 
         return {"logs": logs}
@@ -535,25 +533,44 @@ async def get_error_logs(
     """
     async with get_db() as db:
         # First check if the error_logs table exists
-        cursor = await db.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='error_logs'"
-        )
-        table_exists = await cursor.fetchone()
+        if app_settings.use_postgres:
+            table_check = await db.fetchrow(
+                "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'error_logs'"
+            )
+            table_exists = table_check is not None
+        else:
+            cursor = await db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='error_logs'"
+            )
+            table_exists = await cursor.fetchone()
 
         if not table_exists:
             # Create the table if it doesn't exist
-            await db.execute("""
-                CREATE TABLE IF NOT EXISTS error_logs (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    job_id TEXT,
-                    user_id INTEGER,
-                    error_type TEXT,
-                    error_message TEXT,
-                    stack_trace TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            await db.commit()
+            if app_settings.use_postgres:
+                await db.execute("""
+                    CREATE TABLE IF NOT EXISTS error_logs (
+                        id SERIAL PRIMARY KEY,
+                        job_id TEXT,
+                        user_id INTEGER,
+                        error_type TEXT,
+                        error_message TEXT,
+                        stack_trace TEXT,
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )
+                """)
+            else:
+                await db.execute("""
+                    CREATE TABLE IF NOT EXISTS error_logs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        job_id TEXT,
+                        user_id INTEGER,
+                        error_type TEXT,
+                        error_message TEXT,
+                        stack_trace TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                await db.commit()
             return {"error_logs": [], "message": "Error logs table created"}
 
         query = """
@@ -572,9 +589,9 @@ async def get_error_logs(
         query += " ORDER BY el.created_at DESC LIMIT ?"
         params.append(limit)
 
-        cursor = await db.execute(query, params)
+        rows = await fetchall(db, query, tuple(params))
         logs = []
-        for row in await cursor.fetchall():
+        for row in rows:
             logs.append({
                 "id": row["id"],
                 "job_id": row["job_id"],
@@ -583,8 +600,8 @@ async def get_error_logs(
                 "error_message": row["error_message"],
                 "stack_trace": row["stack_trace"],
                 "created_at": row["created_at"],
-                "filename": row["original_filename"] if "original_filename" in row.keys() else None,
-                "user_email": row["email"] if "email" in row.keys() else None,
+                "filename": row.get("original_filename"),
+                "user_email": row.get("email"),
             })
 
         return {"error_logs": logs}
@@ -657,16 +674,17 @@ PIPELINE_SERVICES = ["transcription", "atomization", "drafting", "editing", "fac
 async def get_all_model_config(_: bool = Depends(verify_admin)):
     """Get all AI model configurations from database."""
     async with get_db() as db:
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             """
             SELECT service_name, model_id, display_name, is_active,
                    cost_per_1k_input, cost_per_1k_output, max_tokens,
                    created_at, updated_at
             FROM ai_model_config
             ORDER BY service_name
-            """
+            """,
+            ()
         )
-        rows = await cursor.fetchall()
 
         configs = {}
         for row in rows:
@@ -711,15 +729,16 @@ async def update_model_config(
 
     async with get_db() as db:
         # Check if exists
-        cursor = await db.execute(
+        exists = await fetchone(
+            db,
             "SELECT id FROM ai_model_config WHERE service_name = ?",
             (service_name,)
         )
-        exists = await cursor.fetchone()
 
         if exists:
             # Update
-            await db.execute(
+            await execute(
+                db,
                 """
                 UPDATE ai_model_config
                 SET model_id = ?, display_name = ?, cost_per_1k_input = ?,
@@ -739,7 +758,8 @@ async def update_model_config(
             )
         else:
             # Insert
-            await db.execute(
+            await execute(
+                db,
                 """
                 INSERT INTO ai_model_config
                 (service_name, model_id, display_name, cost_per_1k_input,
@@ -757,7 +777,8 @@ async def update_model_config(
                 )
             )
 
-        await db.commit()
+        if not app_settings.use_postgres:
+            await db.commit()
 
         # Also update the settings file so it persists
         current_models = settings_manager.get_settings().get("models", {})
@@ -779,12 +800,14 @@ async def init_default_model_configs(_: bool = Depends(verify_admin)):
     async with get_db() as db:
         for service in PIPELINE_SERVICES:
             # Check if exists
-            cursor = await db.execute(
+            exists = await fetchone(
+                db,
                 "SELECT id FROM ai_model_config WHERE service_name = ?",
                 (service,)
             )
-            if not await cursor.fetchone():
-                await db.execute(
+            if not exists:
+                await execute(
+                    db,
                     """
                     INSERT INTO ai_model_config
                     (service_name, model_id, display_name, cost_per_1k_input,
@@ -802,7 +825,8 @@ async def init_default_model_configs(_: bool = Depends(verify_admin)):
                     )
                 )
 
-        await db.commit()
+        if not app_settings.use_postgres:
+            await db.commit()
 
     return {"message": "Default model configs initialized", "services": PIPELINE_SERVICES}
 

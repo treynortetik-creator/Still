@@ -4,10 +4,13 @@ import logging
 from typing import Dict, List, Tuple
 from collections import defaultdict
 
+from app.config import get_settings
 from app.database import get_db
+from app.db_utils import execute, fetchone, fetchall
 from app.services.ai_client import call_llm_text, calculate_openrouter_cost
 from app.utils.json_parser import parse_llm_json
 
+settings = get_settings()
 logger = logging.getLogger(__name__)
 
 
@@ -30,7 +33,8 @@ async def analyze_library_for_remix(user_id: int) -> Tuple[Dict, float]:
     """
     async with get_db() as db:
         # Get user's atoms
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             """
             SELECT id, atom_type, content, tags, source_file
             FROM atoms
@@ -40,7 +44,6 @@ async def analyze_library_for_remix(user_id: int) -> Tuple[Dict, float]:
             """,
             (user_id,)
         )
-        rows = await cursor.fetchall()
 
         if len(rows) < 5:
             return {
@@ -151,11 +154,13 @@ Focus on quality over quantity. Only include suggestions that would genuinely ma
 
     # Update user's cost
     async with get_db() as db:
-        await db.execute(
+        await execute(
+            db,
             "UPDATE users SET total_cost_incurred = total_cost_incurred + ? WHERE id = ?",
             (cost, user_id)
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
     result["atom_count"] = len(rows)
     return result, cost
@@ -174,7 +179,8 @@ async def get_atoms_by_topic(user_id: int, topic: str) -> List[Dict]:
     """
     async with get_db() as db:
         # Simple text search
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             """
             SELECT id, atom_type, content, tags, source_file
             FROM atoms
@@ -187,7 +193,6 @@ async def get_atoms_by_topic(user_id: int, topic: str) -> List[Dict]:
             """,
             (user_id, f"%{topic}%", f"%{topic}%")
         )
-        rows = await cursor.fetchall()
 
         return [
             {
@@ -205,14 +210,16 @@ async def get_library_stats(user_id: int) -> Dict:
     """Get statistics about user's atom library."""
     async with get_db() as db:
         # Total count
-        cursor = await db.execute(
+        total_row = await fetchone(
+            db,
             "SELECT COUNT(*) as count FROM atoms WHERE user_id = ?",
             (user_id,)
         )
-        total = (await cursor.fetchone())["count"]
+        total = total_row["count"]
 
         # By type
-        cursor = await db.execute(
+        type_rows = await fetchall(
+            db,
             """
             SELECT atom_type, COUNT(*) as count
             FROM atoms
@@ -221,15 +228,16 @@ async def get_library_stats(user_id: int) -> Dict:
             """,
             (user_id,)
         )
-        by_type = {row["atom_type"]: row["count"] for row in await cursor.fetchall()}
+        by_type = {row["atom_type"]: row["count"] for row in type_rows}
 
         # Get all tags
-        cursor = await db.execute(
+        tag_rows = await fetchall(
+            db,
             "SELECT tags FROM atoms WHERE user_id = ? AND tags IS NOT NULL",
             (user_id,)
         )
         tag_counts = defaultdict(int)
-        for row in await cursor.fetchall():
+        for row in tag_rows:
             tags = json.loads(row["tags"]) if row["tags"] else []
             for tag in tags:
                 tag_counts[tag] += 1
@@ -265,7 +273,8 @@ async def generate_remix_content(
     async with get_db() as db:
         # Get the specified atoms
         placeholders = ",".join(["?" for _ in atom_ids])
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             f"""
             SELECT content, atom_type, tags
             FROM atoms
@@ -273,7 +282,6 @@ async def generate_remix_content(
             """,
             (*atom_ids, user_id)
         )
-        rows = await cursor.fetchall()
 
         if not rows:
             raise ValueError("No atoms found with those IDs")
@@ -322,10 +330,12 @@ Return ONLY the content, no explanations."""
 
     # Update user's cost
     async with get_db() as db:
-        await db.execute(
+        await execute(
+            db,
             "UPDATE users SET total_cost_incurred = total_cost_incurred + ? WHERE id = ?",
             (cost, user_id)
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
     return response_text.strip(), cost

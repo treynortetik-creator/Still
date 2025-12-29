@@ -3,11 +3,14 @@ import json
 import logging
 from typing import Dict, List, Tuple, Optional
 
+from app.config import get_settings
 from app.database import get_db
+from app.db_utils import execute, fetchone, fetchall
 from app.services.ai_client import call_llm_text, calculate_openrouter_cost
 from app.utils.json_parser import parse_llm_json
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 async def analyze_swipe_collection(
@@ -26,7 +29,8 @@ async def analyze_swipe_collection(
     """
     async with get_db() as db:
         # Get all swipes for user
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             """
             SELECT content, source_type, tags, notes
             FROM swipe_files
@@ -36,7 +40,6 @@ async def analyze_swipe_collection(
             """,
             (user_id,)
         )
-        rows = await cursor.fetchall()
 
         if len(rows) < min_swipes:
             raise ValueError(f"Need at least {min_swipes} swipes to analyze (have {len(rows)})")
@@ -120,14 +123,15 @@ OUTPUT FORMAT (valid JSON):
     # Save analysis to database
     async with get_db() as db:
         # Check if analysis exists
-        cursor = await db.execute(
+        existing = await fetchone(
+            db,
             "SELECT id FROM swipe_analysis WHERE user_id = ? AND analysis_type = 'style_dna'",
             (user_id,)
         )
-        existing = await cursor.fetchone()
 
         if existing:
-            await db.execute(
+            await execute(
+                db,
                 """
                 UPDATE swipe_analysis
                 SET patterns = ?, summary = ?, swipe_count = ?, updated_at = CURRENT_TIMESTAMP
@@ -136,7 +140,8 @@ OUTPUT FORMAT (valid JSON):
                 (json.dumps(result["patterns"]), result.get("summary"), len(rows), existing["id"])
             )
         else:
-            await db.execute(
+            await execute(
+                db,
                 """
                 INSERT INTO swipe_analysis (user_id, analysis_type, patterns, summary, swipe_count)
                 VALUES (?, 'style_dna', ?, ?, ?)
@@ -145,11 +150,13 @@ OUTPUT FORMAT (valid JSON):
             )
 
         # Update user's cost
-        await db.execute(
+        await execute(
+            db,
             "UPDATE users SET total_cost_incurred = total_cost_incurred + ? WHERE id = ?",
             (cost, user_id)
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
     return result, cost
 
@@ -157,7 +164,8 @@ OUTPUT FORMAT (valid JSON):
 async def get_style_dna(user_id: int) -> Optional[Dict]:
     """Get the user's saved Style DNA analysis."""
     async with get_db() as db:
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             """
             SELECT patterns, summary, swipe_count, updated_at
             FROM swipe_analysis
@@ -165,7 +173,6 @@ async def get_style_dna(user_id: int) -> Optional[Dict]:
             """,
             (user_id,)
         )
-        row = await cursor.fetchone()
 
         if not row:
             return None

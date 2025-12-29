@@ -2,8 +2,12 @@
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends
 
+from app.config import get_settings
 from app.database import get_db
+from app.db_utils import fetchone, fetchall
 from app.api.auth import get_current_user_id
+
+settings = get_settings()
 from app.models.analytics import (
     UsageStats,
     CostStats,
@@ -67,7 +71,8 @@ async def get_usage_stats(user_id: int) -> UsageStats:
     """Calculate usage statistics from database."""
     async with get_db() as db:
         # Get job counts
-        cursor = await db.execute(
+        job_stats = await fetchone(
+            db,
             """
             SELECT
                 COUNT(*) as total,
@@ -78,10 +83,10 @@ async def get_usage_stats(user_id: int) -> UsageStats:
             """,
             (user_id,)
         )
-        job_stats = await cursor.fetchone()
 
         # Get total content pieces (outputs)
-        cursor = await db.execute(
+        output_count = await fetchone(
+            db,
             """
             SELECT COUNT(*) as total
             FROM outputs o
@@ -90,10 +95,10 @@ async def get_usage_stats(user_id: int) -> UsageStats:
             """,
             (user_id,)
         )
-        output_count = await cursor.fetchone()
 
         # Get total stills (atoms)
-        cursor = await db.execute(
+        atom_count = await fetchone(
+            db,
             """
             SELECT COUNT(*) as total
             FROM stills s
@@ -102,10 +107,10 @@ async def get_usage_stats(user_id: int) -> UsageStats:
             """,
             (user_id,)
         )
-        atom_count = await cursor.fetchone()
 
         # Get library size (unique stills in content_library)
-        cursor = await db.execute(
+        library_count = await fetchone(
+            db,
             """
             SELECT COUNT(*) as total
             FROM content_library
@@ -113,7 +118,6 @@ async def get_usage_stats(user_id: int) -> UsageStats:
             """,
             (user_id,)
         )
-        library_count = await cursor.fetchone()
 
         return UsageStats(
             total_jobs=job_stats["total"] or 0,
@@ -133,7 +137,8 @@ async def get_cost_stats(user_id: int) -> CostStats:
 
     async with get_db() as db:
         # Total cost
-        cursor = await db.execute(
+        total = await fetchone(
+            db,
             """
             SELECT COALESCE(SUM(cost_incurred), 0) as total
             FROM jobs
@@ -141,10 +146,10 @@ async def get_cost_stats(user_id: int) -> CostStats:
             """,
             (user_id,)
         )
-        total = await cursor.fetchone()
 
         # Cost this month
-        cursor = await db.execute(
+        this_month = await fetchone(
+            db,
             """
             SELECT COALESCE(SUM(cost_incurred), 0) as total
             FROM jobs
@@ -152,10 +157,10 @@ async def get_cost_stats(user_id: int) -> CostStats:
             """,
             (user_id, first_of_month.isoformat())
         )
-        this_month = await cursor.fetchone()
 
         # Cost last month
-        cursor = await db.execute(
+        last_month = await fetchone(
+            db,
             """
             SELECT COALESCE(SUM(cost_incurred), 0) as total
             FROM jobs
@@ -163,10 +168,10 @@ async def get_cost_stats(user_id: int) -> CostStats:
             """,
             (user_id, first_of_last_month.isoformat(), first_of_month.isoformat())
         )
-        last_month = await cursor.fetchone()
 
         # Average cost per job
-        cursor = await db.execute(
+        avg = await fetchone(
+            db,
             """
             SELECT
                 COALESCE(AVG(cost_incurred), 0) as avg_cost
@@ -175,7 +180,6 @@ async def get_cost_stats(user_id: int) -> CostStats:
             """,
             (user_id,)
         )
-        avg = await cursor.fetchone()
 
         return CostStats(
             total_cost=round(total["total"], 2),
@@ -188,7 +192,8 @@ async def get_cost_stats(user_id: int) -> CostStats:
 async def get_content_breakdown(user_id: int) -> ContentBreakdown:
     """Get breakdown of content by type."""
     async with get_db() as db:
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             """
             SELECT
                 content_type,
@@ -200,7 +205,6 @@ async def get_content_breakdown(user_id: int) -> ContentBreakdown:
             """,
             (user_id,)
         )
-        rows = await cursor.fetchall()
 
         # Initialize counts
         breakdown = {
@@ -269,21 +273,37 @@ async def get_weekly_trend(user_id: int) -> list[TimeSeriesDataPoint]:
     """Get content creation trend for the last 7 days."""
     async with get_db() as db:
         # Get daily counts for last 7 days
-        cursor = await db.execute(
-            """
-            SELECT
-                DATE(o.created_at) as date,
-                COUNT(*) as count
-            FROM outputs o
-            JOIN jobs j ON o.job_id = j.id
-            WHERE j.user_id = ?
-                AND o.created_at >= DATE('now', '-7 days')
-            GROUP BY DATE(o.created_at)
-            ORDER BY date
-            """,
-            (user_id,)
-        )
-        rows = await cursor.fetchall()
+        if settings.use_postgres:
+            rows = await db.fetch(
+                """
+                SELECT
+                    DATE(o.created_at)::text as date,
+                    COUNT(*) as count
+                FROM outputs o
+                JOIN jobs j ON o.job_id = j.id
+                WHERE j.user_id = $1
+                    AND o.created_at >= CURRENT_DATE - INTERVAL '7 days'
+                GROUP BY DATE(o.created_at)
+                ORDER BY date
+                """,
+                user_id
+            )
+        else:
+            cursor = await db.execute(
+                """
+                SELECT
+                    DATE(o.created_at) as date,
+                    COUNT(*) as count
+                FROM outputs o
+                JOIN jobs j ON o.job_id = j.id
+                WHERE j.user_id = ?
+                    AND o.created_at >= DATE('now', '-7 days')
+                GROUP BY DATE(o.created_at)
+                ORDER BY date
+                """,
+                (user_id,)
+            )
+            rows = await cursor.fetchall()
 
         # Create a dict of existing data
         data_map = {row["date"]: row["count"] for row in rows}
@@ -304,22 +324,39 @@ async def get_monthly_trend(user_id: int) -> list[TimeSeriesDataPoint]:
     """Get content creation trend for the last 30 days (weekly aggregates)."""
     async with get_db() as db:
         # Get weekly counts for last 4 weeks
-        cursor = await db.execute(
-            """
-            SELECT
-                strftime('%Y-%W', o.created_at) as week,
-                MIN(DATE(o.created_at)) as week_start,
-                COUNT(*) as count
-            FROM outputs o
-            JOIN jobs j ON o.job_id = j.id
-            WHERE j.user_id = ?
-                AND o.created_at >= DATE('now', '-30 days')
-            GROUP BY strftime('%Y-%W', o.created_at)
-            ORDER BY week
-            """,
-            (user_id,)
-        )
-        rows = await cursor.fetchall()
+        if settings.use_postgres:
+            rows = await db.fetch(
+                """
+                SELECT
+                    TO_CHAR(o.created_at, 'IYYY-IW') as week,
+                    MIN(DATE(o.created_at))::text as week_start,
+                    COUNT(*) as count
+                FROM outputs o
+                JOIN jobs j ON o.job_id = j.id
+                WHERE j.user_id = $1
+                    AND o.created_at >= CURRENT_DATE - INTERVAL '30 days'
+                GROUP BY TO_CHAR(o.created_at, 'IYYY-IW')
+                ORDER BY week
+                """,
+                user_id
+            )
+        else:
+            cursor = await db.execute(
+                """
+                SELECT
+                    strftime('%Y-%W', o.created_at) as week,
+                    MIN(DATE(o.created_at)) as week_start,
+                    COUNT(*) as count
+                FROM outputs o
+                JOIN jobs j ON o.job_id = j.id
+                WHERE j.user_id = ?
+                    AND o.created_at >= DATE('now', '-30 days')
+                GROUP BY strftime('%Y-%W', o.created_at)
+                ORDER BY week
+                """,
+                (user_id,)
+            )
+            rows = await cursor.fetchall()
 
         # Convert to time series points
         result = []

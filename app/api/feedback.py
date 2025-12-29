@@ -5,8 +5,12 @@ from pydantic import BaseModel
 from typing import Optional, Literal
 from datetime import datetime
 
+from app.config import get_settings
 from app.database import get_db
+from app.db_utils import execute, fetchone, fetchall
 from app.api.auth import get_current_user_id
+
+settings = get_settings()
 
 router = APIRouter()
 
@@ -40,7 +44,8 @@ async def submit_feedback(
     """
     async with get_db() as db:
         # Verify output exists and belongs to user's job
-        cursor = await db.execute(
+        output_row = await fetchone(
+            db,
             """
             SELECT o.id FROM outputs o
             JOIN jobs j ON o.job_id = j.id
@@ -48,19 +53,20 @@ async def submit_feedback(
             """,
             (data.output_id, user_id)
         )
-        if not await cursor.fetchone():
+        if not output_row:
             raise HTTPException(status_code=404, detail="Output not found")
 
         # Check if feedback already exists
-        cursor = await db.execute(
+        existing = await fetchone(
+            db,
             "SELECT id FROM output_feedback WHERE output_id = ? AND user_id = ?",
             (data.output_id, user_id)
         )
-        existing = await cursor.fetchone()
 
         if existing:
             # Update existing feedback
-            await db.execute(
+            await execute(
+                db,
                 """
                 UPDATE output_feedback
                 SET feedback = ?, comment = ?, updated_at = CURRENT_TIMESTAMP
@@ -71,23 +77,35 @@ async def submit_feedback(
             feedback_id = existing["id"]
         else:
             # Insert new feedback
-            cursor = await db.execute(
-                """
-                INSERT INTO output_feedback (output_id, user_id, feedback, comment)
-                VALUES (?, ?, ?, ?)
-                """,
-                (data.output_id, user_id, data.feedback, data.comment)
-            )
-            feedback_id = cursor.lastrowid
+            if settings.use_postgres:
+                row = await db.fetchrow(
+                    """
+                    INSERT INTO output_feedback (output_id, user_id, feedback, comment)
+                    VALUES ($1, $2, $3, $4)
+                    RETURNING id
+                    """,
+                    data.output_id, user_id, data.feedback, data.comment
+                )
+                feedback_id = row["id"]
+            else:
+                cursor = await db.execute(
+                    """
+                    INSERT INTO output_feedback (output_id, user_id, feedback, comment)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (data.output_id, user_id, data.feedback, data.comment)
+                )
+                feedback_id = cursor.lastrowid
 
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
         # Fetch and return the feedback
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             "SELECT * FROM output_feedback WHERE id = ?",
             (feedback_id,)
         )
-        row = await cursor.fetchone()
 
         return FeedbackResponse(
             id=row["id"],
@@ -106,14 +124,14 @@ async def get_feedback(
 ):
     """Get feedback for a specific output."""
     async with get_db() as db:
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             """
             SELECT * FROM output_feedback
             WHERE output_id = ? AND user_id = ?
             """,
             (output_id, user_id)
         )
-        row = await cursor.fetchone()
 
         if not row:
             return {"feedback": None}
@@ -134,14 +152,21 @@ async def delete_feedback(
 ):
     """Remove feedback for an output."""
     async with get_db() as db:
-        cursor = await db.execute(
+        result = await execute(
+            db,
             "DELETE FROM output_feedback WHERE output_id = ? AND user_id = ?",
             (output_id, user_id)
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Feedback not found")
+        # Check if any rows were affected
+        if settings.use_postgres:
+            if result == "DELETE 0":
+                raise HTTPException(status_code=404, detail="Feedback not found")
+        else:
+            if result == 0:
+                raise HTTPException(status_code=404, detail="Feedback not found")
 
         return {"success": True, "message": "Feedback removed"}
 
@@ -154,15 +179,17 @@ async def get_feedback_summary(
     """Get feedback summary for all outputs in a job."""
     async with get_db() as db:
         # Verify job belongs to user
-        cursor = await db.execute(
+        job_row = await fetchone(
+            db,
             "SELECT id FROM jobs WHERE id = ? AND user_id = ?",
             (job_id, user_id)
         )
-        if not await cursor.fetchone():
+        if not job_row:
             raise HTTPException(status_code=404, detail="Job not found")
 
         # Get all feedback for this job's outputs
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             """
             SELECT
                 f.output_id,
@@ -176,7 +203,6 @@ async def get_feedback_summary(
             """,
             (job_id, user_id)
         )
-        rows = await cursor.fetchall()
 
         feedback_list = []
         thumbs_up = 0
