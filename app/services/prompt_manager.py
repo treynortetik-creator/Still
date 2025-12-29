@@ -6,6 +6,7 @@ from typing import Optional
 
 from app.config import get_settings
 from app.database import get_db
+from app.db_utils import execute, fetchone, fetchval
 
 settings = get_settings()
 
@@ -70,11 +71,12 @@ async def init_prompts_from_files():
     async with get_db() as db:
         for template_name, config in default_prompts.items():
             # Check if already exists
-            cursor = await db.execute(
+            existing = await fetchval(
+                db,
                 "SELECT id FROM prompt_templates WHERE template_name = ?",
                 (template_name,)
             )
-            if await cursor.fetchone():
+            if existing:
                 continue
 
             # Try to load from file
@@ -86,7 +88,8 @@ async def init_prompts_from_files():
                 prompt_content = f"# {template_name} prompt template\n# Edit this template in the admin UI or /data/prompts/{template_name}.txt"
 
             # Insert into database
-            await db.execute(
+            await execute(
+                db,
                 """
                 INSERT INTO prompt_templates
                 (template_name, model, max_tokens, prompt_content, variables)
@@ -101,7 +104,9 @@ async def init_prompts_from_files():
                 )
             )
 
-        await db.commit()
+        # Commit for SQLite (PostgreSQL auto-commits)
+        if not settings.use_postgres:
+            await db.commit()
 
 
 async def get_prompt(template_name: str) -> Optional[dict]:
@@ -111,7 +116,8 @@ async def get_prompt(template_name: str) -> Optional[dict]:
     Returns the prompt content and configuration.
     """
     async with get_db() as db:
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             """
             SELECT template_name, model, max_tokens, prompt_content, variables
             FROM prompt_templates
@@ -119,7 +125,6 @@ async def get_prompt(template_name: str) -> Optional[dict]:
             """,
             (template_name,)
         )
-        row = await cursor.fetchone()
 
         if not row:
             return None
