@@ -2,6 +2,7 @@
 
 Supports both PostgreSQL (Supabase) and SQLite (local development).
 """
+import ssl
 import aiosqlite
 import asyncpg
 from pathlib import Path
@@ -27,12 +28,26 @@ async def init_postgres_pool():
     """Initialize PostgreSQL connection pool for Supabase."""
     global _pg_pool
     if _pg_pool is None:
-        _pg_pool = await asyncpg.create_pool(
-            settings.database_url,
-            min_size=5,
-            max_size=20,
-            statement_cache_size=0,  # Required for Supabase/PgBouncer
-        )
+        # Create SSL context for Supabase connection
+        # Supabase requires SSL but uses self-signed certs, so we disable verification
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+
+        try:
+            _pg_pool = await asyncpg.create_pool(
+                settings.database_url,
+                min_size=2,  # Reduced for Railway/Supabase free tier limits
+                max_size=10,  # Supabase free tier has connection limits
+                statement_cache_size=0,  # Required for Supabase/PgBouncer
+                ssl=ssl_context,  # Required for Supabase
+                command_timeout=60,  # 60 second timeout for commands
+                timeout=30,  # 30 second connection timeout
+            )
+            print(f"PostgreSQL pool initialized (min=2, max=10)")
+        except Exception as e:
+            print(f"Failed to initialize PostgreSQL pool: {e}")
+            raise
     return _pg_pool
 
 
@@ -59,14 +74,31 @@ async def init_db():
     For SQLite: Creates tables if they don't exist
     """
     if settings.use_postgres:
-        # PostgreSQL - just verify connection works
-        pool = await get_pg_pool()
-        async with pool.acquire() as conn:
-            # Test connection
-            await conn.fetchval("SELECT 1")
-            print("PostgreSQL connection verified")
+        # Log connection attempt (mask password)
+        db_url = settings.database_url
+        if db_url:
+            # Mask password in logs
+            import re
+            masked_url = re.sub(r':([^@]+)@', ':****@', db_url)
+            print(f"Connecting to PostgreSQL: {masked_url}")
+        else:
+            print("ERROR: DATABASE_URL is empty but use_postgres is True!")
+            raise ValueError("DATABASE_URL environment variable is not set")
+
+        # PostgreSQL - verify connection works
+        try:
+            pool = await get_pg_pool()
+            async with pool.acquire() as conn:
+                # Test connection
+                result = await conn.fetchval("SELECT 1")
+                print(f"PostgreSQL connection verified (result: {result})")
+        except Exception as e:
+            print(f"ERROR: Failed to connect to PostgreSQL: {e}")
+            print("Check that DATABASE_URL is correct and Supabase is accessible")
+            raise
     else:
         # SQLite - create tables
+        print("Using SQLite database (local development mode)")
         await _init_sqlite_db()
 
 
