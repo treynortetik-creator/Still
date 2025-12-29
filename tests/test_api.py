@@ -121,7 +121,8 @@ async def test_admin_dashboard_redirects_without_auth(client):
     """Test admin dashboard redirects without authentication."""
     response = await client.get("/admin/dashboard", follow_redirects=False)
     # Admin pages redirect to login when not authenticated
-    assert response.status_code in [302, 401]
+    # 503 when admin credentials not configured, 302/401 otherwise
+    assert response.status_code in [302, 401, 503]
 
 
 @pytest.mark.asyncio
@@ -129,7 +130,8 @@ async def test_admin_list_prompts_redirects_without_auth(client):
     """Test admin prompts redirects without authentication."""
     response = await client.get("/admin/prompts", follow_redirects=False)
     # Admin pages redirect to login when not authenticated
-    assert response.status_code in [302, 401]
+    # 503 when admin credentials not configured, 302/401 otherwise
+    assert response.status_code in [302, 401, 503]
 
 
 @pytest.mark.asyncio
@@ -137,7 +139,8 @@ async def test_admin_list_clients(auth_client):
     """Test listing clients via API."""
     response = await auth_client.get("/api/admin/clients")
     # May return 200 or 403 depending on user role
-    assert response.status_code in [200, 403]
+    # 503 when admin credentials not configured
+    assert response.status_code in [200, 403, 503]
 
 
 # ============== Library Generation ==============

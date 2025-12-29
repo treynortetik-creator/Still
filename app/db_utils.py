@@ -55,13 +55,19 @@ async def execute_insert_returning_id(conn, query: str, params: tuple) -> int:
 
 
 async def execute(conn, query: str, params: tuple = ()):
-    """Execute a query with automatic placeholder conversion."""
+    """Execute a query with automatic placeholder conversion.
+
+    Returns:
+        For PostgreSQL: Command tag string (e.g., "DELETE 1", "UPDATE 0")
+        For SQLite: Number of affected rows (int)
+    """
     converted_query = sql(query)
 
     if settings.use_postgres:
         return await conn.execute(converted_query, *params)
     else:
-        return await conn.execute(query, params)
+        cursor = await conn.execute(query, params)
+        return cursor.rowcount
 
 
 async def fetchone(conn, query: str, params: tuple = ()):

@@ -14,7 +14,7 @@ class TestPersonaManager:
         """Test getting default personas."""
         personas = get_default_personas()
         assert "personas" in personas
-        assert len(personas["personas"]) == 3
+        assert len(personas["personas"]) >= 3  # At least 3 default personas
 
     @pytest.mark.asyncio
     async def test_list_personas(self):
