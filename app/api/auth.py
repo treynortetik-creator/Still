@@ -9,6 +9,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.database import get_db
+from app.db_utils import execute, fetchone, execute_insert_returning_id
 from app.services.auth import (
     get_password_hash,
     verify_password,
@@ -79,24 +80,20 @@ async def register(request: Request, user_data: UserRegister):
 
     async with get_db() as db:
         # Check if email already exists
-        cursor = await db.execute(
-            "SELECT id FROM users WHERE email = ?",
-            (user_data.email.lower(),)
-        )
-        if await cursor.fetchone():
+        existing = await fetchone(db, "SELECT id FROM users WHERE email = ?", (user_data.email.lower(),))
+        if existing:
             raise HTTPException(status_code=400, detail="Email already registered")
 
         # Create user
         hashed_password = get_password_hash(user_data.password)
-        cursor = await db.execute(
+        user_id = await execute_insert_returning_id(
+            db,
             """
             INSERT INTO users (email, password_hash, subscription_tier, created_at)
             VALUES (?, ?, ?, ?)
             """,
             (user_data.email.lower(), hashed_password, "free", datetime.utcnow().isoformat())
         )
-        await db.commit()
-        user_id = cursor.lastrowid
 
         # Create token
         token = create_access_token({"sub": str(user_id), "email": user_data.email.lower()})
@@ -120,11 +117,11 @@ async def login(request: Request, user_data: UserLogin):
     Returns JWT token on success.
     """
     async with get_db() as db:
-        cursor = await db.execute(
+        user = await fetchone(
+            db,
             "SELECT id, email, password_hash, subscription_tier FROM users WHERE email = ?",
             (user_data.email.lower(),)
         )
-        user = await cursor.fetchone()
 
         if not user:
             raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -186,11 +183,11 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
     user_id = payload.get("sub")
 
     async with get_db() as db:
-        cursor = await db.execute(
+        user = await fetchone(
+            db,
             "SELECT id, email, subscription_tier, created_at FROM users WHERE id = ?",
             (user_id,)
         )
-        user = await cursor.fetchone()
 
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
@@ -199,7 +196,7 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
             id=user["id"],
             email=user["email"],
             subscription_tier=user["subscription_tier"],
-            created_at=user["created_at"] or "",
+            created_at=str(user["created_at"]) if user["created_at"] else "",
         )
 
 

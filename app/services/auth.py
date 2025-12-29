@@ -7,6 +7,7 @@ from jose import JWTError, jwt
 
 from app.config import get_settings
 from app.database import get_db
+from app.db_utils import execute, fetchval
 
 settings = get_settings()
 
@@ -84,14 +85,26 @@ async def blacklist_token(token: str):
         expires_at = datetime.utcnow() + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
 
     async with get_db() as db:
-        await db.execute(
-            """
-            INSERT OR REPLACE INTO revoked_tokens (token_hash, expires_at)
-            VALUES (?, ?)
-            """,
-            (token_hash, expires_at.isoformat())
-        )
-        await db.commit()
+        if settings.use_postgres:
+            # PostgreSQL: use ON CONFLICT
+            await db.execute(
+                """
+                INSERT INTO revoked_tokens (token_hash, expires_at)
+                VALUES ($1, $2)
+                ON CONFLICT (token_hash) DO UPDATE SET expires_at = $2
+                """,
+                token_hash, expires_at
+            )
+        else:
+            # SQLite: use INSERT OR REPLACE
+            await db.execute(
+                """
+                INSERT OR REPLACE INTO revoked_tokens (token_hash, expires_at)
+                VALUES (?, ?)
+                """,
+                (token_hash, expires_at.isoformat())
+            )
+            await db.commit()
 
 
 async def is_token_blacklisted(token: str) -> bool:
@@ -99,21 +112,21 @@ async def is_token_blacklisted(token: str) -> bool:
     token_hash = _hash_token(token)
 
     async with get_db() as db:
-        cursor = await db.execute(
-            "SELECT 1 FROM revoked_tokens WHERE token_hash = ?",
-            (token_hash,)
-        )
-        return await cursor.fetchone() is not None
+        result = await fetchval(db, "SELECT 1 FROM revoked_tokens WHERE token_hash = ?", (token_hash,))
+        return result is not None
 
 
 async def cleanup_expired_tokens():
     """Remove expired tokens from the blacklist."""
     async with get_db() as db:
-        await db.execute(
-            "DELETE FROM revoked_tokens WHERE expires_at < ?",
-            (datetime.utcnow().isoformat(),)
-        )
-        await db.commit()
+        if settings.use_postgres:
+            await db.execute("DELETE FROM revoked_tokens WHERE expires_at < NOW()")
+        else:
+            await db.execute(
+                "DELETE FROM revoked_tokens WHERE expires_at < ?",
+                (datetime.utcnow().isoformat(),)
+            )
+            await db.commit()
 
 
 def validate_email(email: str) -> bool:
