@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 from app.config import get_settings
+from app.db_utils import fetchone, fetchall
 
 settings = get_settings()
 
@@ -58,11 +59,11 @@ async def get_persona(persona_id: str, user_id: int = None) -> Optional[dict]:
     if user_id:
         from app.database import get_db
         async with get_db() as db:
-            cursor = await db.execute(
+            row = await fetchone(
+                db,
                 "SELECT * FROM personas WHERE id = ? AND user_id = ?",
                 (persona_id, user_id)
             )
-            row = await cursor.fetchone()
             if row:
                 return _row_to_persona_dict(row)
 
@@ -128,11 +129,11 @@ async def list_all_personas(user_id: int) -> list[dict]:
 
     # Add custom personas from DB
     async with get_db() as db:
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             "SELECT * FROM personas WHERE user_id = ? ORDER BY created_at DESC",
             (user_id,)
         )
-        rows = await cursor.fetchall()
         for row in rows:
             result.append(_row_to_persona_dict(row))
 

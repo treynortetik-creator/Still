@@ -4,8 +4,10 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, List
 
+from app.config import get_settings
 from app.api.auth import get_current_user_id
 from app.database import get_db
+from app.db_utils import execute, fetchone
 from app.services.brand_voice_analyzer import (
     analyze_brand_voice,
     get_brand_voice_profile,
@@ -14,6 +16,7 @@ from app.services.brand_voice_analyzer import (
     delete_voice_sample,
 )
 
+settings = get_settings()
 router = APIRouter()
 
 
@@ -120,7 +123,8 @@ async def get_brand_voice_config(
 ):
     """Get the user's extended brand voice configuration."""
     async with get_db() as db:
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             """
             SELECT company_name, industry, tone_linkedin, tone_blog,
                    tone_email, tone_twitter, core_principles,
@@ -131,7 +135,6 @@ async def get_brand_voice_config(
             """,
             (user_id,)
         )
-        row = await cursor.fetchone()
 
         if not row:
             # Return defaults
@@ -173,28 +176,28 @@ async def update_brand_voice_config(
     """Update the user's extended brand voice configuration."""
     async with get_db() as db:
         # Check if exists
-        cursor = await db.execute(
+        exists = await fetchone(
+            db,
             "SELECT id FROM brand_voice_config WHERE user_id = ?",
             (user_id,)
         )
-        exists = await cursor.fetchone()
 
         core_principles_json = json.dumps(config.core_principles) if config.core_principles else None
         phrases_to_use_json = json.dumps(config.phrases_to_use) if config.phrases_to_use else None
         phrases_to_avoid_json = json.dumps(config.phrases_to_avoid) if config.phrases_to_avoid else None
 
         if exists:
-            # Update
-            await db.execute(
-                """
-                UPDATE brand_voice_config
-                SET company_name = ?, industry = ?, tone_linkedin = ?,
-                    tone_blog = ?, tone_email = ?, tone_twitter = ?,
-                    core_principles = ?, phrases_to_use = ?, phrases_to_avoid = ?,
-                    vocabulary_level = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE user_id = ?
-                """,
-                (
+            # Update - use NOW() for PostgreSQL, CURRENT_TIMESTAMP for SQLite
+            if settings.use_postgres:
+                await db.execute(
+                    """
+                    UPDATE brand_voice_config
+                    SET company_name = $1, industry = $2, tone_linkedin = $3,
+                        tone_blog = $4, tone_email = $5, tone_twitter = $6,
+                        core_principles = $7, phrases_to_use = $8, phrases_to_avoid = $9,
+                        vocabulary_level = $10, updated_at = NOW()
+                    WHERE user_id = $11
+                    """,
                     config.company_name,
                     config.industry,
                     config.tone_linkedin,
@@ -207,10 +210,35 @@ async def update_brand_voice_config(
                     config.vocabulary_level,
                     user_id,
                 )
-            )
+            else:
+                await execute(
+                    db,
+                    """
+                    UPDATE brand_voice_config
+                    SET company_name = ?, industry = ?, tone_linkedin = ?,
+                        tone_blog = ?, tone_email = ?, tone_twitter = ?,
+                        core_principles = ?, phrases_to_use = ?, phrases_to_avoid = ?,
+                        vocabulary_level = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE user_id = ?
+                    """,
+                    (
+                        config.company_name,
+                        config.industry,
+                        config.tone_linkedin,
+                        config.tone_blog,
+                        config.tone_email,
+                        config.tone_twitter,
+                        core_principles_json,
+                        phrases_to_use_json,
+                        phrases_to_avoid_json,
+                        config.vocabulary_level,
+                        user_id,
+                    )
+                )
         else:
             # Insert
-            await db.execute(
+            await execute(
+                db,
                 """
                 INSERT INTO brand_voice_config
                 (user_id, company_name, industry, tone_linkedin, tone_blog,
@@ -233,7 +261,8 @@ async def update_brand_voice_config(
                 )
             )
 
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
     return {"message": "Brand voice configuration saved", "config": config.model_dump()}
 
@@ -244,10 +273,12 @@ async def delete_brand_voice_config(
 ):
     """Delete the user's brand voice configuration (reset to defaults)."""
     async with get_db() as db:
-        await db.execute(
+        await execute(
+            db,
             "DELETE FROM brand_voice_config WHERE user_id = ?",
             (user_id,)
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
     return {"message": "Brand voice configuration reset to defaults"}

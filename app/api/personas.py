@@ -6,10 +6,10 @@ from pydantic import BaseModel
 
 from app.api.auth import get_current_user_id
 from app.database import get_db
+from app.db_utils import fetchall
 from app.services.persona_manager import get_persona, list_personas, load_personas
 from app.services.ai_client import call_llm_text
 from app.utils.json_parser import parse_llm_json
-import json
 
 router = APIRouter()
 
@@ -78,11 +78,11 @@ async def get_all_personas(
 
     # Get custom personas from database
     async with get_db() as db:
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             "SELECT * FROM personas WHERE user_id = ? ORDER BY created_at DESC",
             (user_id,)
         )
-        rows = await cursor.fetchall()
 
     custom_personas = [_row_to_persona_dict(row) for row in rows]
 

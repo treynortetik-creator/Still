@@ -3,9 +3,13 @@ import json
 import logging
 from typing import Dict, List, Tuple, Optional
 
+from app.config import get_settings
 from app.database import get_db
+from app.db_utils import execute, fetchone, fetchall
 from app.services.ai_client import call_llm_text, calculate_openrouter_cost
 from app.utils.json_parser import parse_llm_json
+
+settings = get_settings()
 
 logger = logging.getLogger(__name__)
 
@@ -24,31 +28,39 @@ async def analyze_brand_voice(user_id: int, profile_id: int = None) -> Tuple[Dic
     async with get_db() as db:
         # Get or create profile
         if profile_id:
-            cursor = await db.execute(
+            profile_row = await fetchone(
+                db,
                 "SELECT id FROM brand_voice_profiles WHERE id = ? AND user_id = ?",
                 (profile_id, user_id)
             )
         else:
-            cursor = await db.execute(
+            profile_row = await fetchone(
+                db,
                 "SELECT id FROM brand_voice_profiles WHERE user_id = ? ORDER BY created_at LIMIT 1",
                 (user_id,)
             )
 
-        profile_row = await cursor.fetchone()
-
         if not profile_row:
             # Create default profile
-            cursor = await db.execute(
-                "INSERT INTO brand_voice_profiles (user_id) VALUES (?)",
-                (user_id,)
-            )
-            await db.commit()
-            profile_id = cursor.lastrowid
+            if settings.use_postgres:
+                row = await db.fetchrow(
+                    "INSERT INTO brand_voice_profiles (user_id) VALUES ($1) RETURNING id",
+                    user_id
+                )
+                profile_id = row["id"]
+            else:
+                cursor = await db.execute(
+                    "INSERT INTO brand_voice_profiles (user_id) VALUES (?)",
+                    (user_id,)
+                )
+                await db.commit()
+                profile_id = cursor.lastrowid
         else:
             profile_id = profile_row["id"]
 
         # Get samples for this profile
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             """
             SELECT content, content_type
             FROM brand_voice_samples
@@ -58,7 +70,6 @@ async def analyze_brand_voice(user_id: int, profile_id: int = None) -> Tuple[Dic
             """,
             (profile_id,)
         )
-        rows = await cursor.fetchall()
 
         if len(rows) < 3:
             raise ValueError(f"Need at least 3 samples to analyze (have {len(rows)})")
@@ -134,20 +145,20 @@ OUTPUT FORMAT (valid JSON):
 
     # Save to database
     async with get_db() as db:
-        await db.execute(
-            """
-            UPDATE brand_voice_profiles SET
-                vocabulary_patterns = ?,
-                sentence_structure = ?,
-                tone_markers = ?,
-                phrases_to_use = ?,
-                phrases_to_avoid = ?,
-                overall_summary = ?,
-                sample_count = ?,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-            """,
-            (
+        if settings.use_postgres:
+            await db.execute(
+                """
+                UPDATE brand_voice_profiles SET
+                    vocabulary_patterns = $1,
+                    sentence_structure = $2,
+                    tone_markers = $3,
+                    phrases_to_use = $4,
+                    phrases_to_avoid = $5,
+                    overall_summary = $6,
+                    sample_count = $7,
+                    updated_at = NOW()
+                WHERE id = $8
+                """,
                 json.dumps(result.get("vocabulary_patterns")),
                 json.dumps(result.get("sentence_structure")),
                 json.dumps(result.get("tone_markers")),
@@ -157,14 +168,44 @@ OUTPUT FORMAT (valid JSON):
                 len(rows),
                 profile_id,
             )
-        )
-
-        # Update user's cost
-        await db.execute(
-            "UPDATE users SET total_cost_incurred = total_cost_incurred + ? WHERE id = ?",
-            (cost, user_id)
-        )
-        await db.commit()
+            # Update user's cost
+            await db.execute(
+                "UPDATE users SET total_cost_incurred = total_cost_incurred + $1 WHERE id = $2",
+                cost, user_id
+            )
+        else:
+            await execute(
+                db,
+                """
+                UPDATE brand_voice_profiles SET
+                    vocabulary_patterns = ?,
+                    sentence_structure = ?,
+                    tone_markers = ?,
+                    phrases_to_use = ?,
+                    phrases_to_avoid = ?,
+                    overall_summary = ?,
+                    sample_count = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (
+                    json.dumps(result.get("vocabulary_patterns")),
+                    json.dumps(result.get("sentence_structure")),
+                    json.dumps(result.get("tone_markers")),
+                    json.dumps(result.get("phrases_to_use")),
+                    json.dumps(result.get("phrases_to_avoid")),
+                    result.get("overall_summary"),
+                    len(rows),
+                    profile_id,
+                )
+            )
+            # Update user's cost
+            await execute(
+                db,
+                "UPDATE users SET total_cost_incurred = total_cost_incurred + ? WHERE id = ?",
+                (cost, user_id)
+            )
+            await db.commit()
 
     return result, cost
 
@@ -172,7 +213,8 @@ OUTPUT FORMAT (valid JSON):
 async def get_brand_voice_profile(user_id: int) -> Optional[Dict]:
     """Get the user's brand voice profile."""
     async with get_db() as db:
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             """
             SELECT *
             FROM brand_voice_profiles
@@ -182,7 +224,6 @@ async def get_brand_voice_profile(user_id: int) -> Optional[Dict]:
             """,
             (user_id,)
         )
-        row = await cursor.fetchone()
 
         if not row or not row["overall_summary"]:
             return None
@@ -205,16 +246,17 @@ async def get_voice_samples(user_id: int) -> List[Dict]:
     """Get the user's voice samples."""
     async with get_db() as db:
         # Get or create profile first
-        cursor = await db.execute(
+        profile_row = await fetchone(
+            db,
             "SELECT id FROM brand_voice_profiles WHERE user_id = ? ORDER BY created_at LIMIT 1",
             (user_id,)
         )
-        profile_row = await cursor.fetchone()
 
         if not profile_row:
             return []
 
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             """
             SELECT id, content, content_type, created_at
             FROM brand_voice_samples
@@ -223,7 +265,6 @@ async def get_voice_samples(user_id: int) -> List[Dict]:
             """,
             (profile_row["id"],)
         )
-        rows = await cursor.fetchall()
 
         return [
             {
@@ -240,44 +281,69 @@ async def add_voice_sample(user_id: int, content: str, content_type: str = "gene
     """Add a writing sample for voice analysis."""
     async with get_db() as db:
         # Get or create profile
-        cursor = await db.execute(
+        profile_row = await fetchone(
+            db,
             "SELECT id FROM brand_voice_profiles WHERE user_id = ? ORDER BY created_at LIMIT 1",
             (user_id,)
         )
-        profile_row = await cursor.fetchone()
 
         if not profile_row:
-            cursor = await db.execute(
-                "INSERT INTO brand_voice_profiles (user_id) VALUES (?)",
-                (user_id,)
-            )
-            await db.commit()
-            profile_id = cursor.lastrowid
+            if settings.use_postgres:
+                row = await db.fetchrow(
+                    "INSERT INTO brand_voice_profiles (user_id) VALUES ($1) RETURNING id",
+                    user_id
+                )
+                profile_id = row["id"]
+            else:
+                cursor = await db.execute(
+                    "INSERT INTO brand_voice_profiles (user_id) VALUES (?)",
+                    (user_id,)
+                )
+                await db.commit()
+                profile_id = cursor.lastrowid
         else:
             profile_id = profile_row["id"]
 
         # Add sample
-        cursor = await db.execute(
-            """
-            INSERT INTO brand_voice_samples (user_id, profile_id, content, content_type)
-            VALUES (?, ?, ?, ?)
-            """,
-            (user_id, profile_id, content.strip(), content_type)
-        )
-        await db.commit()
-
-        return cursor.lastrowid
+        if settings.use_postgres:
+            row = await db.fetchrow(
+                """
+                INSERT INTO brand_voice_samples (user_id, profile_id, content, content_type)
+                VALUES ($1, $2, $3, $4)
+                RETURNING id
+                """,
+                user_id, profile_id, content.strip(), content_type
+            )
+            return row["id"]
+        else:
+            cursor = await db.execute(
+                """
+                INSERT INTO brand_voice_samples (user_id, profile_id, content, content_type)
+                VALUES (?, ?, ?, ?)
+                """,
+                (user_id, profile_id, content.strip(), content_type)
+            )
+            await db.commit()
+            return cursor.lastrowid
 
 
 async def delete_voice_sample(user_id: int, sample_id: int) -> bool:
     """Delete a voice sample."""
     async with get_db() as db:
-        cursor = await db.execute(
-            "DELETE FROM brand_voice_samples WHERE id = ? AND user_id = ?",
-            (sample_id, user_id)
-        )
-        await db.commit()
-        return cursor.rowcount > 0
+        if settings.use_postgres:
+            result = await db.execute(
+                "DELETE FROM brand_voice_samples WHERE id = $1 AND user_id = $2",
+                sample_id, user_id
+            )
+            # asyncpg returns 'DELETE N' where N is the count
+            return result and result != "DELETE 0"
+        else:
+            cursor = await db.execute(
+                "DELETE FROM brand_voice_samples WHERE id = ? AND user_id = ?",
+                (sample_id, user_id)
+            )
+            await db.commit()
+            return cursor.rowcount > 0
 
 
 async def get_voice_context_for_drafting(user_id: int) -> str:
@@ -329,7 +395,8 @@ async def get_brand_voice_config_context(user_id: int, content_type: str = None)
         Formatted context string for prompt injection
     """
     async with get_db() as db:
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             """
             SELECT company_name, industry, tone_linkedin, tone_blog,
                    tone_email, core_principles, phrases_to_use,
@@ -339,7 +406,6 @@ async def get_brand_voice_config_context(user_id: int, content_type: str = None)
             """,
             (user_id,)
         )
-        row = await cursor.fetchone()
 
         if not row:
             return ""

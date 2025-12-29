@@ -5,10 +5,13 @@ from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 
+from app.config import get_settings
 from app.database import get_db
+from app.db_utils import execute, fetchone, fetchall
 from app.api.auth import get_current_user_id
 from app.models.persona import PersonaCreate, PersonaUpdate, PersonaResponse, PersonaListResponse
 
+settings = get_settings()
 router = APIRouter()
 
 
@@ -43,7 +46,8 @@ async def create_persona(
     now = datetime.utcnow().isoformat()
 
     async with get_db() as db:
-        await db.execute(
+        await execute(
+            db,
             """
             INSERT INTO personas (id, user_id, name, role, industry, pain_points, goals,
                                   tone_preferences, content_preferences, is_default, created_at, updated_at)
@@ -64,14 +68,15 @@ async def create_persona(
                 now,
             )
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
         # Fetch the created persona
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             "SELECT * FROM personas WHERE id = ?",
             (persona_id,)
         )
-        row = await cursor.fetchone()
 
     return PersonaResponse(
         id=row["id"],
@@ -95,11 +100,11 @@ async def list_custom_personas(
 ):
     """List all custom personas for the current user."""
     async with get_db() as db:
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             "SELECT * FROM personas WHERE user_id = ? ORDER BY created_at DESC",
             (user_id,)
         )
-        rows = await cursor.fetchall()
 
     personas = [_row_to_persona_dict(row) for row in rows]
     return {"personas": personas, "total": len(personas)}
@@ -112,11 +117,11 @@ async def get_custom_persona(
 ):
     """Get a specific custom persona."""
     async with get_db() as db:
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             "SELECT * FROM personas WHERE id = ? AND user_id = ?",
             (persona_id, user_id)
         )
-        row = await cursor.fetchone()
 
     if not row:
         raise HTTPException(status_code=404, detail="Persona not found")
@@ -133,11 +138,11 @@ async def update_persona(
     """Update an existing custom persona."""
     async with get_db() as db:
         # Check persona exists and belongs to user
-        cursor = await db.execute(
+        existing = await fetchone(
+            db,
             "SELECT * FROM personas WHERE id = ? AND user_id = ?",
             (persona_id, user_id)
         )
-        existing = await cursor.fetchone()
 
         if not existing:
             raise HTTPException(status_code=404, detail="Persona not found")
@@ -176,18 +181,20 @@ async def update_persona(
         params.append(persona_id)
         params.append(user_id)
 
-        await db.execute(
+        await execute(
+            db,
             f"UPDATE personas SET {', '.join(update_fields)} WHERE id = ? AND user_id = ?",
-            params
+            tuple(params)
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
         # Fetch updated persona
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             "SELECT * FROM personas WHERE id = ?",
             (persona_id,)
         )
-        row = await cursor.fetchone()
 
     return _row_to_persona_dict(row)
 
@@ -200,19 +207,21 @@ async def delete_persona(
     """Delete a custom persona."""
     async with get_db() as db:
         # Check persona exists and belongs to user
-        cursor = await db.execute(
+        existing = await fetchone(
+            db,
             "SELECT id FROM personas WHERE id = ? AND user_id = ?",
             (persona_id, user_id)
         )
-        existing = await cursor.fetchone()
 
         if not existing:
             raise HTTPException(status_code=404, detail="Persona not found")
 
-        await db.execute(
+        await execute(
+            db,
             "DELETE FROM personas WHERE id = ? AND user_id = ?",
             (persona_id, user_id)
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
     return {"message": "Persona deleted successfully"}
