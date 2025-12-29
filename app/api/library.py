@@ -4,10 +4,13 @@ import uuid
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends
 from typing import Optional
 
+from app.config import get_settings
 from app.database import get_db
+from app.db_utils import execute, fetchone, fetchall, fetchval
 from app.models.job import JobResponse, JobStatus
 from app.api.auth import get_current_user_id
 
+settings = get_settings()
 router = APIRouter()
 
 
@@ -50,8 +53,7 @@ async def get_library(
         query += " ORDER BY date_added DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
 
-        cursor = await db.execute(query, params)
-        rows = await cursor.fetchall()
+        rows = await fetchall(db, query, tuple(params))
 
         entries = []
         for row in rows:
@@ -99,8 +101,7 @@ async def get_library(
             count_query += " AND topics LIKE ?"
             count_params.append(f'%"{topic}"%')  # JSON array contains check
 
-        cursor = await db.execute(count_query, count_params)
-        total = (await cursor.fetchone())[0]
+        total = await fetchval(db, count_query, tuple(count_params))
 
         return {
             "entries": entries,
@@ -117,7 +118,8 @@ async def get_library_stats(user_id: int = Depends(get_current_user_id)):
     """
     async with get_db() as db:
         # Count by type
-        cursor = await db.execute(
+        type_rows = await fetchall(
+            db,
             """
             SELECT entry_type, COUNT(*) as count
             FROM content_library
@@ -126,17 +128,18 @@ async def get_library_stats(user_id: int = Depends(get_current_user_id)):
             """,
             (user_id,)
         )
-        type_counts = {row["entry_type"]: row["count"] for row in await cursor.fetchall()}
+        type_counts = {row["entry_type"]: row["count"] for row in type_rows}
 
         # Total count
-        cursor = await db.execute(
+        total = await fetchval(
+            db,
             "SELECT COUNT(*) FROM content_library WHERE user_id = ?",
             (user_id,)
         )
-        total = (await cursor.fetchone())[0]
 
         # Most used
-        cursor = await db.execute(
+        most_used_rows = await fetchall(
+            db,
             """
             SELECT id, content, times_used
             FROM content_library
@@ -148,7 +151,7 @@ async def get_library_stats(user_id: int = Depends(get_current_user_id)):
         )
         most_used = [
             {"id": row["id"], "content": row["content"][:100], "times_used": row["times_used"]}
-            for row in await cursor.fetchall()
+            for row in most_used_rows
         ]
 
         return {
@@ -166,7 +169,8 @@ async def get_library_filters(user_id: int = Depends(get_current_user_id)):
     """
     async with get_db() as db:
         # Get unique campaigns
-        cursor = await db.execute(
+        campaign_rows = await fetchall(
+            db,
             """
             SELECT DISTINCT campaign_name
             FROM content_library
@@ -175,10 +179,11 @@ async def get_library_filters(user_id: int = Depends(get_current_user_id)):
             """,
             (user_id,)
         )
-        campaigns = [row[0] for row in await cursor.fetchall()]
+        campaigns = [row["campaign_name"] for row in campaign_rows]
 
         # Get unique topics (from JSON arrays)
-        cursor = await db.execute(
+        topic_rows = await fetchall(
+            db,
             """
             SELECT topics FROM content_library
             WHERE user_id = ? AND topics IS NOT NULL AND topics != '[]'
@@ -187,9 +192,9 @@ async def get_library_filters(user_id: int = Depends(get_current_user_id)):
         )
 
         all_topics = set()
-        for row in await cursor.fetchall():
-            if row[0]:
-                topics_list = json.loads(row[0])
+        for row in topic_rows:
+            if row["topics"]:
+                topics_list = json.loads(row["topics"])
                 all_topics.update(topics_list)
 
         return {
@@ -221,7 +226,8 @@ async def generate_from_library(
     async with get_db() as db:
         # Verify stills exist and get their content
         placeholders = ",".join("?" * len(ids_to_use))
-        cursor = await db.execute(
+        stills = await fetchall(
+            db,
             f"""
             SELECT id, entry_type, content, persona_relevance
             FROM content_library
@@ -229,7 +235,6 @@ async def generate_from_library(
             """,
             (*ids_to_use, user_id)
         )
-        stills = await cursor.fetchall()
 
         if len(stills) != len(ids_to_use):
             raise HTTPException(status_code=404, detail="Some stills not found")
@@ -247,7 +252,8 @@ async def generate_from_library(
                 "persona_relevance": json.loads(still["persona_relevance"]) if still["persona_relevance"] else {},
             })
 
-        await db.execute(
+        await execute(
+            db,
             """
             INSERT INTO jobs (
                 id, user_id, status, original_filename, file_type,
@@ -270,19 +276,28 @@ async def generate_from_library(
                 json.dumps(still_content),  # Store still content as transcript
             )
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
         # Update usage stats for the stills
         for still_id in ids_to_use:
-            await db.execute(
-                """
-                UPDATE content_library
-                SET times_used = times_used + 1, last_used = CURRENT_TIMESTAMP
-                WHERE id = ?
-                """,
-                (still_id,)
-            )
-        await db.commit()
+            if settings.use_postgres:
+                await db.execute(
+                    "UPDATE content_library SET times_used = times_used + 1, last_used = NOW() WHERE id = $1",
+                    still_id
+                )
+            else:
+                await execute(
+                    db,
+                    """
+                    UPDATE content_library
+                    SET times_used = times_used + 1, last_used = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                    """,
+                    (still_id,)
+                )
+        if not settings.use_postgres:
+            await db.commit()
 
     # Start background processing (skip transcription and distillation)
     from app.services.pipeline import process_job_from_library
@@ -301,15 +316,17 @@ async def delete_library_entry(entry_id: int, user_id: int = Depends(get_current
     Delete a library entry.
     """
     async with get_db() as db:
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             "SELECT id FROM content_library WHERE id = ? AND user_id = ?",
             (entry_id, user_id)
         )
-        if not await cursor.fetchone():
+        if not row:
             raise HTTPException(status_code=404, detail="Entry not found")
 
-        await db.execute("DELETE FROM content_library WHERE id = ?", (entry_id,))
-        await db.commit()
+        await execute(db, "DELETE FROM content_library WHERE id = ?", (entry_id,))
+        if not settings.use_postgres:
+            await db.commit()
 
     return {"message": "Entry deleted successfully"}
 
@@ -320,17 +337,20 @@ async def update_library_notes(entry_id: int, notes: str, user_id: int = Depends
     Update user notes for a library entry.
     """
     async with get_db() as db:
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             "SELECT id FROM content_library WHERE id = ? AND user_id = ?",
             (entry_id, user_id)
         )
-        if not await cursor.fetchone():
+        if not row:
             raise HTTPException(status_code=404, detail="Entry not found")
 
-        await db.execute(
+        await execute(
+            db,
             "UPDATE content_library SET user_notes = ? WHERE id = ?",
             (notes, entry_id)
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
     return {"message": "Notes updated successfully"}

@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse, Response
 
 from app.database import get_db
+from app.db_utils import fetchone, fetchall
 from app.api.auth import get_current_user_id
 
 router = APIRouter()
@@ -59,7 +60,8 @@ async def get_job_with_outputs(job_id: str, user_id: int) -> tuple[dict, list[di
     """
     async with get_db() as db:
         # Get job details
-        cursor = await db.execute(
+        job = await fetchone(
+            db,
             """
             SELECT id, original_filename, target_persona, asset_types,
                    cost_incurred, created_at, completed_at
@@ -67,13 +69,13 @@ async def get_job_with_outputs(job_id: str, user_id: int) -> tuple[dict, list[di
             """,
             (job_id, user_id)
         )
-        job = await cursor.fetchone()
 
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
 
         # Get outputs
-        cursor = await db.execute(
+        output_rows = await fetchall(
+            db,
             """
             SELECT id, content_type, variation_number,
                    step1_draft, step2_edited, step3_final,
@@ -84,7 +86,6 @@ async def get_job_with_outputs(job_id: str, user_id: int) -> tuple[dict, list[di
             """,
             (job_id,)
         )
-        output_rows = await cursor.fetchall()
 
         outputs = []
         for row in output_rows:
@@ -103,7 +104,8 @@ async def get_job_with_outputs(job_id: str, user_id: int) -> tuple[dict, list[di
             })
 
         # Get stills
-        cursor = await db.execute(
+        still_rows = await fetchall(
+            db,
             """
             SELECT id, still_type, content, source_location,
                    tags, persona_relevance, quote_attribution
@@ -112,7 +114,6 @@ async def get_job_with_outputs(job_id: str, user_id: int) -> tuple[dict, list[di
             """,
             (job_id,)
         )
-        still_rows = await cursor.fetchall()
 
         stills = []
         for row in still_rows:

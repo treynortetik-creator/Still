@@ -3,7 +3,9 @@ from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Query
 
+from app.config import get_settings
 from app.database import get_db
+from app.db_utils import execute, fetchone, fetchall
 from app.api.auth import get_current_user_id
 from app.services.ai_editor import get_ai_edit_suggestions
 from app.models.workshop import (
@@ -17,6 +19,7 @@ from app.models.workshop import (
     AIEditRequest,
 )
 
+settings = get_settings()
 router = APIRouter()
 
 
@@ -44,8 +47,7 @@ async def list_workshop_outputs(
 
         query += " ORDER BY COALESCE(o.last_edited, o.created_at) DESC"
 
-        cursor = await db.execute(query, params)
-        rows = await cursor.fetchall()
+        rows = await fetchall(db, query, tuple(params))
 
         outputs = []
         for row in rows:
@@ -79,7 +81,8 @@ async def get_workshop_output(
     """Get a single output for editing in the workshop."""
     async with get_db() as db:
         # Get the output with user verification
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             """
             SELECT o.id, o.job_id, o.content_type, o.status, o.step3_final,
                    o.edited_content, o.last_edited, o.created_at,
@@ -90,7 +93,6 @@ async def get_workshop_output(
             """,
             (output_id, user_id)
         )
-        row = await cursor.fetchone()
 
         if not row:
             raise HTTPException(status_code=404, detail="Output not found")
@@ -100,7 +102,8 @@ async def get_workshop_output(
         original_content = row["step3_final"] or ""
 
         # Get stills from the parent job
-        cursor = await db.execute(
+        still_rows = await fetchall(
+            db,
             """
             SELECT id, still_type, content, source_location
             FROM stills
@@ -109,7 +112,6 @@ async def get_workshop_output(
             """,
             (row["job_id"],)
         )
-        still_rows = await cursor.fetchall()
 
         stills = [
             StillPreview(
@@ -148,7 +150,8 @@ async def update_workshop_content(
     """Save edited content for an output."""
     async with get_db() as db:
         # Verify ownership
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             """
             SELECT o.id
             FROM outputs o
@@ -157,12 +160,13 @@ async def update_workshop_content(
             """,
             (output_id, user_id)
         )
-        if not await cursor.fetchone():
+        if not row:
             raise HTTPException(status_code=404, detail="Output not found")
 
         # Update the content
         now = datetime.utcnow().isoformat()
-        await db.execute(
+        await execute(
+            db,
             """
             UPDATE outputs
             SET edited_content = ?, last_edited = ?
@@ -170,14 +174,15 @@ async def update_workshop_content(
             """,
             (data.content, now, output_id)
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
         # Get updated record
-        cursor = await db.execute(
+        updated = await fetchone(
+            db,
             "SELECT status, last_edited FROM outputs WHERE id = ?",
             (output_id,)
         )
-        updated = await cursor.fetchone()
 
         return WorkshopUpdateResponse(
             id=output_id,
@@ -196,7 +201,8 @@ async def update_workshop_status(
     """Update the status of an output."""
     async with get_db() as db:
         # Verify ownership
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             """
             SELECT o.id
             FROM outputs o
@@ -205,12 +211,13 @@ async def update_workshop_status(
             """,
             (output_id, user_id)
         )
-        if not await cursor.fetchone():
+        if not row:
             raise HTTPException(status_code=404, detail="Output not found")
 
         # Update the status
         now = datetime.utcnow().isoformat()
-        await db.execute(
+        await execute(
+            db,
             """
             UPDATE outputs
             SET status = ?, last_edited = ?
@@ -218,7 +225,8 @@ async def update_workshop_status(
             """,
             (data.status, now, output_id)
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
         return WorkshopUpdateResponse(
             id=output_id,
@@ -236,7 +244,8 @@ async def delete_workshop_output(
     """Delete an output from the workshop."""
     async with get_db() as db:
         # Verify ownership
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             """
             SELECT o.id
             FROM outputs o
@@ -245,12 +254,13 @@ async def delete_workshop_output(
             """,
             (output_id, user_id)
         )
-        if not await cursor.fetchone():
+        if not row:
             raise HTTPException(status_code=404, detail="Output not found")
 
         # Delete the output
-        await db.execute("DELETE FROM outputs WHERE id = ?", (output_id,))
-        await db.commit()
+        await execute(db, "DELETE FROM outputs WHERE id = ?", (output_id,))
+        if not settings.use_postgres:
+            await db.commit()
 
         return {"message": "Output deleted successfully"}
 
@@ -268,7 +278,8 @@ async def request_ai_edit(
     """
     async with get_db() as db:
         # Verify ownership
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             """
             SELECT o.id, o.content_type
             FROM outputs o
@@ -277,7 +288,6 @@ async def request_ai_edit(
             """,
             (output_id, user_id)
         )
-        row = await cursor.fetchone()
 
         if not row:
             raise HTTPException(status_code=404, detail="Output not found")

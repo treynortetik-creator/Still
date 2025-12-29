@@ -5,7 +5,9 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
+from app.config import get_settings
 from app.database import get_db
+from app.db_utils import execute, fetchone, fetchall
 from app.api.auth import get_current_user_id
 from app.services.content_editor import (
     adjust_tone,
@@ -14,6 +16,7 @@ from app.services.content_editor import (
     TONE_PRESETS
 )
 
+settings = get_settings()
 router = APIRouter()
 
 
@@ -64,7 +67,8 @@ async def adjust_content_tone(
 
     async with get_db() as db:
         # Get output and verify access
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             """
             SELECT o.*, j.id as job_id FROM outputs o
             JOIN jobs j ON o.job_id = j.id
@@ -72,7 +76,6 @@ async def adjust_content_tone(
             """,
             (data.output_id, user_id)
         )
-        row = await cursor.fetchone()
 
         if not row:
             raise HTTPException(status_code=404, detail="Output not found")
@@ -97,11 +100,13 @@ async def adjust_content_tone(
 
     # Update user's cost
     async with get_db() as db:
-        await db.execute(
+        await execute(
+            db,
             "UPDATE users SET total_cost_incurred = total_cost_incurred + ? WHERE id = ?",
             (cost, user_id)
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
     return {
         "output_id": data.output_id,
@@ -124,7 +129,8 @@ async def apply_changes(
     """
     async with get_db() as db:
         # Get output and verify access
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             """
             SELECT o.*, j.id as job_id FROM outputs o
             JOIN jobs j ON o.job_id = j.id
@@ -132,7 +138,6 @@ async def apply_changes(
             """,
             (data.output_id, user_id)
         )
-        row = await cursor.fetchone()
 
         if not row:
             raise HTTPException(status_code=404, detail="Output not found")
@@ -155,11 +160,13 @@ async def apply_changes(
 
     # Update user's cost
     async with get_db() as db:
-        await db.execute(
+        await execute(
+            db,
             "UPDATE users SET total_cost_incurred = total_cost_incurred + ? WHERE id = ?",
             (cost, user_id)
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
     return {
         "output_id": data.output_id,
@@ -182,7 +189,8 @@ async def save_edit(
     """
     async with get_db() as db:
         # Get output and verify access
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             """
             SELECT o.*, j.id as job_id FROM outputs o
             JOIN jobs j ON o.job_id = j.id
@@ -190,7 +198,6 @@ async def save_edit(
             """,
             (data.output_id, user_id)
         )
-        row = await cursor.fetchone()
 
         if not row:
             raise HTTPException(status_code=404, detail="Output not found")
@@ -199,7 +206,8 @@ async def save_edit(
         current_content = row["step3_final"] or row["step2_edited"] or row["step1_draft"]
 
         # Save to edit history
-        await db.execute(
+        await execute(
+            db,
             """
             INSERT INTO output_edits (output_id, user_id, previous_content, new_content, edit_note)
             VALUES (?, ?, ?, ?, ?)
@@ -208,7 +216,8 @@ async def save_edit(
         )
 
         # Update output with new content
-        await db.execute(
+        await execute(
+            db,
             """
             UPDATE outputs
             SET step3_final = ?, user_edits = user_edits + 1
@@ -217,7 +226,8 @@ async def save_edit(
             (data.edited_content, output_id)
         )
 
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
         return {
             "success": True,
@@ -234,7 +244,8 @@ async def get_edit_history(
     """Get edit history for an output."""
     async with get_db() as db:
         # Verify access
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             """
             SELECT o.id FROM outputs o
             JOIN jobs j ON o.job_id = j.id
@@ -242,11 +253,12 @@ async def get_edit_history(
             """,
             (output_id, user_id)
         )
-        if not await cursor.fetchone():
+        if not row:
             raise HTTPException(status_code=404, detail="Output not found")
 
         # Get edit history
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             """
             SELECT id, previous_content, new_content, edit_note, created_at
             FROM output_edits
@@ -255,7 +267,6 @@ async def get_edit_history(
             """,
             (output_id,)
         )
-        rows = await cursor.fetchall()
 
         history = []
         for row in rows:
@@ -283,7 +294,8 @@ async def revert_to_version(
     """Revert output to a previous version from edit history."""
     async with get_db() as db:
         # Verify access and get edit record
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             """
             SELECT e.*, o.step3_final as current_content
             FROM output_edits e
@@ -293,7 +305,6 @@ async def revert_to_version(
             """,
             (edit_id, output_id, user_id)
         )
-        row = await cursor.fetchone()
 
         if not row:
             raise HTTPException(status_code=404, detail="Edit record not found")
@@ -303,7 +314,8 @@ async def revert_to_version(
         current_content = row["current_content"]
 
         # Save current as new edit history entry
-        await db.execute(
+        await execute(
+            db,
             """
             INSERT INTO output_edits (output_id, user_id, previous_content, new_content, edit_note)
             VALUES (?, ?, ?, ?, ?)
@@ -312,12 +324,14 @@ async def revert_to_version(
         )
 
         # Update output
-        await db.execute(
+        await execute(
+            db,
             "UPDATE outputs SET step3_final = ?, user_edits = user_edits + 1 WHERE id = ?",
             (revert_content, output_id)
         )
 
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
         return {
             "success": True,

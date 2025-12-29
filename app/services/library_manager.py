@@ -3,8 +3,11 @@ import json
 import logging
 from typing import Optional
 
+from app.config import get_settings
 from app.database import get_db
+from app.db_utils import execute, fetchone, fetchall, fetchval
 
+settings = get_settings()
 logger = logging.getLogger(__name__)
 
 
@@ -76,7 +79,8 @@ async def add_stills_to_library(
             # Validate and sanitize the still data
             validated = validate_still(still)
 
-            await db.execute(
+            await execute(
+                db,
                 """
                 INSERT INTO content_library (
                     user_id, entry_type, content, source, source_timestamp,
@@ -97,7 +101,8 @@ async def add_stills_to_library(
             )
             count += 1
 
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
     return count
 
@@ -119,7 +124,8 @@ async def save_stills_to_db(stills: list[dict], campaign_name: Optional[str] = N
                 logger.warning(f"Skipping still with missing required fields: {still.get('id')}")
                 continue
 
-            await db.execute(
+            await execute(
+                db,
                 """
                 INSERT INTO stills (
                     id, job_id, user_id, still_type, content,
@@ -144,7 +150,8 @@ async def save_stills_to_db(stills: list[dict], campaign_name: Optional[str] = N
             )
             count += 1
 
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
     return count
 
@@ -162,18 +169,20 @@ async def save_outputs_to_db(outputs: list[dict], job_id: str, campaign_name: Op
             # Validate and sanitize the output data
             validated = validate_output(output)
 
-            cursor = await db.execute(
-                """
-                INSERT INTO outputs (
-                    job_id, content_type, variation_number,
-                    step1_draft, step2_edited, step3_final,
-                    atoms_used, citations, warnings, quality_scores,
-                    hook_variations, subject, preview_text,
-                    email_day, email_purpose, sequence_name,
-                    topics, campaign_name
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
+            if settings.use_postgres:
+                # PostgreSQL: use RETURNING to get the inserted ID
+                row = await db.fetchrow(
+                    """
+                    INSERT INTO outputs (
+                        job_id, content_type, variation_number,
+                        step1_draft, step2_edited, step3_final,
+                        atoms_used, citations, warnings, quality_scores,
+                        hook_variations, subject, preview_text,
+                        email_day, email_purpose, sequence_name,
+                        topics, campaign_name
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+                    RETURNING id
+                    """,
                     job_id,
                     validated["content_type"],
                     validated["variation_number"],
@@ -193,14 +202,50 @@ async def save_outputs_to_db(outputs: list[dict], job_id: str, campaign_name: Op
                     json.dumps(validated["topics"]),
                     campaign_name or validated["campaign_name"],
                 )
-            )
-            output_id = cursor.lastrowid
+                output_id = row["id"]
+            else:
+                # SQLite: use lastrowid
+                cursor = await db.execute(
+                    """
+                    INSERT INTO outputs (
+                        job_id, content_type, variation_number,
+                        step1_draft, step2_edited, step3_final,
+                        atoms_used, citations, warnings, quality_scores,
+                        hook_variations, subject, preview_text,
+                        email_day, email_purpose, sequence_name,
+                        topics, campaign_name
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        job_id,
+                        validated["content_type"],
+                        validated["variation_number"],
+                        validated["content"] or validated["step1_draft"],
+                        validated["step2_edited"],
+                        validated["step3_final"],
+                        json.dumps(validated["stills_used"]),
+                        json.dumps(validated["citations"]),
+                        json.dumps(validated["warnings"]),
+                        json.dumps(validated["quality_scores"]) if validated["quality_scores"] else None,
+                        json.dumps(validated["hook_variations"]) if validated["hook_variations"] else None,
+                        validated["subject"],
+                        validated["preview_text"],
+                        validated["email_day"],
+                        validated["email_purpose"],
+                        validated["sequence_name"],
+                        json.dumps(validated["topics"]),
+                        campaign_name or validated["campaign_name"],
+                    )
+                )
+                output_id = cursor.lastrowid
+
             count += 1
 
             # Save image prompts if present
             image_prompts = output.get("image_prompts", [])
             for prompt in image_prompts:
-                await db.execute(
+                await execute(
+                    db,
                     """
                     INSERT INTO image_prompts (output_id, prompt_text, platform, dimensions, style_modifiers)
                     VALUES (?, ?, ?, ?, ?)
@@ -214,7 +259,8 @@ async def save_outputs_to_db(outputs: list[dict], job_id: str, campaign_name: Op
                     )
                 )
 
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
     return count
 
@@ -228,7 +274,8 @@ async def get_library_entries_by_ids(entry_ids: list[int], user_id: int) -> list
 
     async with get_db() as db:
         placeholders = ",".join("?" * len(entry_ids))
-        cursor = await db.execute(
+        rows = await fetchall(
+            db,
             f"""
             SELECT * FROM content_library
             WHERE id IN ({placeholders}) AND user_id = ?
@@ -237,7 +284,7 @@ async def get_library_entries_by_ids(entry_ids: list[int], user_id: int) -> list
         )
 
         entries = []
-        for row in await cursor.fetchall():
+        for row in rows:
             entries.append({
                 "id": row["id"],
                 "entry_type": row["entry_type"],
