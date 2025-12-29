@@ -6,9 +6,13 @@ from typing import Optional
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from app.config import get_settings
 from app.database import get_db
+from app.db_utils import fetchone, fetchall, fetchval, sql
 from app.models.job import JobStatus, JobStatusResponse
 from app.api.auth import get_current_user_id
+
+settings = get_settings()
 
 router = APIRouter()
 
@@ -50,7 +54,8 @@ async def get_job_status(
     and partial transcript preview during processing.
     """
     async with get_db() as db:
-        cursor = await db.execute(
+        row = await fetchone(
+            db,
             """
             SELECT id, user_id, status, current_step, progress, error_message,
                    transcript, cleaned_transcript
@@ -58,7 +63,6 @@ async def get_job_status(
             """,
             (job_id, user_id)
         )
-        row = await cursor.fetchone()
 
         if not row:
             raise HTTPException(status_code=404, detail="Job not found")
@@ -95,7 +99,8 @@ async def get_job_results(
     """
     async with get_db() as db:
         # Get job details (scoped to user)
-        cursor = await db.execute(
+        job = await fetchone(
+            db,
             """
             SELECT id, user_id, status, original_filename, target_persona,
                    asset_types, asset_quantities, cost_incurred,
@@ -104,13 +109,13 @@ async def get_job_results(
             """,
             (job_id, user_id)
         )
-        job = await cursor.fetchone()
 
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
 
         # Get outputs
-        cursor = await db.execute(
+        output_rows = await fetchall(
+            db,
             """
             SELECT id, content_type, variation_number,
                    step1_draft, step2_edited, step3_final,
@@ -122,7 +127,6 @@ async def get_job_results(
             """,
             (job_id,)
         )
-        output_rows = await cursor.fetchall()
 
         # Collect output IDs for batch fetching image prompts
         output_ids = [row["id"] for row in output_rows]
@@ -130,12 +134,13 @@ async def get_job_results(
         # Fetch all image prompts for these outputs in a single query (fixes N+1)
         image_prompts_by_output = {}
         if output_ids:
-            placeholders = ",".join("?" * len(output_ids))
-            prompt_cursor = await db.execute(
-                f"SELECT id, output_id, prompt_text, platform, dimensions, style_modifiers FROM image_prompts WHERE output_id IN ({placeholders})",
-                output_ids
-            )
-            prompt_rows = await prompt_cursor.fetchall()
+            # Build parameterized IN clause
+            if settings.use_postgres:
+                placeholders = ",".join(f"${i+1}" for i in range(len(output_ids)))
+            else:
+                placeholders = ",".join("?" * len(output_ids))
+            query = f"SELECT id, output_id, prompt_text, platform, dimensions, style_modifiers FROM image_prompts WHERE output_id IN ({placeholders})"
+            prompt_rows = await fetchall(db, query, tuple(output_ids)) if not settings.use_postgres else await db.fetch(query, *output_ids)
             for p in prompt_rows:
                 output_id = p["output_id"]
                 if output_id not in image_prompts_by_output:
@@ -181,7 +186,8 @@ async def get_job_results(
             outputs.append(output_data)
 
         # Get stills
-        cursor = await db.execute(
+        still_rows = await fetchall(
+            db,
             """
             SELECT id, still_type, content, source_location,
                    tags, persona_relevance, quote_attribution
@@ -190,7 +196,6 @@ async def get_job_results(
             """,
             (job_id,)
         )
-        still_rows = await cursor.fetchall()
 
         stills = []
         for row in still_rows:
@@ -250,8 +255,7 @@ async def list_jobs(
         query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
 
-        cursor = await db.execute(query, params)
-        rows = await cursor.fetchall()
+        rows = await fetchall(db, query, tuple(params))
 
         jobs = []
         for row in rows:
@@ -275,8 +279,7 @@ async def list_jobs(
             count_query += " AND status = ?"
             count_params.append(status)
 
-        cursor = await db.execute(count_query, count_params)
-        total = (await cursor.fetchone())[0]
+        total = await fetchval(db, count_query, tuple(count_params))
 
         return {
             "jobs": jobs,
@@ -294,15 +297,12 @@ async def get_usage_stats(request: Request, user_id: int = Depends(get_current_u
     """
     async with get_db() as db:
         # Get user's total cost
-        cursor = await db.execute(
-            "SELECT total_cost_incurred FROM users WHERE id = ?",
-            (user_id,)
-        )
-        user_row = await cursor.fetchone()
+        user_row = await fetchone(db, "SELECT total_cost_incurred FROM users WHERE id = ?", (user_id,))
         total_cost = user_row["total_cost_incurred"] if user_row else 0.0
 
         # Get job counts by status
-        cursor = await db.execute(
+        status_rows = await fetchall(
+            db,
             """
             SELECT status, COUNT(*) as count
             FROM jobs
@@ -311,37 +311,53 @@ async def get_usage_stats(request: Request, user_id: int = Depends(get_current_u
             """,
             (user_id,)
         )
-        status_counts = {row["status"]: row["count"] for row in await cursor.fetchall()}
+        status_counts = {row["status"]: row["count"] for row in status_rows}
 
         # Get total jobs
-        cursor = await db.execute(
-            "SELECT COUNT(*) FROM jobs WHERE user_id = ?",
-            (user_id,)
-        )
-        total_jobs = (await cursor.fetchone())[0]
+        total_jobs = await fetchval(db, "SELECT COUNT(*) FROM jobs WHERE user_id = ?", (user_id,))
 
         # Get cost breakdown by month (last 6 months)
-        cursor = await db.execute(
+        if settings.use_postgres:
+            monthly_query = """
+                SELECT
+                    TO_CHAR(created_at, 'YYYY-MM') as month,
+                    SUM(cost_incurred) as cost,
+                    COUNT(*) as job_count
+                FROM jobs
+                WHERE user_id = $1
+                    AND created_at >= CURRENT_DATE - INTERVAL '6 months'
+                GROUP BY TO_CHAR(created_at, 'YYYY-MM')
+                ORDER BY month DESC
             """
-            SELECT
-                strftime('%Y-%m', created_at) as month,
-                SUM(cost_incurred) as cost,
-                COUNT(*) as job_count
-            FROM jobs
-            WHERE user_id = ?
-                AND created_at >= date('now', '-6 months')
-            GROUP BY strftime('%Y-%m', created_at)
-            ORDER BY month DESC
-            """,
-            (user_id,)
-        )
-        monthly_costs = [
-            {"month": row["month"], "cost": row["cost"], "jobs": row["job_count"]}
-            for row in await cursor.fetchall()
-        ]
+            monthly_rows = await db.fetch(monthly_query, user_id)
+            monthly_costs = [
+                {"month": row["month"], "cost": row["cost"], "jobs": row["job_count"]}
+                for row in monthly_rows
+            ]
+        else:
+            monthly_rows = await fetchall(
+                db,
+                """
+                SELECT
+                    strftime('%Y-%m', created_at) as month,
+                    SUM(cost_incurred) as cost,
+                    COUNT(*) as job_count
+                FROM jobs
+                WHERE user_id = ?
+                    AND created_at >= date('now', '-6 months')
+                GROUP BY strftime('%Y-%m', created_at)
+                ORDER BY month DESC
+                """,
+                (user_id,)
+            )
+            monthly_costs = [
+                {"month": row["month"], "cost": row["cost"], "jobs": row["job_count"]}
+                for row in monthly_rows
+            ]
 
         # Get content type breakdown
-        cursor = await db.execute(
+        content_rows = await fetchall(
+            db,
             """
             SELECT content_type, COUNT(*) as count
             FROM outputs o
@@ -351,14 +367,10 @@ async def get_usage_stats(request: Request, user_id: int = Depends(get_current_u
             """,
             (user_id,)
         )
-        content_counts = {row["content_type"]: row["count"] for row in await cursor.fetchall()}
+        content_counts = {row["content_type"]: row["count"] for row in content_rows}
 
         # Get library size
-        cursor = await db.execute(
-            "SELECT COUNT(*) FROM content_library WHERE user_id = ?",
-            (user_id,)
-        )
-        library_size = (await cursor.fetchone())[0]
+        library_size = await fetchval(db, "SELECT COUNT(*) FROM content_library WHERE user_id = ?", (user_id,))
 
         return {
             "total_cost": round(total_cost, 4),

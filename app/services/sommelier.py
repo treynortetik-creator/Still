@@ -3,9 +3,13 @@ import json
 import logging
 from typing import Tuple
 
+from app.config import get_settings
 from app.database import get_db
+from app.db_utils import fetchall, fetchone
 from app.services.ai_client import call_llm_text, calculate_openrouter_cost
 from app.utils.json_parser import parse_llm_json
+
+settings = get_settings()
 
 logger = logging.getLogger(__name__)
 
@@ -86,18 +90,14 @@ Important:
 
         where_clause = " OR ".join(conditions) if conditions else "1=1"
 
-        cursor = await db.execute(
-            f"""
+        query = f"""
             SELECT id, entry_type, content, source, tags, persona_relevance, times_used
             FROM content_library
             WHERE user_id = ? AND ({where_clause})
             ORDER BY times_used DESC
             LIMIT 50
-            """,
-            params
-        )
-
-        rows = await cursor.fetchall()
+        """
+        rows = await fetchall(db, query, tuple(params))
 
         if not rows:
             return [], understood_intent, total_cost
@@ -179,11 +179,11 @@ Write clear, helpful explanations for why each still is relevant."""
                 ranking = ranked_ids[still["id"]]
 
                 # Get full still data
-                cursor = await db.execute(
+                row = await fetchone(
+                    db,
                     "SELECT * FROM content_library WHERE id = ?",
                     (still["id"],)
                 )
-                row = await cursor.fetchone()
 
                 if row:
                     results.append({

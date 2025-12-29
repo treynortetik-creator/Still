@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 from app.config import get_settings
 from app.database import get_db
+from app.db_utils import execute, fetchone
 from app.models.job import JobStatus
 from app.services.transcription import transcribe_file, cleanup_transcript, extract_document_content
 from app.services.distillation import distill_content
@@ -67,14 +68,16 @@ async def log_error_to_db(job_id: str, user_id: int, error_type: str, error_mess
     """Log error details to database for debugging."""
     try:
         async with get_db() as db:
-            await db.execute(
+            await execute(
+                db,
                 """
                 INSERT INTO error_logs (job_id, user_id, error_type, error_message, stack_trace)
                 VALUES (?, ?, ?, ?, ?)
                 """,
                 (job_id, user_id, error_type, error_message, stack_trace)
             )
-            await db.commit()
+            if not settings.use_postgres:
+                await db.commit()
     except Exception as log_err:
         logger.warning(f"Failed to log error to database: {log_err}")
 
@@ -110,7 +113,8 @@ async def update_job_status(
     """Update job status in database and track user costs."""
     async with get_db() as db:
         if error_message:
-            await db.execute(
+            await execute(
+                db,
                 """
                 UPDATE jobs SET
                     status = ?, current_step = ?, progress = ?,
@@ -120,7 +124,8 @@ async def update_job_status(
                 (status.value, current_step, progress, cost_to_add, error_message, job_id)
             )
         else:
-            await db.execute(
+            await execute(
+                db,
                 """
                 UPDATE jobs SET
                     status = ?, current_step = ?, progress = ?,
@@ -132,7 +137,8 @@ async def update_job_status(
 
         # Update user's total cost if cost was added
         if cost_to_add > 0:
-            await db.execute(
+            await execute(
+                db,
                 """
                 UPDATE users SET total_cost_incurred = total_cost_incurred + ?
                 WHERE id = (SELECT user_id FROM jobs WHERE id = ?)
@@ -140,16 +146,14 @@ async def update_job_status(
                 (cost_to_add, job_id)
             )
 
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
 
 async def get_job_data(job_id: str) -> dict:
     """Get job data from database."""
     async with get_db() as db:
-        cursor = await db.execute(
-            "SELECT * FROM jobs WHERE id = ?", (job_id,)
-        )
-        row = await cursor.fetchone()
+        row = await fetchone(db, "SELECT * FROM jobs WHERE id = ?", (job_id,))
         if row:
             return dict(row)
         return None
@@ -236,11 +240,13 @@ async def process_job(job_id: str):
 
                 # Save both transcript and cleaned_transcript
                 async with get_db() as db:
-                    await db.execute(
+                    await execute(
+                        db,
                         "UPDATE jobs SET transcript = ?, cleaned_transcript = ? WHERE id = ?",
                         (transcript, cleaned_transcript, job_id)
                     )
-                    await db.commit()
+                    if not settings.use_postgres:
+                        await db.commit()
 
         elif is_audio_video:
             # ======== AUDIO/VIDEO PATH: Transcribe → Cleanup ========
@@ -261,11 +267,13 @@ async def process_job(job_id: str):
 
                 # Save transcript to database
                 async with get_db() as db:
-                    await db.execute(
+                    await execute(
+                        db,
                         "UPDATE jobs SET transcript = ? WHERE id = ?",
                         (transcript, job_id)
                     )
-                    await db.commit()
+                    if not settings.use_postgres:
+                        await db.commit()
 
             # Step 0b: Cleanup (for spoken content with filler words, etc.)
             if not cleaned_transcript:
@@ -283,11 +291,13 @@ async def process_job(job_id: str):
 
                 # Save cleaned transcript
                 async with get_db() as db:
-                    await db.execute(
+                    await execute(
+                        db,
                         "UPDATE jobs SET cleaned_transcript = ? WHERE id = ?",
                         (cleaned_transcript, job_id)
                     )
-                    await db.commit()
+                    if not settings.use_postgres:
+                        await db.commit()
 
         else:
             # ======== TEXT UPLOAD PATH (file_type == "text") ========
@@ -306,11 +316,13 @@ async def process_job(job_id: str):
                 total_cost += clean_cost
 
                 async with get_db() as db:
-                    await db.execute(
+                    await execute(
+                        db,
                         "UPDATE jobs SET cleaned_transcript = ? WHERE id = ?",
                         (cleaned_transcript, job_id)
                     )
-                    await db.commit()
+                    if not settings.use_postgres:
+                        await db.commit()
 
         # ======== STEP 1: DISTILLATION ========
         await update_job_status(
@@ -337,11 +349,11 @@ async def process_job(job_id: str):
                 "Stills saved to Reserve", 100, total_cost
             )
             async with get_db() as db:
-                await db.execute(
-                    "UPDATE jobs SET completed_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    (job_id,)
-                )
-                await db.commit()
+                if settings.use_postgres:
+                    await db.execute("UPDATE jobs SET completed_at = NOW() WHERE id = $1", job_id)
+                else:
+                    await execute(db, "UPDATE jobs SET completed_at = CURRENT_TIMESTAMP WHERE id = ?", (job_id,))
+                    await db.commit()
             return
 
         # ======== STEP 2: DRAFTING ========
@@ -500,11 +512,11 @@ async def process_job(job_id: str):
 
         # Update completed_at timestamp
         async with get_db() as db:
-            await db.execute(
-                "UPDATE jobs SET completed_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (job_id,)
-            )
-            await db.commit()
+            if settings.use_postgres:
+                await db.execute("UPDATE jobs SET completed_at = NOW() WHERE id = $1", job_id)
+            else:
+                await execute(db, "UPDATE jobs SET completed_at = CURRENT_TIMESTAMP WHERE id = ?", (job_id,))
+                await db.commit()
 
         # Trigger webhooks for job completion and content generation
         try:
@@ -669,11 +681,11 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
         )
 
         async with get_db() as db:
-            await db.execute(
-                "UPDATE jobs SET completed_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (job_id,)
-            )
-            await db.commit()
+            if settings.use_postgres:
+                await db.execute("UPDATE jobs SET completed_at = NOW() WHERE id = $1", job_id)
+            else:
+                await execute(db, "UPDATE jobs SET completed_at = CURRENT_TIMESTAMP WHERE id = ?", (job_id,))
+                await db.commit()
 
     except Exception as e:
         error_detail = f"{type(e).__name__}: {str(e)}"

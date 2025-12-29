@@ -13,6 +13,7 @@ from slowapi.util import get_remote_address
 
 from app.config import get_settings
 from app.database import get_db
+from app.db_utils import execute, fetchval
 from app.models.job import JobResponse, JobStatus
 from app.api.auth import get_current_user_id
 from app.utils.security import sanitize_filename
@@ -150,7 +151,8 @@ async def upload_content(
 
     # Create job in database
     async with get_db() as db:
-        await db.execute(
+        await execute(
+            db,
             """
             INSERT INTO jobs (
                 id, user_id, status, original_filename, file_type, file_size,
@@ -175,7 +177,8 @@ async def upload_content(
                 5,
             )
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
     # Start background processing
     from app.services.pipeline import process_job
@@ -255,7 +258,8 @@ async def upload_text(
 
     # Create job in database
     async with get_db() as db:
-        await db.execute(
+        await execute(
+            db,
             """
             INSERT INTO jobs (
                 id, user_id, status, original_filename, file_type, file_size,
@@ -281,7 +285,8 @@ async def upload_text(
                 content,  # Text content is already the transcript
             )
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
     # Start background processing
     from app.services.pipeline import process_job
@@ -361,19 +366,20 @@ async def quick_distill(
     if not target_persona:
         # Get the first available persona for the user
         async with get_db() as db:
-            cursor = await db.execute(
+            persona_id = await fetchval(
+                db,
                 "SELECT id FROM personas WHERE user_id = ? LIMIT 1",
                 (user_id,)
             )
-            row = await cursor.fetchone()
-            if row:
-                target_persona = row["id"]
+            if persona_id:
+                target_persona = persona_id
             else:
                 target_persona = "general"  # Fallback
 
     # Create job in database with quick_distill processing mode
     async with get_db() as db:
-        await db.execute(
+        await execute(
+            db,
             """
             INSERT INTO jobs (
                 id, user_id, status, original_filename, file_type, file_size,
@@ -398,7 +404,8 @@ async def quick_distill(
                 5,
             )
         )
-        await db.commit()
+        if not settings.use_postgres:
+            await db.commit()
 
     # Start background processing
     from app.services.pipeline import process_job
