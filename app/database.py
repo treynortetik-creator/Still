@@ -3,11 +3,13 @@
 Supports both PostgreSQL (Supabase) and SQLite (local development).
 """
 import ssl
+import socket
 import aiosqlite
 import asyncpg
 from pathlib import Path
 from typing import AsyncGenerator, Optional, Union
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse, parse_qs, unquote
 
 from app.config import get_settings
 
@@ -24,6 +26,29 @@ else:
     DATABASE_PATH = None
 
 
+def _parse_database_url(url: str) -> dict:
+    """Parse DATABASE_URL into connection parameters."""
+    parsed = urlparse(url)
+
+    # Extract components
+    params = {
+        "user": parsed.username or "postgres",
+        "password": unquote(parsed.password) if parsed.password else None,
+        "host": parsed.hostname,
+        "port": parsed.port or 5432,
+        "database": parsed.path.lstrip("/") or "postgres",
+    }
+
+    # Parse query string for additional options
+    if parsed.query:
+        query_params = parse_qs(parsed.query)
+        for key, values in query_params.items():
+            if values:
+                params[key] = values[0]
+
+    return params
+
+
 async def init_postgres_pool():
     """Initialize PostgreSQL connection pool for Supabase."""
     global _pg_pool
@@ -34,9 +59,29 @@ async def init_postgres_pool():
         ssl_context.check_hostname = False
         ssl_context.verify_mode = ssl.CERT_NONE
 
+        # Parse the database URL to get individual components
+        db_params = _parse_database_url(settings.database_url)
+        host = db_params["host"]
+        port = db_params["port"]
+
+        print(f"Attempting to connect to {host}:{port}")
+
+        # Resolve hostname to IPv4 to avoid IPv6 issues on some platforms
+        try:
+            # Get IPv4 address explicitly
+            ipv4_addr = socket.gethostbyname(host)
+            print(f"Resolved {host} to IPv4: {ipv4_addr}")
+        except socket.gaierror as e:
+            print(f"Warning: Could not resolve {host}: {e}")
+            ipv4_addr = host  # Fall back to hostname
+
         try:
             _pg_pool = await asyncpg.create_pool(
-                settings.database_url,
+                host=ipv4_addr,
+                port=port,
+                user=db_params["user"],
+                password=db_params["password"],
+                database=db_params["database"],
                 min_size=2,  # Reduced for Railway/Supabase free tier limits
                 max_size=10,  # Supabase free tier has connection limits
                 statement_cache_size=0,  # Required for Supabase/PgBouncer
@@ -47,6 +92,7 @@ async def init_postgres_pool():
             print(f"PostgreSQL pool initialized (min=2, max=10)")
         except Exception as e:
             print(f"Failed to initialize PostgreSQL pool: {e}")
+            print(f"Connection details: host={ipv4_addr}, port={port}, user={db_params['user']}, database={db_params['database']}")
             raise
     return _pg_pool
 
