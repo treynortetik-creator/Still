@@ -669,7 +669,16 @@ class AIModelConfigRequest(BaseModel):
 
 
 # Service names that can have models configured
-PIPELINE_SERVICES = ["transcription", "atomization", "drafting", "editing", "factcheck"]
+PIPELINE_SERVICES = [
+    "transcription",
+    "distillation",
+    "distillation_pass2",
+    "atomization",
+    "drafting",
+    "editing",
+    "factcheck",
+    "workshop_ai_edit",
+]
 
 
 @router.get("/model-config")

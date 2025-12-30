@@ -29,6 +29,14 @@ async def init_prompts_from_files():
                 "cleaned_transcript"
             ],
         },
+        "distillation_pass2": {
+            "model": "gemini-2.0-flash-lite",
+            "max_tokens": 8000,
+            "variables": [
+                "target_persona_title", "persona_pain_points", "persona_priorities",
+                "cleaned_transcript", "first_pass_stills", "first_pass_count"
+            ],
+        },
         "linkedin_draft": {
             "model": "claude-opus-4-5-20251101",
             "max_tokens": 4000,
