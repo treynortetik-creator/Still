@@ -74,6 +74,11 @@ async def init_prompts_from_files():
             "max_tokens": 8000,
             "variables": ["original_transcript", "edited_draft_from_step2"],
         },
+        "summarization": {
+            "model": "gemini-2.0-flash-lite",
+            "max_tokens": 500,
+            "variables": ["transcript"],
+        },
     }
 
     async with get_db() as db:

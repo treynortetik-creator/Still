@@ -457,6 +457,7 @@ class OpenRouterToggle(BaseModel):
 class ModelConfig(BaseModel):
     transcription: str
     atomization: str
+    summarization: str
     drafting: str
     editing: str
     factcheck: str
@@ -517,6 +518,7 @@ async def save_model_config(config: ModelConfig, _: bool = Depends(verify_admin)
         "transcription": config.transcription,
         "atomization": config.atomization,
         "distillation": config.atomization,  # Alias - both point to same model
+        "summarization": config.summarization,
         "drafting": config.drafting,
         "editing": config.editing,
         "factcheck": config.factcheck
