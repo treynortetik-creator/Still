@@ -1,7 +1,7 @@
 """Admin API endpoints."""
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from fastapi import APIRouter, HTTPException, Query, Body, Depends
 from typing import Optional, Dict
 from pydantic import BaseModel
@@ -28,8 +28,8 @@ async def get_dashboard(_: bool = Depends(verify_admin)):
         row = await fetchone(db, "SELECT COUNT(*) as cnt FROM jobs WHERE status NOT IN ('complete', 'failed')", ())
         active_jobs = row["cnt"]
 
-        # Jobs completed today
-        today = datetime.now().strftime("%Y-%m-%d")
+        # Jobs completed today - use date objects for PostgreSQL compatibility
+        today = date.today()
         row = await fetchone(
             db,
             "SELECT COUNT(*) as cnt FROM jobs WHERE status = 'complete' AND date(completed_at) = ?",
@@ -46,7 +46,7 @@ async def get_dashboard(_: bool = Depends(verify_admin)):
         cost_today = row["total"]
 
         # Total cost this week
-        week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+        week_ago = date.today() - timedelta(days=7)
         row = await fetchone(
             db,
             "SELECT COALESCE(SUM(cost_incurred), 0) as total FROM jobs WHERE date(created_at) >= ?",
@@ -55,7 +55,7 @@ async def get_dashboard(_: bool = Depends(verify_admin)):
         cost_week = row["total"]
 
         # Total cost this month
-        month_start = datetime.now().replace(day=1).strftime("%Y-%m-%d")
+        month_start = date.today().replace(day=1)
         row = await fetchone(
             db,
             "SELECT COALESCE(SUM(cost_incurred), 0) as total FROM jobs WHERE date(created_at) >= ?",
