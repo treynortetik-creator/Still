@@ -27,6 +27,7 @@ DEFAULT_MODELS = {
     "transcription": "google/gemini-2.5-flash",
     "distillation": "google/gemini-2.5-flash",
     "distillation_pass2": "google/gemini-2.0-flash-lite",
+    "summarization": "google/gemini-2.0-flash-lite",
     "atomization": "google/gemini-2.5-flash",
     "drafting": "google/gemini-3-flash-preview",
     "editing": "google/gemini-2.5-flash",

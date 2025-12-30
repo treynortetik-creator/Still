@@ -1,12 +1,14 @@
 """Content drafting service - Step 2 of the pipeline."""
 import logging
-from typing import Tuple
+from typing import Tuple, Dict, Optional
 
 from app.services.ai_client import call_llm_text, calculate_openrouter_cost
 from app.services.prompt_manager import get_rendered_prompt
 from app.services.persona_manager import get_persona_for_job
 from app.services.distillation import select_stills_for_content_type, group_stills_by_type
 from app.utils.json_parser import parse_llm_json
+from app.database import get_db
+from app.db_utils import fetchall
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +73,93 @@ async def get_user_context(user_id: int, content_type: str = None) -> str:
     return "\n".join(context_parts)
 
 
+async def get_source_summaries(job_ids: list[str]) -> Dict[str, Dict[str, str]]:
+    """
+    Fetch source summaries for multiple job IDs.
+
+    Args:
+        job_ids: List of job IDs to fetch summaries for
+
+    Returns:
+        Dict mapping job_id -> {"campaign_name": str, "summary": str}
+    """
+    if not job_ids:
+        return {}
+
+    summaries = {}
+
+    try:
+        async with get_db() as db:
+            # Build query for multiple job IDs
+            placeholders = ", ".join(["?" for _ in job_ids])
+            query = f"SELECT id, campaign_name, source_summary FROM jobs WHERE id IN ({placeholders})"
+
+            rows = await fetchall(db, query, tuple(job_ids))
+
+            for row in rows:
+                job_id = row["id"]
+                summaries[job_id] = {
+                    "campaign_name": row["campaign_name"] or "Unknown Source",
+                    "summary": row["source_summary"] or ""
+                }
+    except Exception as e:
+        logger.warning(f"Failed to fetch source summaries: {e}")
+
+    return summaries
+
+
+async def build_source_context(stills: list[dict]) -> str:
+    """
+    Build source context block for multi-source generation.
+
+    When generating content from stills that came from multiple sources,
+    this function builds a context block that helps the AI understand
+    where each piece of content originated.
+
+    Args:
+        stills: List of still dicts, each with a 'job_id' field
+
+    Returns:
+        Context string to inject into prompts, or empty string if single source
+    """
+    # Extract unique job IDs from stills
+    job_ids = list(set(
+        s.get("job_id") for s in stills
+        if s.get("job_id") and s.get("job_id") != "manual"
+    ))
+
+    # Only add context for multi-source generation
+    if len(job_ids) <= 1:
+        return ""
+
+    # Fetch summaries for all sources
+    summaries = await get_source_summaries(job_ids)
+
+    if not summaries:
+        return ""
+
+    # Build context block
+    context_parts = ["SOURCE CONTEXT:", "---"]
+
+    for job_id in job_ids:
+        info = summaries.get(job_id, {})
+        campaign = info.get("campaign_name", "Unknown Source")
+        summary = info.get("summary", "")
+
+        # Count stills from this source
+        source_stills = [s for s in stills if s.get("job_id") == job_id]
+        still_count = len(source_stills)
+
+        context_parts.append(f'\nSource: "{campaign}"')
+        if summary:
+            context_parts.append(f"Summary: {summary}")
+        context_parts.append(f"({still_count} pieces selected from this source)")
+
+    context_parts.append("\n---\n")
+
+    return "\n".join(context_parts)
+
+
 async def draft_linkedin_posts(
     stills: list[dict],
     persona_id: str,
@@ -117,8 +206,12 @@ async def draft_linkedin_posts(
     if user_id:
         user_context = await get_user_context(user_id, content_type="linkedin")
 
+    # Get source context for multi-source generation
+    source_context = await build_source_context(selected_stills)
+
     # Add JSON output instruction
-    full_prompt = prompt + user_context + f"""
+    # Source context is injected right before the stills content
+    full_prompt = source_context + prompt + user_context + f"""
 
 Generate exactly {count} LinkedIn post variations.
 
@@ -211,8 +304,11 @@ async def draft_blog_post(
     if user_id:
         user_context = await get_user_context(user_id, content_type="blog")
 
+    # Get source context for multi-source generation
+    source_context = await build_source_context(stills)
+
     # Add JSON output instruction
-    full_prompt = prompt + user_context + """
+    full_prompt = source_context + prompt + user_context + """
 
 OUTPUT FORMAT (valid JSON):
 {
@@ -281,8 +377,11 @@ async def draft_email(
     if user_id:
         user_context = await get_user_context(user_id, content_type="email")
 
+    # Get source context for multi-source generation
+    source_context = await build_source_context(selected_stills)
+
     # Add output instruction
-    full_prompt = prompt + user_context + """
+    full_prompt = source_context + prompt + user_context + """
 
 OUTPUT FORMAT (valid JSON):
 {
@@ -372,7 +471,10 @@ QUOTES:
     if user_id:
         user_context = await get_user_context(user_id, content_type="email")
 
-    prompt = f"""You are an expert email marketing strategist creating a 5-email nurture sequence.
+    # Get source context for multi-source generation
+    source_context = await build_source_context(stills)
+
+    prompt = f"""{source_context}You are an expert email marketing strategist creating a 5-email nurture sequence.
 {user_context}
 
 TARGET AUDIENCE:

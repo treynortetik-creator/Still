@@ -1,4 +1,5 @@
 """Pipeline orchestrator - coordinates the 4-step content generation process."""
+import asyncio
 import json
 import logging
 import os
@@ -14,6 +15,7 @@ from app.db_utils import execute, fetchone
 from app.models.job import JobStatus
 from app.services.transcription import transcribe_file, cleanup_transcript, extract_document_content
 from app.services.distillation import distill_content, distill_content_pass2
+from app.services.summarization import generate_source_summary
 from app.services.drafting import draft_linkedin_posts, draft_blog_post, draft_email, draft_email_sequence
 from app.services.hook_generator import batch_generate_hooks
 from app.services.editing import batch_edit_content
@@ -324,12 +326,18 @@ async def process_job(job_id: str):
                     if not settings.use_postgres:
                         await db.commit()
 
-        # ======== STEP 1: DISTILLATION (Pass 1) ========
+        # ======== STEP 1: DISTILLATION (Pass 1) + SUMMARIZATION (parallel) ========
         await update_job_status(
             job_id, JobStatus.DISTILLING,
             "Step 1a: Distilling content stills (Pass 1)", 25, total_cost
         )
         total_cost = 0
+
+        # Start summarization in parallel with distillation
+        # Summarization is non-blocking - if it fails, we just won't have a summary
+        summary_task = asyncio.create_task(
+            generate_source_summary(cleaned_transcript, job_id, user_id)
+        )
 
         stills, still_cost = await distill_content(
             cleaned_transcript, target_persona, job_id, user_id
@@ -353,6 +361,24 @@ async def process_job(job_id: str):
         # Merge stills from both passes
         stills.extend(pass2_stills)
         logger.info(f"Job {job_id}: Total stills after both passes: {len(stills)}")
+
+        # Await summarization result (should be done by now, ran in parallel)
+        try:
+            source_summary, summary_cost = await summary_task
+            total_cost += summary_cost
+            if source_summary:
+                # Save summary to jobs table
+                async with get_db() as db:
+                    await execute(
+                        db,
+                        "UPDATE jobs SET source_summary = ? WHERE id = ?",
+                        (source_summary, job_id)
+                    )
+                    if not settings.use_postgres:
+                        await db.commit()
+                logger.info(f"Job {job_id}: Source summary saved ({len(source_summary)} chars)")
+        except Exception as summary_err:
+            logger.warning(f"Job {job_id}: Summary step failed (non-fatal): {summary_err}")
 
         # Save stills to database and the Reserve
         await save_stills_to_db(stills, campaign_name=campaign_name)

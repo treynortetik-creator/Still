@@ -1,0 +1,13 @@
+Analyze this content and provide a concise summary (150-250 words) that captures:
+
+1. **Main Topic/Theme**: What is this content primarily about?
+2. **Key Speakers/Sources**: Who are the main voices or sources cited?
+3. **Primary Statistics**: What are the most important numbers or data points?
+4. **Core Problems Discussed**: What challenges or pain points are addressed?
+5. **Solutions/Recommendations**: What fixes or approaches are suggested?
+6. **Overall Tone**: Is it formal, conversational, technical, persuasive?
+
+Format as a flowing paragraph, not bullet points. This summary will be used to provide context when combining content from this source with content from other sources.
+
+CONTENT TO SUMMARIZE:
+{transcript}

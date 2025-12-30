@@ -107,6 +107,21 @@
             </div>
 
             <div>
+                <label class="block text-sm font-medium mb-1" style="color: var(--admin-text);">Summarization Model</label>
+                <div class="flex gap-2">
+                    <select id="model-summarization" class="flex-1 border rounded px-3 py-2 admin-card" style="border-color: var(--admin-border);">
+                        <option value="">-- Select a model --</option>
+                    </select>
+                    <button onclick="loadOpenRouterModels('summarization')"
+                        class="px-3 py-2 rounded whitespace-nowrap hover:opacity-80" style="background-color: var(--admin-border); color: var(--admin-text);">
+                        Load
+                    </button>
+                </div>
+                <p class="text-xs mt-1" style="color: var(--admin-text-muted);">Generates source summaries for cross-source context</p>
+                <p id="status-summarization" class="text-xs mt-1"></p>
+            </div>
+
+            <div>
                 <label class="block text-sm font-medium mb-1" style="color: var(--admin-text);">Drafting Model</label>
                 <div class="flex gap-2">
                     <select id="model-drafting" class="flex-1 border rounded px-3 py-2 admin-card" style="border-color: var(--admin-border);">
@@ -295,6 +310,7 @@ async function loadSettings() {
             if (data.models.transcription) document.getElementById('model-transcription').dataset.savedValue = data.models.transcription;
             if (data.models.distillation) document.getElementById('model-distillation').dataset.savedValue = data.models.distillation;
             if (data.models.distillation_pass2) document.getElementById('model-distillation_pass2').dataset.savedValue = data.models.distillation_pass2;
+            if (data.models.summarization) document.getElementById('model-summarization').dataset.savedValue = data.models.summarization;
             if (data.models.drafting) document.getElementById('model-drafting').dataset.savedValue = data.models.drafting;
             if (data.models.editing) document.getElementById('model-editing').dataset.savedValue = data.models.editing;
             if (data.models.factcheck) document.getElementById('model-factcheck').dataset.savedValue = data.models.factcheck;
@@ -340,6 +356,7 @@ async function saveModelConfig() {
         transcription: document.getElementById('model-transcription').value,
         distillation: document.getElementById('model-distillation').value,
         distillation_pass2: document.getElementById('model-distillation_pass2').value,
+        summarization: document.getElementById('model-summarization').value,
         drafting: document.getElementById('model-drafting').value,
         editing: document.getElementById('model-editing').value,
         factcheck: document.getElementById('model-factcheck').value,
