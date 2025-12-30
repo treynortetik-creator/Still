@@ -504,16 +504,16 @@ async def save_api_key(request: ApiKeyRequest, _: bool = Depends(verify_admin)):
 
 @router.post("/settings/openrouter")
 async def toggle_openrouter(request: OpenRouterToggle, _: bool = Depends(verify_admin)):
-    """Toggle OpenRouter usage."""
-    settings_manager.set_openrouter_enabled(request.enabled)
+    """Toggle OpenRouter usage (saves to database)."""
+    await settings_manager.set_openrouter_enabled(request.enabled)
     return {"status": "ok", "use_openrouter": request.enabled}
 
 
 @router.post("/settings/models")
 async def save_model_config(config: ModelConfig, _: bool = Depends(verify_admin)):
-    """Save model configuration for each pipeline step."""
+    """Save model configuration for each pipeline step (saves to database)."""
     # Save both atomization and distillation as they're aliases for the same step
-    settings_manager.set_model_config({
+    await settings_manager.set_model_config({
         "transcription": config.transcription,
         "atomization": config.atomization,
         "distillation": config.atomization,  # Alias - both point to same model
@@ -782,10 +782,8 @@ async def update_model_config(
         if not app_settings.use_postgres:
             await db.commit()
 
-        # Also update the settings file so it persists
-        current_models = settings_manager.get_settings().get("models", {})
-        current_models[service_name] = config.model_id
-        settings_manager.set_model_config(current_models)
+        # Refresh the settings cache so changes take effect immediately
+        await settings_manager.refresh_settings_cache()
 
         return {
             "message": f"Model config for {service_name} updated",
@@ -797,39 +795,7 @@ async def update_model_config(
 @router.post("/model-config/init-defaults")
 async def init_default_model_configs(_: bool = Depends(verify_admin)):
     """Initialize default model configurations for all services."""
-    default_model = "google/gemini-2.0-flash"
-
-    async with get_db() as db:
-        for service in PIPELINE_SERVICES:
-            # Check if exists
-            exists = await fetchone(
-                db,
-                "SELECT id FROM ai_model_config WHERE service_name = ?",
-                (service,)
-            )
-            if not exists:
-                await execute(
-                    db,
-                    """
-                    INSERT INTO ai_model_config
-                    (service_name, model_id, display_name, cost_per_1k_input,
-                     cost_per_1k_output, max_tokens, is_active)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        service,
-                        default_model,
-                        "Gemini 2.0 Flash",
-                        0.0001,
-                        0.0004,
-                        4096,
-                        1,
-                    )
-                )
-
-        if not app_settings.use_postgres:
-            await db.commit()
-
+    await settings_manager.init_default_settings()
     return {"message": "Default model configs initialized", "services": PIPELINE_SERVICES}
 
 

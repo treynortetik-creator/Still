@@ -147,6 +147,11 @@ async def lifespan(app: FastAPI):
     await init_prompts_from_files()
     print("Prompt templates loaded")
 
+    # Initialize settings from database (or create defaults)
+    from app.services import settings_manager
+    await settings_manager.init_default_settings()
+    print("Settings initialized from database")
+
     # Start autopilot scheduler
     from app.services.scheduler import start_scheduler, stop_scheduler
     await start_scheduler()

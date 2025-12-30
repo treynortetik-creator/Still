@@ -542,6 +542,16 @@ async def _init_sqlite_db():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS global_settings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                setting_key TEXT UNIQUE NOT NULL,
+                setting_value TEXT NOT NULL,
+                setting_type TEXT DEFAULT 'string',
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
             -- Indexes
             CREATE INDEX IF NOT EXISTS idx_jobs_user_id ON jobs(user_id);
             CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
@@ -587,6 +597,7 @@ async def _init_sqlite_db():
             CREATE INDEX IF NOT EXISTS idx_stills_campaign ON stills(campaign_name);
             CREATE INDEX IF NOT EXISTS idx_outputs_campaign ON outputs(campaign_name);
             CREATE INDEX IF NOT EXISTS idx_content_library_campaign ON content_library(campaign_name);
+            CREATE INDEX IF NOT EXISTS idx_global_settings_key ON global_settings(setting_key);
         """)
 
         await db.commit()
