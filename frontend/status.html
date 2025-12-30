@@ -83,7 +83,7 @@
                     <div class="w-8 h-8 rounded-full border-2 border-still-border flex items-center justify-center mr-3 step-circle" aria-hidden="true">
                         <span class="text-sm text-still-muted">1</span>
                     </div>
-                    <span class="text-still-muted">Transcribing & Cleaning</span>
+                    <span class="text-still-muted">Extracting Content</span>
                 </div>
                 <div class="flex items-center" id="step-distill" role="listitem" aria-current="false">
                     <div class="w-8 h-8 rounded-full border-2 border-still-border flex items-center justify-center mr-3 step-circle" aria-hidden="true">
@@ -126,9 +126,9 @@
                 </div>
             </div>
 
-            <!-- Transcript Preview (hidden until available) -->
+            <!-- Content Preview (hidden until available) -->
             <div id="transcript-preview-section" class="hidden mt-6">
-                <h3 class="text-sm font-semibold text-still-text mb-2">Transcript Preview</h3>
+                <h3 class="text-sm font-semibold text-still-text mb-2">Extracted Content Preview</h3>
                 <div class="bg-still-bg border border-still-border rounded-lg p-4 max-h-40 overflow-y-auto">
                     <p id="transcript-preview" class="text-sm text-still-muted whitespace-pre-wrap"></p>
                 </div>
@@ -224,8 +224,8 @@
 
         const statusMap = {
             'uploading': { step: 0, text: 'Uploading file...' },
-            'transcribing': { step: 1, text: 'Transcribing content...' },
-            'cleaning': { step: 1, text: 'Cleaning transcript...' },
+            'transcribing': { step: 1, text: 'Extracting content from file...' },
+            'cleaning': { step: 1, text: 'Processing extracted content...' },
             'distilling': { step: 2, text: 'Distilling content stills...' },
             'drafting': { step: 3, text: 'Drafting content...' },
             'editing': { step: 4, text: 'Editing for audience...' },
