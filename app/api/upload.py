@@ -129,11 +129,17 @@ async def upload_content(
     processing_mode = validate_processing_mode(processing_mode)
 
     # Parse and validate JSON fields
+    # Allow empty asset types for quick_distill mode (stills-only extraction)
+    is_quick_distill = processing_mode == "quick_distill"
     asset_types_list = validate_json_field(asset_types, "asset_types", list)
-    asset_types_list = validate_asset_types(asset_types_list)
+    asset_types_list = validate_asset_types(asset_types_list, allow_empty=is_quick_distill)
 
     asset_quantities_dict = validate_json_field(asset_quantities, "asset_quantities", dict)
     asset_quantities_dict = validate_asset_quantities(asset_quantities_dict, asset_types_list)
+
+    # Auto-generate campaign name from filename for quick_distill if not provided
+    if is_quick_distill and not campaign_name:
+        campaign_name = generate_campaign_from_filename(file.filename)
 
     # Create job ID
     job_id = str(uuid.uuid4())
@@ -173,7 +179,7 @@ async def upload_content(
                 processing_mode,
                 campaign_name,
                 magic_words,
-                "Uploading file",
+                "Uploading file" if not is_quick_distill else "Uploading file for Quick Distill",
                 5,
             )
         )
@@ -237,11 +243,17 @@ async def upload_text(
     processing_mode = validate_processing_mode(processing_mode)
 
     # Parse and validate JSON fields
+    # Allow empty asset types for quick_distill mode (stills-only extraction)
+    is_quick_distill = processing_mode == "quick_distill"
     asset_types_list = validate_json_field(asset_types, "asset_types", list)
-    asset_types_list = validate_asset_types(asset_types_list)
+    asset_types_list = validate_asset_types(asset_types_list, allow_empty=is_quick_distill)
 
     asset_quantities_dict = validate_json_field(asset_quantities, "asset_quantities", dict)
     asset_quantities_dict = validate_asset_quantities(asset_quantities_dict, asset_types_list)
+
+    # Auto-generate campaign name from content_name for quick_distill if not provided
+    if is_quick_distill and not campaign_name and content_name:
+        campaign_name = generate_campaign_from_filename(content_name)
 
     # Create job ID
     job_id = str(uuid.uuid4())
@@ -280,7 +292,7 @@ async def upload_text(
                 processing_mode,
                 campaign_name,
                 magic_words,
-                "Processing text content",
+                "Processing text content" if not is_quick_distill else "Processing text for Quick Distill",
                 10,
                 content,  # Text content is already the transcript
             )

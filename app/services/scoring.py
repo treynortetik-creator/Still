@@ -62,11 +62,10 @@ OUTPUT FORMAT (valid JSON):
   "engagement_potential": {{"score": 80, "reason": "Provides actionable insights"}}
 }}"""
 
-    # Use unified AI client
+    # Use unified AI client (no token limit)
     response_text, input_tokens, output_tokens, model_used = await call_llm_text(
         prompt=prompt,
         step="scoring",
-        max_tokens=1000,
         response_format="json",
     )
 

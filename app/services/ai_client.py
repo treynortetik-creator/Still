@@ -57,7 +57,7 @@ def normalize_model_name(model_name: str) -> str:
 async def call_llm_text(
     prompt: str,
     step: str,
-    max_tokens: int = 4096,
+    max_tokens: int = None,  # No limit by default - use model's maximum
     response_format: Optional[str] = None,
     job_id: str = None,
     user_id: int = None,
@@ -68,7 +68,7 @@ async def call_llm_text(
     Args:
         prompt: The text prompt to send
         step: Pipeline step name (transcription, atomization, drafting, editing, factcheck)
-        max_tokens: Maximum tokens for response
+        max_tokens: Maximum tokens for response (None = no limit, use model's maximum)
         response_format: Optional format hint ("json" for JSON responses)
         job_id: Optional job ID for logging
         user_id: Optional user ID for logging
@@ -87,13 +87,16 @@ async def call_llm_text(
     async def do_call():
         kwargs = {
             "model": model,
-            "max_tokens": max_tokens,
             "messages": messages,
             "extra_headers": {
                 "HTTP-Referer": "https://contentmultiplier.com",
                 "X-Title": "ContentMultiplier",
             }
         }
+
+        # Only set max_tokens if explicitly provided (no limit by default)
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
 
         # Add JSON response format if requested
         if response_format == "json":
@@ -121,7 +124,7 @@ async def call_llm_with_file(
     file_path: Path,
     prompt: str,
     step: str = "transcription",
-    max_tokens: int = 8192,
+    max_tokens: int = None,  # No limit by default - use model's maximum
     job_id: str = None,
     user_id: int = None,
 ) -> Tuple[str, int, int, str]:
@@ -134,7 +137,7 @@ async def call_llm_with_file(
         file_path: Path to the file to process
         prompt: The text prompt/instructions
         step: Pipeline step name for model selection
-        max_tokens: Maximum tokens for response
+        max_tokens: Maximum tokens for response (None = no limit, use model's maximum)
         job_id: Optional job ID for logging
         user_id: Optional user ID for logging
 
@@ -199,15 +202,20 @@ async def call_llm_with_file(
     messages = [{"role": "user", "content": content}]
 
     async def do_call():
-        return client.chat.completions.create(
-            model=model,
-            max_tokens=max_tokens,
-            messages=messages,
-            extra_headers={
+        kwargs = {
+            "model": model,
+            "messages": messages,
+            "extra_headers": {
                 "HTTP-Referer": "https://contentmultiplier.com",
                 "X-Title": "ContentMultiplier",
             }
-        )
+        }
+
+        # Only set max_tokens if explicitly provided (no limit by default)
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
+
+        return client.chat.completions.create(**kwargs)
 
     response = await retry_async(
         do_call,

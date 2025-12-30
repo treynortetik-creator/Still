@@ -171,11 +171,10 @@ CONTENT TO EDIT:
 
 Provide your editing suggestions as valid JSON."""
 
-    # Call the LLM
+    # Call the LLM (no token limit)
     response_text, input_tokens, output_tokens, model_used = await call_llm_text(
         prompt=full_prompt,
         step="workshop_ai_edit",
-        max_tokens=2048,
         response_format="json",
     )
 

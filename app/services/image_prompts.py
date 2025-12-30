@@ -85,7 +85,6 @@ IMPORTANT: Create prompts that would work for Midjourney, DALL-E, or Stable Diff
         response_text, input_tokens, output_tokens, model = await call_llm_text(
             prompt=prompt,
             step="drafting",
-            max_tokens=1500,
             response_format="json",
             job_id=job_id,
             user_id=user_id,

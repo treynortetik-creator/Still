@@ -130,8 +130,7 @@ Return ONLY the adjusted content, nothing else. No explanations or preamble."""
     response_text, input_tokens, output_tokens, model = await call_llm_text(
         prompt=prompt,
         step="editing",
-        max_tokens=4096,
-        job_id=job_id,
+                job_id=job_id,
         user_id=user_id,
     )
 
@@ -186,8 +185,7 @@ OUTPUT FORMAT (valid JSON):
     response_text, input_tokens, output_tokens, model = await call_llm_text(
         prompt=prompt,
         step="editing",
-        max_tokens=4096,
-        response_format="json",
+                response_format="json",
         job_id=job_id,
         user_id=user_id,
     )
@@ -253,8 +251,7 @@ Return the FULL content with the regenerated section in place. No explanations."
     response_text, input_tokens, output_tokens, model = await call_llm_text(
         prompt=prompt,
         step="editing",
-        max_tokens=4096,
-        job_id=job_id,
+                job_id=job_id,
         user_id=user_id,
     )
 

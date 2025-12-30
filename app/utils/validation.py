@@ -84,12 +84,13 @@ def validate_json_field(
     return parsed
 
 
-def validate_asset_types(asset_types: list) -> list:
+def validate_asset_types(asset_types: list, allow_empty: bool = False) -> list:
     """
     Validate asset types list.
 
     Args:
         asset_types: List of asset type strings
+        allow_empty: If True, allows empty list (for quick_distill mode)
 
     Returns:
         The validated list
@@ -105,7 +106,7 @@ def validate_asset_types(asset_types: list) -> list:
             detail="asset_types must be a list"
         )
 
-    if len(asset_types) == 0:
+    if len(asset_types) == 0 and not allow_empty:
         raise HTTPException(
             status_code=400,
             detail="At least one asset type is required"

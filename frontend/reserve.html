@@ -197,12 +197,20 @@
                 <h1 class="text-4xl font-bold text-still-text">The Reserve</h1>
                 <p class="text-still-muted mt-1" id="library-stats">Loading your stills...</p>
             </div>
-            <button id="generate-btn" disabled class="btn btn-primary-glow">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                </svg>
-                Generate from Selected (<span id="selected-count">0</span>)
-            </button>
+            <div class="flex gap-3">
+                <button id="add-still-btn" class="btn btn-secondary">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Add Still
+                </button>
+                <button id="generate-btn" disabled class="btn btn-primary-glow">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    Generate from Selected (<span id="selected-count">0</span>)
+                </button>
+            </div>
         </header>
 
         <!-- Job filter banner -->
@@ -369,6 +377,86 @@
         <!-- Pagination -->
         <nav class="mt-10 flex justify-center gap-2" id="pagination" aria-label="Pagination"></nav>
     </main>
+
+    <!-- Add Still Modal -->
+    <div id="add-still-modal" class="hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-labelledby="add-still-modal-title">
+        <div class="modal-backdrop" onclick="closeAddStillModal()"></div>
+        <div class="modal max-w-xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            <h2 id="add-still-modal-title" class="text-xl font-bold mb-6 text-still-text">Add a Still to Your Reserve</h2>
+
+            <form id="add-still-form" class="space-y-5">
+                <div>
+                    <label for="add-still-type" class="form-label form-label-required">Still Type</label>
+                    <select id="add-still-type" class="input-premium select-premium" required>
+                        <option value="data">Data - Statistics, numbers, metrics</option>
+                        <option value="insight">Insight - Key learnings, observations</option>
+                        <option value="story">Story - Anecdotes, case studies</option>
+                        <option value="problem">Problem - Pain points, challenges</option>
+                        <option value="solution">Solution - How-tos, recommendations</option>
+                        <option value="quote">Quote - Memorable statements</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="add-still-content" class="form-label form-label-required">Content</label>
+                    <textarea id="add-still-content" rows="5" class="input-premium" required
+                        placeholder="Enter the still content (quote, stat, story, etc.)"></textarea>
+                    <p class="form-helper">Maximum 10,000 characters</p>
+                </div>
+
+                <div>
+                    <label for="add-still-source" class="form-label">Source <span class="text-still-muted font-normal">(optional)</span></label>
+                    <input type="text" id="add-still-source" class="input-premium"
+                        placeholder="e.g., Industry Report 2024, Company Webinar">
+                </div>
+
+                <div>
+                    <label for="add-still-speaker" class="form-label">Speaker/Attribution <span class="text-still-muted font-normal">(optional)</span></label>
+                    <input type="text" id="add-still-speaker" class="input-premium"
+                        placeholder="e.g., John Smith, CEO">
+                    <p class="form-helper">For quotes, who said this?</p>
+                </div>
+
+                <div>
+                    <label for="add-still-campaign" class="form-label">Campaign <span class="text-still-muted font-normal">(optional)</span></label>
+                    <input type="text" id="add-still-campaign" class="input-premium"
+                        placeholder="e.g., Q1 Marketing Campaign"
+                        list="campaign-suggestions">
+                    <datalist id="campaign-suggestions"></datalist>
+                </div>
+
+                <div>
+                    <label for="add-still-topics" class="form-label">Topics <span class="text-still-muted font-normal">(optional)</span></label>
+                    <input type="text" id="add-still-topics" class="input-premium"
+                        placeholder="e.g., marketing, AI, leadership (comma-separated)">
+                    <p class="form-helper">Comma-separated topic keywords for filtering</p>
+                </div>
+
+                <div>
+                    <label for="add-still-tags" class="form-label">Tags <span class="text-still-muted font-normal">(optional)</span></label>
+                    <input type="text" id="add-still-tags" class="input-premium"
+                        placeholder="e.g., ROI, healthcare, executive (comma-separated)">
+                    <p class="form-helper">Comma-separated tags for organization</p>
+                </div>
+
+                <div>
+                    <label for="add-still-notes" class="form-label">Notes <span class="text-still-muted font-normal">(optional)</span></label>
+                    <textarea id="add-still-notes" rows="2" class="input-premium"
+                        placeholder="Personal notes about this still"></textarea>
+                </div>
+
+                <div class="mt-8 flex gap-3">
+                    <button type="button" onclick="closeAddStillModal()" class="btn btn-ghost flex-1">Cancel</button>
+                    <button type="submit" id="add-still-submit" class="btn btn-primary flex-1">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Add Still
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- Generate Modal -->
     <div id="generate-modal" class="hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-labelledby="modal-title">
@@ -1040,9 +1128,101 @@
             });
         }
 
-        // Escape key closes modal
+        // Escape key closes modals
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeGenerateModal();
+            if (e.key === 'Escape') {
+                closeGenerateModal();
+                closeAddStillModal();
+            }
+        });
+
+        // ============================================
+        // Add Still Modal Functions
+        // ============================================
+
+        function openAddStillModal() {
+            // Clear form
+            document.getElementById('add-still-form').reset();
+
+            // Populate campaign suggestions from existing campaigns
+            const campaignSuggestions = document.getElementById('campaign-suggestions');
+            campaignSuggestions.innerHTML = '';
+            const campaignSelect = document.getElementById('filter-campaign');
+            Array.from(campaignSelect.options).forEach(opt => {
+                if (opt.value) {
+                    const option = document.createElement('option');
+                    option.value = opt.value;
+                    campaignSuggestions.appendChild(option);
+                }
+            });
+
+            document.getElementById('add-still-modal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            document.getElementById('add-still-content').focus();
+        }
+
+        function closeAddStillModal() {
+            document.getElementById('add-still-modal').classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        document.getElementById('add-still-btn').addEventListener('click', openAddStillModal);
+
+        document.getElementById('add-still-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('add-still-submit');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `
+                <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Adding...
+            `;
+
+            const tagsInput = document.getElementById('add-still-tags').value;
+            const topicsInput = document.getElementById('add-still-topics').value;
+
+            const requestData = {
+                entry_type: document.getElementById('add-still-type').value,
+                content: document.getElementById('add-still-content').value,
+                source: document.getElementById('add-still-source').value || null,
+                speaker: document.getElementById('add-still-speaker').value || null,
+                campaign_name: document.getElementById('add-still-campaign').value || null,
+                topics: topicsInput ? topicsInput.split(',').map(t => t.trim()).filter(t => t) : null,
+                tags: tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(t => t) : null,
+                user_notes: document.getElementById('add-still-notes').value || null,
+            };
+
+            try {
+                const response = await Auth.fetchWithAuth('/api/library/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast('Still added successfully!', 'success');
+                    closeAddStillModal();
+                    loadLibrary();  // Refresh the list
+                    loadFilters();  // Refresh filter options
+                } else {
+                    throw new Error(data.detail || 'Failed to add still');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = `
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Add Still
+                `;
+            }
         });
 
         // Initial load

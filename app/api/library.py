@@ -2,16 +2,30 @@
 import json
 import uuid
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends
+from pydantic import BaseModel
 from typing import Optional
 
 from app.config import get_settings
 from app.database import get_db
-from app.db_utils import execute, fetchone, fetchall, fetchval
+from app.db_utils import execute, fetchone, fetchall, fetchval, execute_insert_returning_id
 from app.models.job import JobResponse, JobStatus
 from app.api.auth import get_current_user_id
 
 settings = get_settings()
 router = APIRouter()
+
+
+class CreateStillRequest(BaseModel):
+    """Request model for manually creating a still."""
+    entry_type: str  # data, insight, story, problem, solution, quote
+    content: str
+    source: Optional[str] = None
+    source_timestamp: Optional[str] = None
+    speaker: Optional[str] = None
+    tags: Optional[list[str]] = None
+    topics: Optional[list[str]] = None
+    campaign_name: Optional[str] = None
+    user_notes: Optional[str] = None
 
 
 @router.get("/library")
@@ -354,3 +368,130 @@ async def update_library_notes(entry_id: int, notes: str, user_id: int = Depends
             await db.commit()
 
     return {"message": "Notes updated successfully"}
+
+
+@router.post("/library/add")
+async def create_library_entry(
+    request: CreateStillRequest,
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Manually add a still to the Reserve.
+
+    Allows users to create custom stills without going through content processing.
+    """
+    # Validate entry type
+    valid_types = {"data", "insight", "story", "problem", "solution", "quote"}
+    if request.entry_type not in valid_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid entry type. Must be one of: {', '.join(valid_types)}"
+        )
+
+    # Validate content
+    if not request.content or not request.content.strip():
+        raise HTTPException(status_code=400, detail="Content is required")
+
+    if len(request.content) > 10000:
+        raise HTTPException(status_code=400, detail="Content exceeds maximum length of 10,000 characters")
+
+    async with get_db() as db:
+        # Insert the new still
+        new_id = await execute_insert_returning_id(
+            db,
+            """
+            INSERT INTO content_library (
+                user_id, entry_type, content, source, source_timestamp,
+                speaker, tags, persona_relevance, times_used, user_notes,
+                campaign_name, topics
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                request.entry_type,
+                request.content.strip(),
+                request.source,
+                request.source_timestamp,
+                request.speaker,
+                json.dumps(request.tags or []),
+                json.dumps({"general": 3}),  # Default relevance
+                0,
+                request.user_notes,
+                request.campaign_name,
+                json.dumps(request.topics or []),
+            )
+        )
+
+        if not settings.use_postgres:
+            await db.commit()
+
+    return {
+        "message": "Still added successfully",
+        "id": new_id,
+        "entry_type": request.entry_type,
+    }
+
+
+@router.put("/library/{entry_id}")
+async def update_library_entry(
+    entry_id: int,
+    request: CreateStillRequest,
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Update a still in the Reserve.
+    """
+    # Validate entry type
+    valid_types = {"data", "insight", "story", "problem", "solution", "quote"}
+    if request.entry_type not in valid_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid entry type. Must be one of: {', '.join(valid_types)}"
+        )
+
+    # Validate content
+    if not request.content or not request.content.strip():
+        raise HTTPException(status_code=400, detail="Content is required")
+
+    async with get_db() as db:
+        # Verify ownership
+        row = await fetchone(
+            db,
+            "SELECT id FROM content_library WHERE id = ? AND user_id = ?",
+            (entry_id, user_id)
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail="Entry not found")
+
+        await execute(
+            db,
+            """
+            UPDATE content_library SET
+                entry_type = ?,
+                content = ?,
+                source = ?,
+                source_timestamp = ?,
+                speaker = ?,
+                tags = ?,
+                user_notes = ?,
+                campaign_name = ?,
+                topics = ?
+            WHERE id = ?
+            """,
+            (
+                request.entry_type,
+                request.content.strip(),
+                request.source,
+                request.source_timestamp,
+                request.speaker,
+                json.dumps(request.tags or []),
+                request.user_notes,
+                request.campaign_name,
+                json.dumps(request.topics or []),
+                entry_id,
+            )
+        )
+        if not settings.use_postgres:
+            await db.commit()
+
+    return {"message": "Still updated successfully", "id": entry_id}

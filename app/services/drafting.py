@@ -139,8 +139,7 @@ OUTPUT FORMAT (valid JSON):
     response_text, input_tokens, output_tokens, model = await call_llm_text(
         prompt=full_prompt,
         step="drafting",
-        max_tokens=config.get("max_tokens", 4096),
-        response_format="json",
+                response_format="json",
         job_id=job_id,
         user_id=user_id,
     )
@@ -228,8 +227,7 @@ OUTPUT FORMAT (valid JSON):
     response_text, input_tokens, output_tokens, model = await call_llm_text(
         prompt=full_prompt,
         step="drafting",
-        max_tokens=config.get("max_tokens", 4096),
-        response_format="json",
+                response_format="json",
         job_id=job_id,
         user_id=user_id,
     )
@@ -299,8 +297,7 @@ OUTPUT FORMAT (valid JSON):
     response_text, input_tokens, output_tokens, model = await call_llm_text(
         prompt=full_prompt,
         step="drafting",
-        max_tokens=config.get("max_tokens", 4096),
-        response_format="json",
+                response_format="json",
         job_id=job_id,
         user_id=user_id,
     )
@@ -477,7 +474,6 @@ OUTPUT FORMAT (valid JSON):
     response_text, input_tokens, output_tokens, model = await call_llm_text(
         prompt=prompt,
         step="drafting",
-        max_tokens=8192,  # Larger for 5 emails
         response_format="json",
         job_id=job_id,
         user_id=user_id,

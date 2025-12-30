@@ -131,7 +131,6 @@ Focus on quality over quantity. Only include suggestions that would genuinely ma
     response_text, input_tokens, output_tokens, model = await call_llm_text(
         prompt=prompt,
         step="editing",
-        max_tokens=4096,
         response_format="json",
         user_id=user_id,
     )
@@ -322,7 +321,6 @@ Return ONLY the content, no explanations."""
     response_text, input_tokens, output_tokens, model = await call_llm_text(
         prompt=prompt,
         step="drafting",
-        max_tokens=2048,
         user_id=user_id,
     )
 

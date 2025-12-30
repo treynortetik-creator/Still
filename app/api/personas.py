@@ -161,7 +161,6 @@ OUTPUT FORMAT (valid JSON):
         response_text, _, _, _ = await call_llm_text(
             prompt=prompt,
             step="drafting",
-            max_tokens=1000,
             response_format="json",
         )
 

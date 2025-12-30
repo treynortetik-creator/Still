@@ -54,7 +54,6 @@ Important:
     response_text, input_tokens, output_tokens, model = await call_llm_text(
         prompt=parse_prompt,
         step="distillation",  # Reuse distillation model for search
-        max_tokens=500,
         response_format="json",
         job_id=None,
         user_id=user_id,
@@ -147,7 +146,6 @@ Write clear, helpful explanations for why each still is relevant."""
     response_text, input_tokens, output_tokens, model = await call_llm_text(
         prompt=rerank_prompt,
         step="distillation",
-        max_tokens=2000,
         response_format="json",
         job_id=None,
         user_id=user_id,

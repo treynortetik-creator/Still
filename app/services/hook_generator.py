@@ -114,11 +114,10 @@ OUTPUT FORMAT (valid JSON):
   ]
 }}"""
 
-    # Call LLM via unified client
+    # Call LLM via unified client (no token limit)
     response_text, input_tokens, output_tokens, model = await call_llm_text(
         prompt=prompt,
         step="drafting",
-        max_tokens=4096,
         response_format="json",
         job_id=job_id,
         user_id=user_id,

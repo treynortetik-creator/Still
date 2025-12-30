@@ -101,12 +101,11 @@ Instructions:
 
 Output the full transcript only, no additional commentary."""
 
-    # Call LLM with file
+    # Call LLM with file (no token limit)
     response_text, input_tokens, output_tokens, model = await call_llm_with_file(
         file_path=file_path,
         prompt=prompt,
         step="transcription",
-        max_tokens=8192,
         job_id=job_id,
         user_id=user_id,
     )
@@ -148,7 +147,6 @@ OUTPUT REQUIREMENTS:
     response_text, input_tokens, output_tokens, model = await call_llm_text(
         prompt=prompt,
         step="transcription",
-        max_tokens=8192,
         job_id=job_id,
         user_id=user_id,
     )
@@ -225,12 +223,11 @@ EXTRACTION INSTRUCTIONS:
 
 Extract the complete document content now:"""
 
-    # Call LLM with file (for PDFs and images that support multimodal)
+    # Call LLM with file (for PDFs and images that support multimodal, no token limit)
     response_text, input_tokens, output_tokens, model = await call_llm_with_file(
         file_path=file_path,
         prompt=prompt,
         step="transcription",
-        max_tokens=8192,
         job_id=job_id,
         user_id=user_id,
     )
