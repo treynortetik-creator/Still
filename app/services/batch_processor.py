@@ -167,7 +167,7 @@ async def finalize_batch(batch_id: str):
             SET status = ?, completed_at = ?
             WHERE id = ?
             """,
-            (status, datetime.utcnow().isoformat(), batch_id)
+            (status, datetime.utcnow(), batch_id)
         )
         if not settings.use_postgres:
             await db.commit()

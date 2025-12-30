@@ -155,7 +155,7 @@ async def get_cost_stats(user_id: int) -> CostStats:
             FROM jobs
             WHERE user_id = ? AND created_at >= ?
             """,
-            (user_id, first_of_month.isoformat())
+            (user_id, first_of_month)
         )
 
         # Cost last month
@@ -166,7 +166,7 @@ async def get_cost_stats(user_id: int) -> CostStats:
             FROM jobs
             WHERE user_id = ? AND created_at >= ? AND created_at < ?
             """,
-            (user_id, first_of_last_month.isoformat(), first_of_month.isoformat())
+            (user_id, first_of_last_month, first_of_month)
         )
 
         # Average cost per job

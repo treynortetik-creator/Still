@@ -52,7 +52,7 @@ async def fetch_rss_feed(url: str) -> dict:
                 published = None
                 if hasattr(entry, 'published_parsed') and entry.published_parsed:
                     try:
-                        published = datetime(*entry.published_parsed[:6]).isoformat()
+                        published = datetime(*entry.published_parsed[:6])
                     except (ValueError, TypeError, IndexError):
                         # Invalid date format in feed entry - skip it
                         pass
@@ -194,7 +194,7 @@ async def check_source(source_id: int) -> dict:
                 last_error = NULL
             WHERE id = ?
             """,
-            (next_check.isoformat(), new_items, source_id)
+            (next_check, new_items, source_id)
         )
         if not settings.use_postgres:
             await db.commit()

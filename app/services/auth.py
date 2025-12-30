@@ -102,7 +102,7 @@ async def blacklist_token(token: str):
                 INSERT OR REPLACE INTO revoked_tokens (token_hash, expires_at)
                 VALUES (?, ?)
                 """,
-                (token_hash, expires_at.isoformat())
+                (token_hash, expires_at)
             )
             await db.commit()
 
@@ -124,7 +124,7 @@ async def cleanup_expired_tokens():
         else:
             await db.execute(
                 "DELETE FROM revoked_tokens WHERE expires_at < ?",
-                (datetime.utcnow().isoformat(),)
+                (datetime.utcnow(),)
             )
             await db.commit()
 

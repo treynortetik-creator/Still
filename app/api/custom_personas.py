@@ -43,7 +43,7 @@ async def create_persona(
 ):
     """Create a new custom persona."""
     persona_id = str(uuid.uuid4())
-    now = datetime.utcnow().isoformat()
+    now = datetime.utcnow()
 
     async with get_db() as db:
         await execute(
@@ -177,7 +177,7 @@ async def update_persona(
             raise HTTPException(status_code=400, detail="No fields to update")
 
         update_fields.append("updated_at = ?")
-        params.append(datetime.utcnow().isoformat())
+        params.append(datetime.utcnow())
         params.append(persona_id)
         params.append(user_id)
 

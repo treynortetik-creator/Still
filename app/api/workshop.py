@@ -164,7 +164,7 @@ async def update_workshop_content(
             raise HTTPException(status_code=404, detail="Output not found")
 
         # Update the content
-        now = datetime.utcnow().isoformat()
+        now = datetime.utcnow()
         await execute(
             db,
             """
@@ -215,7 +215,7 @@ async def update_workshop_status(
             raise HTTPException(status_code=404, detail="Output not found")
 
         # Update the status
-        now = datetime.utcnow().isoformat()
+        now = datetime.utcnow()
         await execute(
             db,
             """

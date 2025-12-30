@@ -92,7 +92,7 @@ async def register(request: Request, user_data: UserRegister):
             INSERT INTO users (email, password_hash, subscription_tier, created_at)
             VALUES (?, ?, ?, ?)
             """,
-            (user_data.email.lower(), hashed_password, "free", datetime.utcnow().isoformat())
+            (user_data.email.lower(), hashed_password, "free", datetime.utcnow())
         )
 
         # Create token

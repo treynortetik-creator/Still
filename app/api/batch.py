@@ -178,7 +178,7 @@ async def upload_batch(
                 json.dumps(job_ids),
                 len(job_ids),
                 json.dumps(batch_settings),
-                datetime.utcnow().isoformat(),
+                datetime.utcnow(),
             )
         )
         if not settings.use_postgres:
