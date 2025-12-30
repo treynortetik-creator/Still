@@ -54,15 +54,24 @@ def get_model_for_step(step: str) -> str:
     """Get the configured model for a specific pipeline step."""
     settings = get_settings()
     models = settings.get("models", {})
-    
+
     defaults = {
         "transcription": "google/gemini-2.5-flash",
         "distillation": "google/gemini-2.5-flash",
+        "atomization": "google/gemini-2.5-flash",  # Alias for distillation
         "drafting": "google/gemini-3-flash-preview",
         "editing": "google/gemini-2.5-flash",
         "factcheck": "google/gemini-2.5-flash",
         "workshop_ai_edit": "google/gemini-2.5-flash-preview"
     }
+
+    # Handle atomization/distillation aliasing - they're the same step
+    if step == "distillation":
+        # Try distillation first, then atomization as fallback
+        return models.get("distillation", models.get("atomization", defaults.get("distillation", "google/gemini-2.5-flash")))
+    elif step == "atomization":
+        # Try atomization first, then distillation as fallback
+        return models.get("atomization", models.get("distillation", defaults.get("atomization", "google/gemini-2.5-flash")))
 
     return models.get(step, defaults.get(step, "google/gemini-2.5-flash"))
 

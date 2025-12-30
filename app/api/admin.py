@@ -512,9 +512,11 @@ async def toggle_openrouter(request: OpenRouterToggle, _: bool = Depends(verify_
 @router.post("/settings/models")
 async def save_model_config(config: ModelConfig, _: bool = Depends(verify_admin)):
     """Save model configuration for each pipeline step."""
+    # Save both atomization and distillation as they're aliases for the same step
     settings_manager.set_model_config({
         "transcription": config.transcription,
         "atomization": config.atomization,
+        "distillation": config.atomization,  # Alias - both point to same model
         "drafting": config.drafting,
         "editing": config.editing,
         "factcheck": config.factcheck

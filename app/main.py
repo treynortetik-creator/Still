@@ -1,10 +1,14 @@
 """Main FastAPI application for ContentMultiplier."""
 import asyncio
+import traceback
+import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from pathlib import Path
 
 from slowapi import Limiter
@@ -14,6 +18,8 @@ from datetime import datetime
 
 from app.config import get_settings
 from app.database import init_db, close_postgres_pool
+
+logger = logging.getLogger(__name__)
 from app.api import upload, jobs, library, admin, auth, personas, export, feedback, edit
 from app.api import admin_views, swipes, memory, brand_voice, remix, custom_personas, batch, analytics
 from app.api import webhooks, calendar, autopilot, sommelier, workshop
@@ -54,6 +60,68 @@ def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSO
             }
         },
         headers={"Retry-After": str(retry_after)}
+    )
+
+
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Global exception handler - ensures all errors return JSON, not plain text."""
+    # Log the full exception with traceback
+    error_id = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
+    tb = traceback.format_exc()
+    logger.error(f"Unhandled exception [{error_id}]: {exc}\n{tb}")
+
+    # Try to log to database
+    try:
+        from app.database import get_db
+        from app.db_utils import execute
+        async with get_db() as db:
+            await execute(
+                db,
+                """
+                INSERT INTO error_logs (error_type, error_message, stack_trace, context)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    type(exc).__name__,
+                    str(exc)[:1000],  # Limit message length
+                    tb[:5000],  # Limit stack trace length
+                    f"URL: {request.url}, Method: {request.method}",
+                )
+            )
+            if not get_settings().use_postgres:
+                await db.commit()
+    except Exception as log_err:
+        logger.error(f"Failed to log error to database: {log_err}")
+
+    # Return JSON error response
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error. Please try again.",
+            "error_id": error_id,
+            "error_type": type(exc).__name__,
+            # Include error message in development, hide in production
+            "message": str(exc) if settings.debug else "An unexpected error occurred",
+        }
+    )
+
+
+async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    """Handle HTTP exceptions to ensure JSON response."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
+
+
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """Handle validation errors with detailed JSON response."""
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": "Validation error",
+            "errors": exc.errors()
+        }
     )
 
 
@@ -107,6 +175,11 @@ app = FastAPI(
 # Add rate limiter to app state
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+
+# Add global exception handlers for JSON responses
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(Exception, global_exception_handler)
 
 # CORS middleware - use allowed_origins from settings
 # In production, set ALLOWED_ORIGINS env var to comma-separated list of domains
