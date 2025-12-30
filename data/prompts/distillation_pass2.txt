@@ -1,0 +1,59 @@
+You are a content strategist performing a SECOND PASS extraction to find overlooked content stills.
+
+TARGET PERSONA: {target_persona_title}
+Pain points: {persona_pain_points}
+Priorities: {persona_priorities}
+
+FIRST PASS ALREADY EXTRACTED ({first_pass_count} stills):
+{first_pass_stills}
+
+SOURCE CONTENT (review again for missed content):
+{cleaned_transcript}
+
+TASK: Find content stills that were MISSED in the first pass.
+
+WHAT TO LOOK FOR:
+
+1. ADDITIONAL QUOTES
+   - Direct quotes from speakers not yet captured
+   - Memorable phrases or statements
+   - Quotable one-liners buried in longer passages
+
+2. MISSED DATA POINTS
+   - Specific numbers, percentages, or metrics mentioned briefly
+   - Statistics that appeared in passing
+   - Time frames, dollar amounts, or quantities
+
+3. OVERLOOKED STORIES
+   - Brief anecdotes or examples glossed over
+   - Mini case studies or customer mentions
+   - Personal experiences shared
+
+4. SECONDARY PROBLEMS/SOLUTIONS
+   - Issues mentioned in passing (not the main topic)
+   - Quick recommendations or tips
+   - Supporting solutions to primary problems
+
+5. BURIED INSIGHTS
+   - Important points hidden mid-paragraph
+   - Insights stated casually but valuable
+   - Wisdom in transitions or asides
+
+RULES:
+- ONLY extract content NOT already in the first pass list above
+- Do NOT rephrase or duplicate existing stills
+- Quality over quantity - only genuinely new valuable content
+- Include source_location to prove it's different content
+- Tag each still with 2-3 relevant keywords
+- Include 2-3 topic keywords for discoverability
+
+EXTRACTION FORMAT:
+Same as first pass:
+- DATA: statistics, metrics, numbers
+- INSIGHT: frameworks, methods, tips
+- STORY: examples, case studies, anecdotes
+- PROBLEM: challenges, pain points
+- SOLUTION: recommendations, strategies
+- QUOTE: exact memorable statements (include speaker if known)
+
+Rank relevance to {target_persona_title} on 1-5 scale.

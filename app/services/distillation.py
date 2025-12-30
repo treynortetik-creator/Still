@@ -134,6 +134,139 @@ Return valid JSON with this structure:
     return stills, cost
 
 
+def format_stills_for_review(stills: list[dict]) -> str:
+    """Format first pass stills for display in second pass prompt."""
+    if not stills:
+        return "No stills extracted in first pass."
+
+    lines = []
+    for i, still in enumerate(stills, 1):
+        still_type = still.get("still_type", "insight")
+        content = still.get("content", "")[:200]  # Truncate long content
+        source = still.get("source_location", "unknown")
+        lines.append(f"{i}. [{still_type.upper()}] {content} (source: {source})")
+
+    return "\n".join(lines)
+
+
+async def distill_content_pass2(
+    cleaned_transcript: str,
+    first_pass_stills: list[dict],
+    target_persona_id: str,
+    job_id: str,
+    user_id: int,
+) -> Tuple[list[dict], float]:
+    """
+    Second pass extraction - finds content overlooked in first pass.
+
+    Reviews what was already extracted and looks for:
+    - Additional quotes from different speakers
+    - Missed data points/statistics
+    - Brief anecdotes glossed over
+    - Secondary problems/solutions
+    - Insights buried in longer passages
+
+    Returns (stills_list, cost) tuple.
+    """
+    # Get persona details (optional)
+    persona = None
+    if target_persona_id and target_persona_id not in ("general", "none", ""):
+        persona = await get_persona(target_persona_id, user_id=user_id)
+
+    # Format first pass stills for the prompt
+    first_pass_summary = format_stills_for_review(first_pass_stills)
+
+    # Build variables based on whether we have a persona
+    if persona:
+        variables = {
+            "target_persona_title": persona["title"],
+            "persona_pain_points": ", ".join(persona["pain_points"]),
+            "persona_priorities": ", ".join(persona["priorities"]),
+            "cleaned_transcript": cleaned_transcript,
+            "first_pass_stills": first_pass_summary,
+            "first_pass_count": len(first_pass_stills),
+        }
+    else:
+        variables = {
+            "target_persona_title": "general audience",
+            "persona_pain_points": "common business challenges, efficiency, growth, staying competitive",
+            "persona_priorities": "actionable insights, practical solutions, valuable information",
+            "cleaned_transcript": cleaned_transcript,
+            "first_pass_stills": first_pass_summary,
+            "first_pass_count": len(first_pass_stills),
+        }
+
+    prompt, config = await get_rendered_prompt("distillation_pass2", variables)
+
+    # Add JSON output instruction
+    full_prompt = prompt + """
+
+OUTPUT FORMAT:
+Return valid JSON with this structure:
+{
+  "stills": [
+    {
+      "type": "data|insight|story|problem|solution|quote",
+      "content": "The actual content extracted (for quotes, use exact verbatim text)",
+      "source_location": "timestamp or section reference",
+      "relevance_to_persona": 1-5,
+      "why_relevant": "Brief explanation",
+      "tags": ["tag1", "tag2"],
+      "topics": ["topic1", "topic2"],
+      "speaker": "Name of person who said this (for quotes only, null otherwise)"
+    }
+  ],
+  "summary": "Brief summary of what additional content was found"
+}
+
+Remember: ONLY include NEW stills not already in the first pass. Quality over quantity."""
+
+    # Call LLM via unified client
+    response_text, input_tokens, output_tokens, model = await call_llm_text(
+        prompt=full_prompt,
+        step="distillation_pass2",
+        response_format="json",
+        job_id=job_id,
+        user_id=user_id,
+    )
+
+    # Use robust JSON parser
+    try:
+        result = parse_llm_json(response_text, context="distillation pass 2 response")
+    except ValueError as e:
+        result = {
+            "stills": [],
+            "summary": f"Could not parse LLM response: {str(e)}",
+        }
+
+    # Process stills
+    stills = []
+    still_data_list = result.get("stills", [])
+    for still_data in still_data_list:
+        relevance_key = target_persona_id if persona else "general"
+        still = {
+            "id": str(uuid.uuid4()),
+            "job_id": job_id,
+            "user_id": user_id,
+            "still_type": still_data.get("type", "insight"),
+            "content": still_data.get("content", ""),
+            "source_location": still_data.get("source_location"),
+            "tags": still_data.get("tags", []),
+            "topics": still_data.get("topics", []),
+            "persona_relevance": {
+                relevance_key: still_data.get("relevance_to_persona", 3)
+            },
+            "why_relevant": still_data.get("why_relevant"),
+            "quote_attribution": still_data.get("speaker"),
+        }
+        stills.append(still)
+
+    # Calculate cost
+    cost = calculate_openrouter_cost(model, input_tokens, output_tokens)
+
+    return stills, cost
+
+
 def select_stills_for_content_type(
     stills: list[dict],
     content_type: str,

@@ -13,7 +13,7 @@ from app.database import get_db
 from app.db_utils import execute, fetchone
 from app.models.job import JobStatus
 from app.services.transcription import transcribe_file, cleanup_transcript, extract_document_content
-from app.services.distillation import distill_content
+from app.services.distillation import distill_content, distill_content_pass2
 from app.services.drafting import draft_linkedin_posts, draft_blog_post, draft_email, draft_email_sequence
 from app.services.hook_generator import batch_generate_hooks
 from app.services.editing import batch_edit_content
@@ -324,10 +324,10 @@ async def process_job(job_id: str):
                     if not settings.use_postgres:
                         await db.commit()
 
-        # ======== STEP 1: DISTILLATION ========
+        # ======== STEP 1: DISTILLATION (Pass 1) ========
         await update_job_status(
             job_id, JobStatus.DISTILLING,
-            "Step 1: Distilling content stills", 30, total_cost
+            "Step 1a: Distilling content stills (Pass 1)", 25, total_cost
         )
         total_cost = 0
 
@@ -335,6 +335,24 @@ async def process_job(job_id: str):
             cleaned_transcript, target_persona, job_id, user_id
         )
         total_cost += still_cost
+        logger.info(f"Job {job_id}: Pass 1 extracted {len(stills)} stills")
+
+        # ======== STEP 1b: DISTILLATION (Pass 2 - Deep Extraction) ========
+        await update_job_status(
+            job_id, JobStatus.DISTILLING,
+            "Step 1b: Deep extraction (Pass 2)", 35, total_cost
+        )
+        total_cost = 0
+
+        pass2_stills, pass2_cost = await distill_content_pass2(
+            cleaned_transcript, stills, target_persona, job_id, user_id
+        )
+        total_cost += pass2_cost
+        logger.info(f"Job {job_id}: Pass 2 extracted {len(pass2_stills)} additional stills")
+
+        # Merge stills from both passes
+        stills.extend(pass2_stills)
+        logger.info(f"Job {job_id}: Total stills after both passes: {len(stills)}")
 
         # Save stills to database and the Reserve
         await save_stills_to_db(stills, campaign_name=campaign_name)
