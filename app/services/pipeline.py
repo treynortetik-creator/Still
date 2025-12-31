@@ -530,18 +530,21 @@ async def process_job(job_id: str):
             )
             total_cost += hook_cost
 
-        # ======== STEP 7: IMAGE PROMPT GENERATION ========
-        await update_job_status(
-            job_id, JobStatus.FACTCHECKING,
-            "Step 7: Generating image prompts", 98, total_cost
-        )
-        total_cost = 0
+        # ======== STEP 7: IMAGE PROMPT GENERATION (Optional) ========
+        if job_data.get("generate_image_prompts"):
+            await update_job_status(
+                job_id, JobStatus.FACTCHECKING,
+                "Step 7: Generating image prompts", 98, total_cost
+            )
+            total_cost = 0
 
-        from app.services.image_prompts import batch_generate_image_prompts
-        scored_drafts, img_cost = await batch_generate_image_prompts(
-            scored_drafts, job_id, user_id
-        )
-        total_cost += img_cost
+            from app.services.image_prompts import batch_generate_image_prompts
+            scored_drafts, img_cost = await batch_generate_image_prompts(
+                scored_drafts, job_id, user_id
+            )
+            total_cost += img_cost
+        else:
+            logger.info(f"Job {job_id}: Skipping image prompt generation (disabled)")
 
         # ======== SAVE RESULTS ========
         # Enrich outputs with topics from their stills

@@ -58,14 +58,23 @@ async def list_workshop_outputs(
             if len(content) > 100 and len(preview) == 100:
                 preview += "..."
 
+            # Convert datetime objects to strings if needed
+            last_edited = row["last_edited"]
+            if hasattr(last_edited, 'isoformat'):
+                last_edited = last_edited.isoformat()
+
+            created_at = row["created_at"]
+            if hasattr(created_at, 'isoformat'):
+                created_at = created_at.isoformat()
+
             outputs.append(WorkshopOutputListItem(
                 id=row["id"],
                 job_id=row["job_id"],
                 content_type=row["content_type"],
                 status=row["status"] or "draft",
                 preview=preview,
-                last_edited=row["last_edited"],
-                created_at=row["created_at"],
+                last_edited=last_edited,
+                created_at=created_at,
                 subject=row["subject"],
                 email_day=row["email_day"],
             ))
@@ -123,6 +132,15 @@ async def get_workshop_output(
             for s in still_rows
         ]
 
+        # Convert datetime objects to strings if needed
+        last_edited = row["last_edited"]
+        if hasattr(last_edited, 'isoformat'):
+            last_edited = last_edited.isoformat()
+
+        created_at = row["created_at"]
+        if hasattr(created_at, 'isoformat'):
+            created_at = created_at.isoformat()
+
         return WorkshopOutputDetail(
             id=row["id"],
             job_id=row["job_id"],
@@ -130,8 +148,8 @@ async def get_workshop_output(
             status=row["status"] or "draft",
             content=content,
             original_content=original_content,
-            last_edited=row["last_edited"],
-            created_at=row["created_at"],
+            last_edited=last_edited,
+            created_at=created_at,
             character_count=len(content),
             subject=row["subject"],
             email_day=row["email_day"],

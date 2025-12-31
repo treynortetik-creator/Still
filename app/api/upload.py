@@ -89,6 +89,7 @@ async def upload_content(
     processing_mode: str = Form(default="autopilot"),
     campaign_name: Optional[str] = Form(default=None),
     magic_words: Optional[str] = Form(default=None),
+    generate_image_prompts: str = Form(default="false"),
     user_id: int = Depends(get_current_user_id),
 ):
     """
@@ -141,6 +142,9 @@ async def upload_content(
     if is_quick_distill and not campaign_name:
         campaign_name = generate_campaign_from_filename(file.filename)
 
+    # Parse generate_image_prompts boolean from string
+    gen_img_prompts = generate_image_prompts.lower() in ("true", "1", "yes")
+
     # Create job ID
     job_id = str(uuid.uuid4())
 
@@ -163,8 +167,8 @@ async def upload_content(
             INSERT INTO jobs (
                 id, user_id, status, original_filename, file_type, file_size,
                 target_persona, asset_types, asset_quantities, processing_mode,
-                campaign_name, magic_words, current_step, progress
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                campaign_name, magic_words, generate_image_prompts, current_step, progress
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 job_id,
@@ -179,6 +183,7 @@ async def upload_content(
                 processing_mode,
                 campaign_name,
                 magic_words,
+                gen_img_prompts,
                 "Uploading file" if not is_quick_distill else "Uploading file for Quick Distill",
                 5,
             )
@@ -210,6 +215,7 @@ async def upload_text(
     campaign_name: Optional[str] = Form(default=None),
     content_name: Optional[str] = Form(default="pasted_content.txt"),
     magic_words: Optional[str] = Form(default=None),
+    generate_image_prompts: str = Form(default="false"),
     user_id: int = Depends(get_current_user_id),
 ):
     """
@@ -255,6 +261,9 @@ async def upload_text(
     if is_quick_distill and not campaign_name and content_name:
         campaign_name = generate_campaign_from_filename(content_name)
 
+    # Parse generate_image_prompts boolean from string
+    gen_img_prompts = generate_image_prompts.lower() in ("true", "1", "yes")
+
     # Create job ID
     job_id = str(uuid.uuid4())
 
@@ -276,8 +285,8 @@ async def upload_text(
             INSERT INTO jobs (
                 id, user_id, status, original_filename, file_type, file_size,
                 target_persona, asset_types, asset_quantities, processing_mode,
-                campaign_name, magic_words, current_step, progress, transcript
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                campaign_name, magic_words, generate_image_prompts, current_step, progress, transcript
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 job_id,
@@ -292,6 +301,7 @@ async def upload_text(
                 processing_mode,
                 campaign_name,
                 magic_words,
+                gen_img_prompts,
                 "Processing text content" if not is_quick_distill else "Processing text for Quick Distill",
                 10,
                 content,  # Text content is already the transcript

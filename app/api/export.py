@@ -226,6 +226,13 @@ def format_markdown(job: dict, outputs: list[dict], atoms: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def serialize_datetime(obj):
+    """JSON serializer for datetime objects."""
+    if hasattr(obj, 'isoformat'):
+        return obj.isoformat()
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+
 def format_json(job: dict, outputs: list[dict], atoms: list[dict]) -> str:
     """Format job results as JSON."""
     return json.dumps({
@@ -239,7 +246,7 @@ def format_json(job: dict, outputs: list[dict], atoms: list[dict]) -> str:
         },
         "outputs": outputs,
         "atoms": atoms,
-    }, indent=2)
+    }, indent=2, default=serialize_datetime)
 
 
 def create_docx(job: dict, outputs: list[dict], atoms: list[dict]) -> bytes:

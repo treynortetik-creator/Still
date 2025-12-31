@@ -404,6 +404,28 @@
                     <p id="content-types-help" class="form-helper mt-3">Select at least one content type to generate.</p>
                 </fieldset>
 
+                <!-- Advanced Options -->
+                <div class="mt-6 pt-6 border-t" style="border-color: var(--glass-border);">
+                    <p class="text-sm font-medium text-still-muted mb-4">Advanced Options</p>
+
+                    <!-- Image Prompts Toggle -->
+                    <label class="flex items-center justify-between cursor-pointer p-4 rounded-xl" style="background: var(--surface-elevated);">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-5 h-5 text-still-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                                <span class="font-medium text-still-text">Generate Image Prompts</span>
+                            </div>
+                            <p class="text-sm text-still-muted mt-1 ml-7">Create AI image prompts for Midjourney, DALL-E, etc.</p>
+                        </div>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="generate-image-prompts" aria-label="Generate image prompts">
+                            <div class="toggle-knob"></div>
+                        </div>
+                    </label>
+                </div>
+
                 <!-- Processing Time Estimate -->
                 <div class="mt-6 rounded-xl p-5" style="background: linear-gradient(135deg, rgba(212, 117, 43, 0.1) 0%, rgba(233, 168, 114, 0.05) 100%); border: 1px solid rgba(212, 117, 43, 0.2);">
                     <div class="flex items-start gap-4">
@@ -715,6 +737,7 @@
                 let response;
                 const magicWords = document.getElementById('magic-words').value.trim();
                 const campaignName = document.getElementById('campaign-name').value.trim();
+                const generateImagePrompts = document.getElementById('generate-image-prompts')?.checked || false;
 
                 if (uploadMode === 'file') {
                     const formData = new FormData();
@@ -723,6 +746,7 @@
                     formData.append('asset_quantities', JSON.stringify(assetQuantities));
                     formData.append('processing_mode', processingMode);
                     formData.append('campaign_name', campaignName);
+                    formData.append('generate_image_prompts', generateImagePrompts);
                     if (magicWords) {
                         formData.append('magic_words', magicWords);
                     }
@@ -760,6 +784,7 @@
                     formData.append('processing_mode', processingMode);
                     formData.append('campaign_name', campaignName);
                     formData.append('content_name', document.getElementById('content-name').value || 'pasted_content.txt');
+                    formData.append('generate_image_prompts', generateImagePrompts);
                     if (magicWords) {
                         formData.append('magic_words', magicWords);
                     }
