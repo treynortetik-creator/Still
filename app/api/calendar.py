@@ -196,12 +196,16 @@ async def get_calendar(
         unscheduled = []
         for row in unscheduled_rows:
             content_preview = (row["step3_final"] or "")[:100] + "..." if row["step3_final"] else ""
+            # Convert datetime to string for Pydantic
+            created_at = row["created_at"]
+            if hasattr(created_at, 'isoformat'):
+                created_at = created_at.isoformat()
             unscheduled.append(UnscheduledOutput(
                 output_id=row["id"],
                 content_type=row["content_type"],
                 content_preview=content_preview,
                 job_id=row["job_id"],
-                created_at=row["created_at"]
+                created_at=created_at
             ))
 
     return CalendarView(
@@ -241,12 +245,16 @@ async def get_unscheduled_content(
     outputs = []
     for row in rows:
         content_preview = (row["step3_final"] or "")[:100] + "..." if row["step3_final"] else ""
+        # Convert datetime to string for JSON serialization
+        created_at = row["created_at"]
+        if hasattr(created_at, 'isoformat'):
+            created_at = created_at.isoformat()
         outputs.append({
             "output_id": row["id"],
             "content_type": row["content_type"],
             "content_preview": content_preview,
             "job_id": row["job_id"],
-            "created_at": row["created_at"]
+            "created_at": created_at
         })
 
     return {"outputs": outputs, "total": len(outputs)}
