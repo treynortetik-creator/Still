@@ -1,6 +1,6 @@
 """Content Calendar API endpoints."""
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from typing import Optional
 from collections import defaultdict
 from fastapi import APIRouter, HTTPException, Depends, Query
@@ -136,6 +136,13 @@ async def get_calendar(
     user_id: int = Depends(get_current_user_id),
 ):
     """Get calendar view for a date range with scheduled and unscheduled content."""
+    # Convert string dates to date objects for PostgreSQL
+    try:
+        start_date_obj = date.fromisoformat(start_date)
+        end_date_obj = date.fromisoformat(end_date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+
     async with get_db() as db:
         # Get scheduled content
         scheduled = await fetchall(
@@ -150,7 +157,7 @@ async def get_calendar(
             AND cs.scheduled_date >= ? AND cs.scheduled_date <= ?
             ORDER BY cs.scheduled_date, cs.scheduled_time
             """,
-            (user_id, start_date, end_date)
+            (user_id, start_date_obj, end_date_obj)
         )
 
         # Group by date
