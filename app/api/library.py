@@ -345,6 +345,56 @@ async def delete_library_entry(entry_id: int, user_id: int = Depends(get_current
     return {"message": "Entry deleted successfully"}
 
 
+class BatchDeleteRequest(BaseModel):
+    """Request model for batch deleting stills."""
+    ids: list[int]
+
+
+@router.post("/library/batch-delete")
+async def batch_delete_library_entries(
+    request: BatchDeleteRequest,
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Delete multiple library entries at once.
+    """
+    if not request.ids:
+        raise HTTPException(status_code=400, detail="No IDs provided")
+
+    if len(request.ids) > 500:
+        raise HTTPException(status_code=400, detail="Maximum 500 entries can be deleted at once")
+
+    async with get_db() as db:
+        # Verify ownership of all entries
+        placeholders = ",".join("?" * len(request.ids))
+        rows = await fetchall(
+            db,
+            f"SELECT id FROM content_library WHERE id IN ({placeholders}) AND user_id = ?",
+            (*request.ids, user_id)
+        )
+
+        found_ids = {row["id"] for row in rows}
+        requested_ids = set(request.ids)
+
+        if found_ids != requested_ids:
+            missing = requested_ids - found_ids
+            raise HTTPException(
+                status_code=404,
+                detail=f"Some entries not found or not owned by user: {list(missing)[:5]}"
+            )
+
+        # Delete all entries
+        await execute(
+            db,
+            f"DELETE FROM content_library WHERE id IN ({placeholders}) AND user_id = ?",
+            (*request.ids, user_id)
+        )
+        if not settings.use_postgres:
+            await db.commit()
+
+    return {"message": f"Successfully deleted {len(request.ids)} entries", "deleted_count": len(request.ids)}
+
+
 @router.put("/library/{entry_id}/notes")
 async def update_library_notes(entry_id: int, notes: str, user_id: int = Depends(get_current_user_id)):
     """
