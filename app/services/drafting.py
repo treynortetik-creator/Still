@@ -584,8 +584,13 @@ OUTPUT FORMAT (valid JSON):
     # Parse response with robust JSON parser
     result = parse_llm_json(response_text, context="email sequence")
 
-    emails = result.get("emails", [])
-    sequence_name = result.get("sequence_name", "Email Nurture Sequence")
+    # Handle both formats: {"emails": [...]} or just [...]
+    if isinstance(result, list):
+        emails = result
+        sequence_name = "Email Nurture Sequence"
+    else:
+        emails = result.get("emails", [])
+        sequence_name = result.get("sequence_name", "Email Nurture Sequence")
 
     # Add sequence metadata to each email
     for email in emails:
