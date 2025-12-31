@@ -22,7 +22,7 @@ async def init_prompts_from_files():
     # Default prompts with their configurations
     default_prompts = {
         "distillation": {
-            "model": "gemini-2.0-flash",
+            "model": "gemini-2.5-flash",
             "max_tokens": 8000,
             "variables": [
                 "target_persona_title", "persona_pain_points", "persona_priorities",
@@ -30,7 +30,7 @@ async def init_prompts_from_files():
             ],
         },
         "distillation_pass2": {
-            "model": "gemini-2.0-flash-lite",
+            "model": "gemini-2.5-flash",
             "max_tokens": 8000,
             "variables": [
                 "target_persona_title", "persona_pain_points", "persona_priorities",
@@ -62,7 +62,7 @@ async def init_prompts_from_files():
             ],
         },
         "audience_edit": {
-            "model": "gemini-2.0-flash",
+            "model": "gemini-2.5-flash",
             "max_tokens": 8000,
             "variables": [
                 "persona_title", "persona_language_level",
@@ -75,7 +75,7 @@ async def init_prompts_from_files():
             "variables": ["original_transcript", "edited_draft_from_step2"],
         },
         "summarization": {
-            "model": "gemini-2.0-flash-lite",
+            "model": "gemini-2.5-flash",
             "max_tokens": 500,
             "variables": ["transcript"],
         },

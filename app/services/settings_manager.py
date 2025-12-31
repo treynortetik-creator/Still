@@ -26,13 +26,13 @@ _cache_lock = threading.Lock()
 DEFAULT_MODELS = {
     "transcription": "google/gemini-2.5-flash",
     "distillation": "google/gemini-2.5-flash",
-    "distillation_pass2": "google/gemini-2.0-flash-lite",
-    "summarization": "google/gemini-2.0-flash-lite",
+    "distillation_pass2": "google/gemini-2.5-flash",
+    "summarization": "google/gemini-2.5-flash",
     "atomization": "google/gemini-2.5-flash",
     "drafting": "google/gemini-3-flash-preview",
     "editing": "google/gemini-2.5-flash",
     "factcheck": "google/gemini-2.5-flash",
-    "workshop_ai_edit": "google/gemini-2.5-flash-preview",
+    "workshop_ai_edit": "google/gemini-2.5-flash",
 }
 
 
