@@ -62,6 +62,12 @@ async def schedule_content(
             )
 
         # Create schedule
+        # Convert string date to date object for asyncpg (PostgreSQL requires proper date types)
+        try:
+            scheduled_date_obj = date.fromisoformat(data.scheduled_date)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+
         if settings.use_postgres:
             row = await db.fetchrow(
                 """
@@ -72,7 +78,7 @@ async def schedule_content(
                 """,
                 user_id,
                 data.output_id,
-                data.scheduled_date,
+                scheduled_date_obj,
                 data.scheduled_time,
                 data.platform,
                 data.notes
@@ -89,7 +95,7 @@ async def schedule_content(
                 (
                     user_id,
                     data.output_id,
-                    data.scheduled_date,
+                    scheduled_date_obj.isoformat(),  # SQLite stores dates as strings
                     data.scheduled_time,
                     data.platform,
                     data.notes
@@ -319,8 +325,14 @@ async def update_schedule(
         values = []
 
         if data.scheduled_date is not None:
+            # Convert string to date object for asyncpg (PostgreSQL requires proper date types)
+            try:
+                scheduled_date_obj = date.fromisoformat(data.scheduled_date)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
             updates.append("scheduled_date = ?")
-            values.append(data.scheduled_date)
+            # Use date object for PostgreSQL, string for SQLite
+            values.append(scheduled_date_obj if settings.use_postgres else data.scheduled_date)
 
         if data.scheduled_time is not None:
             updates.append("scheduled_time = ?")
