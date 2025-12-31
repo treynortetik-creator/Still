@@ -23,6 +23,13 @@ from app.models.calendar import (
 router = APIRouter()
 
 
+def to_iso_string(value):
+    """Convert date/time objects to ISO format strings for Pydantic responses."""
+    if hasattr(value, 'isoformat'):
+        return value.isoformat()
+    return value
+
+
 @router.post("/calendar/schedule", response_model=ScheduleResponse)
 async def schedule_content(
     data: ScheduleCreate,
@@ -129,8 +136,8 @@ async def schedule_content(
     return ScheduleResponse(
         id=schedule["id"],
         output_id=schedule["output_id"],
-        scheduled_date=schedule["scheduled_date"],
-        scheduled_time=schedule["scheduled_time"],
+        scheduled_date=to_iso_string(schedule["scheduled_date"]),
+        scheduled_time=to_iso_string(schedule["scheduled_time"]),
         platform=schedule["platform"],
         status=schedule["status"],
         notes=schedule["notes"],
@@ -175,11 +182,13 @@ async def get_calendar(
         days = defaultdict(list)
         for item in scheduled:
             content_preview = (item["step3_final"] or "")[:100] + "..." if item["step3_final"] else ""
-            days[item["scheduled_date"]].append(ScheduledItem(
+            # Convert date to string for dict key (PostgreSQL returns date objects)
+            date_key = to_iso_string(item["scheduled_date"])
+            days[date_key].append(ScheduledItem(
                 id=item["id"],
                 output_id=item["output_id"],
                 platform=item["platform"],
-                scheduled_time=item["scheduled_time"],
+                scheduled_time=to_iso_string(item["scheduled_time"]),
                 status=item["status"],
                 content_preview=content_preview,
                 content_type=item["content_type"],
@@ -297,8 +306,8 @@ async def get_schedule(
     return ScheduleResponse(
         id=schedule["id"],
         output_id=schedule["output_id"],
-        scheduled_date=schedule["scheduled_date"],
-        scheduled_time=schedule["scheduled_time"],
+        scheduled_date=to_iso_string(schedule["scheduled_date"]),
+        scheduled_time=to_iso_string(schedule["scheduled_time"]),
         platform=schedule["platform"],
         status=schedule["status"],
         notes=schedule["notes"],
@@ -395,8 +404,8 @@ async def update_schedule(
     return ScheduleResponse(
         id=updated["id"],
         output_id=updated["output_id"],
-        scheduled_date=updated["scheduled_date"],
-        scheduled_time=updated["scheduled_time"],
+        scheduled_date=to_iso_string(updated["scheduled_date"]),
+        scheduled_time=to_iso_string(updated["scheduled_time"]),
         platform=updated["platform"],
         status=updated["status"],
         notes=updated["notes"],
