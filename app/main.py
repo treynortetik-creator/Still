@@ -21,7 +21,7 @@ from app.database import init_db, close_postgres_pool
 
 logger = logging.getLogger(__name__)
 from app.api import upload, jobs, library, admin, auth, personas, export, feedback, edit
-from app.api import admin_views, swipes, memory, brand_voice, remix, custom_personas, batch, analytics
+from app.api import admin_views, swipes, memory, brand_voice, remix, custom_personas, batch
 from app.api import webhooks, calendar, autopilot, sommelier, workshop
 
 settings = get_settings()
@@ -215,7 +215,6 @@ app.include_router(brand_voice.router, prefix="/api", tags=["brand-voice"])
 app.include_router(remix.router, prefix="/api", tags=["remix"])
 app.include_router(custom_personas.router, prefix="/api", tags=["custom-personas"])
 app.include_router(batch.router, prefix="/api", tags=["batch"])
-app.include_router(analytics.router, prefix="/api", tags=["analytics"])
 app.include_router(webhooks.router, prefix="/api", tags=["webhooks"])
 app.include_router(calendar.router, prefix="/api", tags=["calendar"])
 app.include_router(autopilot.router, prefix="/api", tags=["autopilot"])
@@ -289,12 +288,6 @@ async def serve_swipes():
 async def serve_remix():
     """Serve content remix page."""
     return FileResponse(frontend_path / "remix.html")
-
-
-@app.get("/analytics.html")
-async def serve_analytics():
-    """Serve analytics dashboard page."""
-    return FileResponse(frontend_path / "analytics.html")
 
 
 @app.get("/batch-status.html")

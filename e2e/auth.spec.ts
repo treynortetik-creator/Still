@@ -288,7 +288,6 @@ test.describe('Authentication', () => {
       '/reserve.html',
       '/results.html',
       '/settings.html',
-      '/analytics.html',
       '/personas.html',
     ];
 

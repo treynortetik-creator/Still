@@ -5,8 +5,7 @@ function renderPremiumNav(activePage = '') {
         { href: '/reserve.html', label: 'Reserve' },
         { href: '/workshop.html', label: 'Workshop' },
         { href: '/calendar.html', label: 'Calendar' },
-        { href: '/autopilot.html', label: 'Autopilot' },
-        { href: '/analytics.html', label: 'Analytics' },
+        // { href: '/autopilot.html', label: 'Autopilot' },  // Hidden for MVP - feature ready for future
         { href: '/settings.html', label: 'Settings' },
     ];
 

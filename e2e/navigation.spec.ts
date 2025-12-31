@@ -104,16 +104,6 @@ test.describe('Navigation & Routing', () => {
       expect(hasSettings).toBe(true);
     });
 
-    test('should load analytics page', async ({ page }) => {
-      await page.goto('/analytics.html');
-      await page.waitForTimeout(1000);
-
-      // Should have nav and analytics-specific elements
-      const hasNav = await page.locator('#nav-container').count() > 0;
-      const hasContent = await page.locator('#analytics-content, #loading').count() > 0;
-      expect(hasNav && hasContent).toBe(true);
-    });
-
     test('should load workshop page', async ({ page }) => {
       await page.goto('/workshop.html');
 
