@@ -1,6 +1,6 @@
 """Content Calendar API endpoints."""
 import json
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, time
 from typing import Optional
 from collections import defaultdict
 from fastapi import APIRouter, HTTPException, Depends, Query
@@ -62,11 +62,16 @@ async def schedule_content(
             )
 
         # Create schedule
-        # Convert string date to date object for asyncpg (PostgreSQL requires proper date types)
+        # Convert string date/time to proper objects for asyncpg (PostgreSQL requires proper types)
         try:
             scheduled_date_obj = date.fromisoformat(data.scheduled_date)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+
+        try:
+            scheduled_time_obj = time.fromisoformat(data.scheduled_time)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM:SS")
 
         if settings.use_postgres:
             row = await db.fetchrow(
@@ -79,7 +84,7 @@ async def schedule_content(
                 user_id,
                 data.output_id,
                 scheduled_date_obj,
-                data.scheduled_time,
+                scheduled_time_obj,
                 data.platform,
                 data.notes
             )
@@ -96,7 +101,7 @@ async def schedule_content(
                     user_id,
                     data.output_id,
                     scheduled_date_obj.isoformat(),  # SQLite stores dates as strings
-                    data.scheduled_time,
+                    scheduled_time_obj.isoformat(),  # SQLite stores times as strings
                     data.platform,
                     data.notes
                 )
@@ -335,8 +340,14 @@ async def update_schedule(
             values.append(scheduled_date_obj if settings.use_postgres else data.scheduled_date)
 
         if data.scheduled_time is not None:
+            # Convert string to time object for asyncpg (PostgreSQL requires proper time types)
+            try:
+                scheduled_time_obj = time.fromisoformat(data.scheduled_time)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM:SS")
             updates.append("scheduled_time = ?")
-            values.append(data.scheduled_time)
+            # Use time object for PostgreSQL, string for SQLite
+            values.append(scheduled_time_obj if settings.use_postgres else data.scheduled_time)
 
         if data.platform is not None:
             valid_platforms = {"linkedin", "blog", "email", "email_sequence"}
