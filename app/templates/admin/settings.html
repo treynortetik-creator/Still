@@ -373,10 +373,13 @@ async function saveModelConfig() {
         if (response.ok) {
             showSuccess();
         } else {
-            showError('Failed to save model configuration');
+            const data = await response.json();
+            console.error('Model config save error:', data);
+            showError(data.detail || 'Failed to save model configuration');
         }
     } catch (err) {
-        showError('Failed to save model configuration');
+        console.error('Model config save exception:', err);
+        showError('Failed to save model configuration: ' + err.message);
     }
 }
 

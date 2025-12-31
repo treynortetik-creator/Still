@@ -456,11 +456,13 @@ class OpenRouterToggle(BaseModel):
 
 class ModelConfig(BaseModel):
     transcription: str
-    atomization: str
+    distillation: str  # Frontend uses distillation, aliased to atomization
+    distillation_pass2: str
     summarization: str
     drafting: str
     editing: str
     factcheck: str
+    workshop_ai_edit: str
 
 
 class AIEditorConfigRequest(BaseModel):
@@ -513,15 +515,17 @@ async def toggle_openrouter(request: OpenRouterToggle, _: bool = Depends(verify_
 @router.post("/settings/models")
 async def save_model_config(config: ModelConfig, _: bool = Depends(verify_admin)):
     """Save model configuration for each pipeline step (saves to database)."""
-    # Save both atomization and distillation as they're aliases for the same step
+    # Save all model configs including aliases
     await settings_manager.set_model_config({
         "transcription": config.transcription,
-        "atomization": config.atomization,
-        "distillation": config.atomization,  # Alias - both point to same model
+        "distillation": config.distillation,
+        "atomization": config.distillation,  # Alias - both point to same model
+        "distillation_pass2": config.distillation_pass2,
         "summarization": config.summarization,
         "drafting": config.drafting,
         "editing": config.editing,
-        "factcheck": config.factcheck
+        "factcheck": config.factcheck,
+        "workshop_ai_edit": config.workshop_ai_edit,
     })
     return {"status": "ok", "models": config.model_dump()}
 
