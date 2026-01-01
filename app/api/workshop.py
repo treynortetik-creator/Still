@@ -23,6 +23,13 @@ settings = get_settings()
 router = APIRouter()
 
 
+def to_iso_string(value):
+    """Convert datetime objects to ISO format strings for Pydantic responses."""
+    if hasattr(value, 'isoformat'):
+        return value.isoformat()
+    return value
+
+
 @router.get("/workshop", response_model=WorkshopOutputList)
 async def list_workshop_outputs(
     status: Optional[str] = Query(None, description="Filter by status: draft, polished, published"),
@@ -205,7 +212,7 @@ async def update_workshop_content(
         return WorkshopUpdateResponse(
             id=output_id,
             status=updated["status"] or "draft",
-            last_edited=updated["last_edited"],
+            last_edited=to_iso_string(updated["last_edited"]),
             message="Content saved successfully"
         )
 
@@ -249,7 +256,7 @@ async def update_workshop_status(
         return WorkshopUpdateResponse(
             id=output_id,
             status=data.status,
-            last_edited=now,
+            last_edited=to_iso_string(now),
             message=f"Status updated to {data.status}"
         )
 
