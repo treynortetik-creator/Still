@@ -1,4 +1,5 @@
 """The Sommelier - AI-powered semantic search API endpoints."""
+import traceback
 from fastapi import APIRouter, HTTPException, Query, Depends, Request
 from pydantic import BaseModel
 from typing import Optional
@@ -8,6 +9,7 @@ from slowapi.util import get_remote_address
 
 from app.api.auth import get_current_user_id
 from app.services.sommelier import search_stills, get_example_queries
+from app.utils.retry import log_error
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
@@ -63,6 +65,13 @@ async def sommelier_search(
         )
 
     except Exception as e:
+        # Log error to database for admin panel
+        await log_error(
+            error_type="SommelierSearch",
+            error_message=f"Search failed: {str(e)}\n{traceback.format_exc()}",
+            user_id=user_id,
+            context=f"Query: {search_request.query[:100]}"
+        )
         raise HTTPException(
             status_code=500,
             detail=f"Search failed: {str(e)}"

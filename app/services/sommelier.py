@@ -80,11 +80,17 @@ Important:
     # Step 2: Search database with expanded keywords
     async with get_db() as db:
         # Build search query - search across content and tags
+        # Note: tags is JSONB in PostgreSQL, need to cast to text for LIKE
         conditions = []
         params = [user_id]
 
         for keyword in search_keywords[:10]:  # Limit to 10 keywords
-            conditions.append("(content LIKE ? OR tags LIKE ?)")
+            if settings.use_postgres:
+                # PostgreSQL: cast JSONB to text for LIKE operator
+                conditions.append("(content LIKE ? OR tags::text LIKE ?)")
+            else:
+                # SQLite: tags stored as text
+                conditions.append("(content LIKE ? OR tags LIKE ?)")
             params.extend([f"%{keyword}%", f"%{keyword}%"])
 
         where_clause = " OR ".join(conditions) if conditions else "1=1"
