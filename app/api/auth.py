@@ -228,15 +228,23 @@ async def get_current_user_id(authorization: Optional[str] = Header(None)) -> in
 
 # Admin authentication dependency
 from app.config import get_settings
+from fastapi import Request, Cookie
+import hmac
+import base64
 
-async def verify_admin(authorization: Optional[str] = Header(None)) -> bool:
+async def verify_admin(
+    request: Request,
+    authorization: Optional[str] = Header(None),
+    admin_session: Optional[str] = Cookie(None)
+) -> bool:
     """
-    Dependency to verify admin credentials via Basic Auth or Bearer token with admin role.
+    Dependency to verify admin credentials via Basic Auth, Bearer token, or session cookie.
     Use in route functions: _: bool = Depends(verify_admin)
 
-    Supports two authentication methods:
+    Supports three authentication methods:
     1. Basic Auth: Authorization: Basic base64(username:password)
     2. Bearer token with admin claim
+    3. admin_session cookie (set by login form)
     """
     settings = get_settings()
 
@@ -247,6 +255,20 @@ async def verify_admin(authorization: Optional[str] = Header(None)) -> bool:
             detail="Admin panel is not configured. Set ADMIN_USERNAME and ADMIN_PASSWORD environment variables."
         )
 
+    # Check for admin_session cookie first (most common case from web UI)
+    if admin_session:
+        try:
+            expected_token = hmac.new(
+                settings.secret_key.encode(),
+                f"{settings.admin_username}:admin".encode(),
+                "sha256"
+            ).hexdigest()
+            if hmac.compare_digest(admin_session, expected_token):
+                return True
+        except (TypeError, AttributeError, UnicodeDecodeError):
+            pass  # Invalid cookie format, try other auth methods
+
+    # If no authorization header and cookie check failed
     if not authorization:
         raise HTTPException(
             status_code=401,
@@ -263,13 +285,11 @@ async def verify_admin(authorization: Optional[str] = Header(None)) -> bool:
 
     # Handle Basic Auth
     if auth_type == "basic":
-        import base64
         try:
             decoded = base64.b64decode(credentials).decode("utf-8")
             username, password = decoded.split(":", 1)
 
             # Use constant-time comparison to prevent timing attacks
-            import hmac
             username_match = hmac.compare_digest(username, settings.admin_username)
             password_match = hmac.compare_digest(password, settings.admin_password)
 

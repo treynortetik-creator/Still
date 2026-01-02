@@ -78,3 +78,6 @@ node_modules/
 *.key
 secrets.json
 credentials.json
+
+# MCP Server config (contains secrets)
+.mcp.json
