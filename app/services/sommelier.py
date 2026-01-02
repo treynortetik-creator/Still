@@ -79,6 +79,19 @@ Important:
 
     # Step 2: Search database with expanded keywords
     async with get_db() as db:
+        # First, check if user has ANY content in their Reserve
+        total_count = await fetchone(
+            db,
+            "SELECT COUNT(*) as count FROM content_library WHERE user_id = ?",
+            (user_id,)
+        )
+
+        if not total_count or total_count["count"] == 0:
+            logger.info(f"Sommelier: User {user_id} has no content in Reserve")
+            return [], "Your Reserve is empty. Save some stills from your processed content first!", total_cost
+
+        logger.info(f"Sommelier: User {user_id} has {total_count['count']} items in Reserve, searching with keywords: {search_keywords[:5]}")
+
         # Build search query - search across content and tags
         # Note: tags is JSONB in PostgreSQL, need to cast to text for LIKE
         conditions = []
@@ -102,7 +115,13 @@ Important:
             ORDER BY times_used DESC
             LIMIT 50
         """
+
+        logger.debug(f"Sommelier query: {query}")
+        logger.debug(f"Sommelier params count: {len(params)}")
+
         rows = await fetchall(db, query, tuple(params))
+
+        logger.info(f"Sommelier: Found {len(rows)} matching items for user {user_id}")
 
         if not rows:
             return [], understood_intent, total_cost
