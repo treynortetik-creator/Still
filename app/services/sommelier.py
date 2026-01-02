@@ -69,52 +69,64 @@ Write clear, helpful explanations for why each still is relevant."""
 
 async def get_sommelier_config() -> Dict[str, str]:
     """Get Sommelier configuration from database."""
-    async with get_db() as db:
-        rows = await fetchall(
-            db,
-            "SELECT config_key, config_value FROM ai_editor_config WHERE config_key LIKE ?",
-            ("sommelier_%",)
-        )
+    try:
+        async with get_db() as db:
+            rows = await fetchall(
+                db,
+                "SELECT config_key, config_value FROM ai_editor_config WHERE config_key LIKE ?",
+                ("sommelier_%",)
+            )
 
-        config = {}
-        for row in rows:
-            config[row["config_key"]] = row["config_value"]
+            config = {}
+            for row in rows:
+                config[row["config_key"]] = row["config_value"]
 
-        # Return defaults if not configured
-        if "sommelier_parse_prompt" not in config:
-            config["sommelier_parse_prompt"] = DEFAULT_PARSE_PROMPT
-        if "sommelier_rerank_prompt" not in config:
-            config["sommelier_rerank_prompt"] = DEFAULT_RERANK_PROMPT
+            # Return defaults if not configured
+            if "sommelier_parse_prompt" not in config:
+                config["sommelier_parse_prompt"] = DEFAULT_PARSE_PROMPT
+            if "sommelier_rerank_prompt" not in config:
+                config["sommelier_rerank_prompt"] = DEFAULT_RERANK_PROMPT
 
-        return config
+            return config
+    except Exception as e:
+        logger.error(f"Error loading sommelier config from database: {e}", exc_info=True)
+        # Return defaults on database error
+        return {
+            "sommelier_parse_prompt": DEFAULT_PARSE_PROMPT,
+            "sommelier_rerank_prompt": DEFAULT_RERANK_PROMPT,
+        }
 
 
 async def save_sommelier_config(config_key: str, config_value: str) -> None:
     """Save Sommelier configuration to database."""
-    async with get_db() as db:
-        if settings.use_postgres:
-            await db.execute(
-                """
-                INSERT INTO ai_editor_config (config_key, config_value, updated_at)
-                VALUES ($1, $2, NOW())
-                ON CONFLICT(config_key) DO UPDATE SET
-                    config_value = EXCLUDED.config_value,
-                    updated_at = NOW()
-                """,
-                config_key, config_value
-            )
-        else:
-            await db.execute(
-                """
-                INSERT INTO ai_editor_config (config_key, config_value, updated_at)
-                VALUES (?, ?, CURRENT_TIMESTAMP)
-                ON CONFLICT(config_key) DO UPDATE SET
-                    config_value = excluded.config_value,
-                    updated_at = CURRENT_TIMESTAMP
-                """,
-                (config_key, config_value)
-            )
-            await db.commit()
+    try:
+        async with get_db() as db:
+            if settings.use_postgres:
+                await db.execute(
+                    """
+                    INSERT INTO ai_editor_config (config_key, config_value, updated_at)
+                    VALUES ($1, $2, NOW())
+                    ON CONFLICT(config_key) DO UPDATE SET
+                        config_value = EXCLUDED.config_value,
+                        updated_at = NOW()
+                    """,
+                    config_key, config_value
+                )
+            else:
+                await db.execute(
+                    """
+                    INSERT INTO ai_editor_config (config_key, config_value, updated_at)
+                    VALUES (?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(config_key) DO UPDATE SET
+                        config_value = excluded.config_value,
+                        updated_at = CURRENT_TIMESTAMP
+                    """,
+                    (config_key, config_value)
+                )
+                await db.commit()
+    except Exception as e:
+        logger.error(f"Error saving sommelier config to database: {e}", exc_info=True)
+        raise
 
 
 async def search_stills(

@@ -481,14 +481,25 @@ class SommelierConfigRequest(BaseModel):
 @router.get("/settings")
 async def get_settings(_: bool = Depends(verify_admin)):
     """Get current settings including API key status and model config."""
-    settings = settings_manager.get_settings()
-    api_keys = settings_manager.get_api_key_status()
-    
-    return {
-        "api_keys": api_keys,
-        "use_openrouter": settings.get("use_openrouter", False),
-        "models": settings.get("models", {})
-    }
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        settings = settings_manager.get_settings()
+        api_keys = settings_manager.get_api_key_status()
+
+        return {
+            "api_keys": api_keys,
+            "use_openrouter": settings.get("use_openrouter", False),
+            "models": settings.get("models", {})
+        }
+    except Exception as e:
+        logger.error(f"Error loading settings: {e}", exc_info=True)
+        # Return minimal defaults on error
+        return {
+            "api_keys": {"openrouter": False, "gemini": False, "anthropic": False},
+            "use_openrouter": True,
+            "models": {}
+        }
 
 
 @router.post("/settings/apikey")
@@ -546,80 +557,86 @@ async def get_error_logs(
     """
     Get detailed error logs with stack traces for debugging.
     """
-    async with get_db() as db:
-        # First check if the error_logs table exists
-        if app_settings.use_postgres:
-            table_check = await db.fetchrow(
-                "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'error_logs'"
-            )
-            table_exists = table_check is not None
-        else:
-            cursor = await db.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='error_logs'"
-            )
-            table_exists = await cursor.fetchone()
-
-        if not table_exists:
-            # Create the table if it doesn't exist
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        async with get_db() as db:
+            # First check if the error_logs table exists
             if app_settings.use_postgres:
-                await db.execute("""
-                    CREATE TABLE IF NOT EXISTS error_logs (
-                        id SERIAL PRIMARY KEY,
-                        job_id TEXT,
-                        user_id INTEGER,
-                        error_type TEXT,
-                        error_message TEXT,
-                        stack_trace TEXT,
-                        created_at TIMESTAMP DEFAULT NOW()
-                    )
-                """)
+                table_check = await db.fetchrow(
+                    "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'error_logs'"
+                )
+                table_exists = table_check is not None
             else:
-                await db.execute("""
-                    CREATE TABLE IF NOT EXISTS error_logs (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        job_id TEXT,
-                        user_id INTEGER,
-                        error_type TEXT,
-                        error_message TEXT,
-                        stack_trace TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
-                await db.commit()
-            return {"error_logs": [], "message": "Error logs table created"}
+                cursor = await db.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='error_logs'"
+                )
+                table_exists = await cursor.fetchone()
 
-        query = """
-            SELECT el.*, j.original_filename, u.email
-            FROM error_logs el
-            LEFT JOIN jobs j ON el.job_id = j.id
-            LEFT JOIN users u ON el.user_id = u.id
-            WHERE 1=1
-        """
-        params = []
+            if not table_exists:
+                # Create the table if it doesn't exist
+                if app_settings.use_postgres:
+                    await db.execute("""
+                        CREATE TABLE IF NOT EXISTS error_logs (
+                            id SERIAL PRIMARY KEY,
+                            job_id TEXT,
+                            user_id INTEGER,
+                            error_type TEXT,
+                            error_message TEXT,
+                            stack_trace TEXT,
+                            created_at TIMESTAMP DEFAULT NOW()
+                        )
+                    """)
+                else:
+                    await db.execute("""
+                        CREATE TABLE IF NOT EXISTS error_logs (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            job_id TEXT,
+                            user_id INTEGER,
+                            error_type TEXT,
+                            error_message TEXT,
+                            stack_trace TEXT,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    """)
+                    await db.commit()
+                return {"error_logs": [], "message": "Error logs table created"}
 
-        if job_id:
-            query += " AND el.job_id = ?"
-            params.append(job_id)
+            query = """
+                SELECT el.*, j.original_filename, u.email
+                FROM error_logs el
+                LEFT JOIN jobs j ON el.job_id = j.id
+                LEFT JOIN users u ON el.user_id = u.id
+                WHERE 1=1
+            """
+            params = []
 
-        query += " ORDER BY el.created_at DESC LIMIT ?"
-        params.append(limit)
+            if job_id:
+                query += " AND el.job_id = ?"
+                params.append(job_id)
 
-        rows = await fetchall(db, query, tuple(params))
-        logs = []
-        for row in rows:
-            logs.append({
-                "id": row["id"],
-                "job_id": row["job_id"],
-                "user_id": row["user_id"],
-                "error_type": row["error_type"],
-                "error_message": row["error_message"],
-                "stack_trace": row["stack_trace"],
-                "created_at": row["created_at"],
-                "filename": row.get("original_filename"),
-                "user_email": row.get("email"),
-            })
+            query += " ORDER BY el.created_at DESC LIMIT ?"
+            params.append(limit)
 
-        return {"error_logs": logs}
+            rows = await fetchall(db, query, tuple(params))
+            logs = []
+            for row in rows:
+                logs.append({
+                    "id": row["id"],
+                    "job_id": row["job_id"],
+                    "user_id": row["user_id"],
+                    "error_type": row["error_type"],
+                    "error_message": row["error_message"],
+                    "stack_trace": row["stack_trace"],
+                    "created_at": row["created_at"],
+                    "filename": row.get("original_filename"),
+                    "user_email": row.get("email"),
+                })
+
+            return {"error_logs": logs}
+    except Exception as e:
+        logger.error(f"Error loading error logs: {e}", exc_info=True)
+        return {"error_logs": [], "error": str(e)}
 
 
 @router.get("/openrouter-models")
@@ -826,12 +843,23 @@ async def init_default_model_configs(_: bool = Depends(verify_admin)):
 @router.get("/ai-editor-config")
 async def get_ai_editor_config(_: bool = Depends(verify_admin)):
     """Get AI editor configuration."""
-    config = await get_editor_config()
-    return {
-        "system_prompt": config.get("system_prompt", DEFAULT_EDITOR_PROMPT),
-        "model": config.get("model", "google/gemini-2.5-flash-preview"),
-        "default_prompt": DEFAULT_EDITOR_PROMPT,
-    }
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        config = await get_editor_config()
+        return {
+            "system_prompt": config.get("system_prompt", DEFAULT_EDITOR_PROMPT),
+            "model": config.get("model", "google/gemini-2.5-flash-preview"),
+            "default_prompt": DEFAULT_EDITOR_PROMPT,
+        }
+    except Exception as e:
+        logger.error(f"Error loading AI editor config: {e}", exc_info=True)
+        # Return defaults on error
+        return {
+            "system_prompt": DEFAULT_EDITOR_PROMPT,
+            "model": "google/gemini-2.5-flash-preview",
+            "default_prompt": DEFAULT_EDITOR_PROMPT,
+        }
 
 
 @router.put("/ai-editor-config")
@@ -862,13 +890,25 @@ async def reset_ai_editor_config(_: bool = Depends(verify_admin)):
 @router.get("/sommelier-config")
 async def get_sommelier_config_endpoint(_: bool = Depends(verify_admin)):
     """Get Sommelier configuration."""
-    config = await get_sommelier_config()
-    return {
-        "parse_prompt": config.get("sommelier_parse_prompt", DEFAULT_PARSE_PROMPT),
-        "rerank_prompt": config.get("sommelier_rerank_prompt", DEFAULT_RERANK_PROMPT),
-        "default_parse_prompt": DEFAULT_PARSE_PROMPT,
-        "default_rerank_prompt": DEFAULT_RERANK_PROMPT,
-    }
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        config = await get_sommelier_config()
+        return {
+            "parse_prompt": config.get("sommelier_parse_prompt", DEFAULT_PARSE_PROMPT),
+            "rerank_prompt": config.get("sommelier_rerank_prompt", DEFAULT_RERANK_PROMPT),
+            "default_parse_prompt": DEFAULT_PARSE_PROMPT,
+            "default_rerank_prompt": DEFAULT_RERANK_PROMPT,
+        }
+    except Exception as e:
+        logger.error(f"Error loading sommelier config: {e}", exc_info=True)
+        # Return defaults on error
+        return {
+            "parse_prompt": DEFAULT_PARSE_PROMPT,
+            "rerank_prompt": DEFAULT_RERANK_PROMPT,
+            "default_parse_prompt": DEFAULT_PARSE_PROMPT,
+            "default_rerank_prompt": DEFAULT_RERANK_PROMPT,
+        }
 
 
 @router.put("/sommelier-config")
