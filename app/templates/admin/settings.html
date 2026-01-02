@@ -181,6 +181,21 @@
                 <p id="status-workshop_ai_edit" class="text-xs mt-1"></p>
             </div>
 
+            <div>
+                <label class="block text-sm font-medium mb-1" style="color: var(--admin-text);">Sommelier Model</label>
+                <div class="flex gap-2">
+                    <select id="model-sommelier" class="flex-1 border rounded px-3 py-2 admin-card" style="border-color: var(--admin-border);">
+                        <option value="">-- Select a model --</option>
+                    </select>
+                    <button onclick="loadOpenRouterModels('sommelier')"
+                        class="px-3 py-2 rounded whitespace-nowrap hover:opacity-80" style="background-color: var(--admin-border); color: var(--admin-text);">
+                        Load
+                    </button>
+                </div>
+                <p class="text-xs mt-1" style="color: var(--admin-text-muted);">AI-powered semantic search in The Reserve</p>
+                <p id="status-sommelier" class="text-xs mt-1"></p>
+            </div>
+
             <div class="pt-4">
                 <button onclick="saveModelConfig()" 
                     class="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
@@ -223,6 +238,56 @@
                     Save Configuration
                 </button>
                 <button onclick="resetAIEditorConfig()"
+                    class="px-4 py-2 border rounded hover:opacity-80" style="border-color: var(--admin-border); color: var(--admin-text);">
+                    Reset to Default
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sommelier Configuration -->
+    <div class="admin-card border rounded-lg shadow lg:col-span-2">
+        <div class="px-6 py-4 border-b" style="border-color: var(--admin-border);">
+            <h2 class="text-lg font-semibold">Sommelier Configuration</h2>
+            <p class="text-sm" style="color: var(--admin-text-muted);">Configure the AI-powered semantic search in The Reserve</p>
+        </div>
+        <div class="p-6 space-y-4">
+            <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+                <p class="text-sm text-blue-800">
+                    <strong>The Sommelier:</strong> This AI searches your Reserve to find relevant stills.
+                    The Parse Prompt extracts keywords from user queries.
+                    The Rerank Prompt scores and orders the results by relevance.
+                </p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium mb-1" style="color: var(--admin-text);">Query Parse Prompt</label>
+                <textarea id="sommelier-parse-prompt" rows="10"
+                    class="w-full border rounded px-3 py-2 admin-card font-mono text-sm"
+                    style="border-color: var(--admin-border);"
+                    placeholder="Loading..."></textarea>
+                <p class="text-xs mt-1" style="color: var(--admin-text-muted);">
+                    This prompt extracts keywords from user queries. Use {query} as a placeholder.
+                </p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium mb-1" style="color: var(--admin-text);">Rerank Prompt</label>
+                <textarea id="sommelier-rerank-prompt" rows="12"
+                    class="w-full border rounded px-3 py-2 admin-card font-mono text-sm"
+                    style="border-color: var(--admin-border);"
+                    placeholder="Loading..."></textarea>
+                <p class="text-xs mt-1" style="color: var(--admin-text-muted);">
+                    This prompt scores and ranks search results. Use {understood_intent}, {preferred_types}, {stills_json}, {limit} as placeholders.
+                </p>
+            </div>
+
+            <div class="flex gap-4 pt-2">
+                <button onclick="saveSommelierConfig()"
+                    class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                    Save Configuration
+                </button>
+                <button onclick="resetSommelierConfig()"
                     class="px-4 py-2 border rounded hover:opacity-80" style="border-color: var(--admin-border); color: var(--admin-text);">
                     Reset to Default
                 </button>
@@ -315,6 +380,7 @@ async function loadSettings() {
             if (data.models.editing) document.getElementById('model-editing').dataset.savedValue = data.models.editing;
             if (data.models.factcheck) document.getElementById('model-factcheck').dataset.savedValue = data.models.factcheck;
             if (data.models.workshop_ai_edit) document.getElementById('model-workshop_ai_edit').dataset.savedValue = data.models.workshop_ai_edit;
+            if (data.models.sommelier) document.getElementById('model-sommelier').dataset.savedValue = data.models.sommelier;
         }
 
     } catch (err) {
@@ -360,7 +426,8 @@ async function saveModelConfig() {
         drafting: document.getElementById('model-drafting').value,
         editing: document.getElementById('model-editing').value,
         factcheck: document.getElementById('model-factcheck').value,
-        workshop_ai_edit: document.getElementById('model-workshop_ai_edit').value
+        workshop_ai_edit: document.getElementById('model-workshop_ai_edit').value,
+        sommelier: document.getElementById('model-sommelier').value
     };
     
     try {
@@ -446,8 +513,64 @@ async function resetAIEditorConfig() {
     }
 }
 
+// Sommelier Config
+async function loadSommelierConfig() {
+    try {
+        const response = await fetch('/api/admin/sommelier-config');
+        const data = await response.json();
+        document.getElementById('sommelier-parse-prompt').value = data.parse_prompt || '';
+        document.getElementById('sommelier-rerank-prompt').value = data.rerank_prompt || '';
+    } catch (err) {
+        console.error('Failed to load Sommelier config:', err);
+    }
+}
+
+async function saveSommelierConfig() {
+    const parsePrompt = document.getElementById('sommelier-parse-prompt').value;
+    const rerankPrompt = document.getElementById('sommelier-rerank-prompt').value;
+
+    try {
+        const response = await fetch('/api/admin/sommelier-config', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                parse_prompt: parsePrompt,
+                rerank_prompt: rerankPrompt
+            })
+        });
+
+        if (response.ok) {
+            showSuccess();
+        } else {
+            showError('Failed to save Sommelier configuration');
+        }
+    } catch (err) {
+        showError('Failed to save Sommelier configuration');
+    }
+}
+
+async function resetSommelierConfig() {
+    if (!confirm('Reset Sommelier configuration to defaults?')) return;
+
+    try {
+        const response = await fetch('/api/admin/sommelier-config/reset', {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            await loadSommelierConfig();
+            showSuccess();
+        } else {
+            showError('Failed to reset configuration');
+        }
+    } catch (err) {
+        showError('Failed to reset configuration');
+    }
+}
+
 // Load AI editor config on page load
 loadAIEditorConfig();
+loadSommelierConfig();
 
 loadSettings();
 </script>

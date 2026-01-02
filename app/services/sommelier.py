@@ -1,17 +1,120 @@
 """The Sommelier - AI-powered semantic search for stills in The Reserve."""
 import json
 import logging
-from typing import Tuple
+from typing import Tuple, Dict
 
 from app.config import get_settings
 from app.database import get_db
-from app.db_utils import fetchall, fetchone
+from app.db_utils import fetchall, fetchone, execute
 from app.services.ai_client import call_llm_text, calculate_openrouter_cost
 from app.utils.json_parser import parse_llm_json
 
 settings = get_settings()
 
 logger = logging.getLogger(__name__)
+
+# Default prompt for parsing user queries
+DEFAULT_PARSE_PROMPT = """You are a content search assistant. The user wants to find content stills for their content creation.
+
+USER QUERY: "{query}"
+
+Analyze this query and respond with JSON:
+{{
+    "understood_intent": "Brief description of what the user is looking for",
+    "search_keywords": ["keyword1", "keyword2", "keyword3"],
+    "still_types_preferred": ["data", "insight", "story", "problem", "solution", "quote"],
+    "topic_focus": "Main topic or theme"
+}}
+
+Important:
+- Generate 5-10 search keywords covering different phrasings
+- Include synonyms and related terms
+- Consider the types of content stills that would be useful
+- Be generous with keywords to maximize matches"""
+
+# Default prompt for reranking search results
+DEFAULT_RERANK_PROMPT = """You are The Sommelier, an expert at matching content stills to user needs.
+
+USER IS LOOKING FOR: {understood_intent}
+PREFERRED STILL TYPES: {preferred_types}
+
+AVAILABLE STILLS:
+{stills_json}
+
+Rank these stills by relevance to the user's query. Return JSON:
+{{
+    "ranked_stills": [
+        {{
+            "id": <still_id>,
+            "relevance_score": 1-5,
+            "why_relevant": "Brief explanation of why this still matches the query"
+        }}
+    ]
+}}
+
+Guidelines:
+- Score 5 = Perfect match for their needs
+- Score 4 = Highly relevant
+- Score 3 = Moderately relevant
+- Score 2 = Somewhat related
+- Score 1 = Loosely connected but potentially useful
+
+BE GENEROUS with scoring - when in doubt, score higher rather than lower.
+For broad or exploratory queries, include MORE stills to give the user options.
+The user WANTS to see their content - help them find it.
+
+Return top {limit} most relevant stills.
+Write clear, helpful explanations for why each still is relevant."""
+
+
+async def get_sommelier_config() -> Dict[str, str]:
+    """Get Sommelier configuration from database."""
+    async with get_db() as db:
+        rows = await fetchall(
+            db,
+            "SELECT config_key, config_value FROM ai_editor_config WHERE config_key LIKE ?",
+            ("sommelier_%",)
+        )
+
+        config = {}
+        for row in rows:
+            config[row["config_key"]] = row["config_value"]
+
+        # Return defaults if not configured
+        if "sommelier_parse_prompt" not in config:
+            config["sommelier_parse_prompt"] = DEFAULT_PARSE_PROMPT
+        if "sommelier_rerank_prompt" not in config:
+            config["sommelier_rerank_prompt"] = DEFAULT_RERANK_PROMPT
+
+        return config
+
+
+async def save_sommelier_config(config_key: str, config_value: str) -> None:
+    """Save Sommelier configuration to database."""
+    async with get_db() as db:
+        if settings.use_postgres:
+            await db.execute(
+                """
+                INSERT INTO ai_editor_config (config_key, config_value, updated_at)
+                VALUES ($1, $2, NOW())
+                ON CONFLICT(config_key) DO UPDATE SET
+                    config_value = EXCLUDED.config_value,
+                    updated_at = NOW()
+                """,
+                config_key, config_value
+            )
+        else:
+            await db.execute(
+                """
+                INSERT INTO ai_editor_config (config_key, config_value, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(config_key) DO UPDATE SET
+                    config_value = excluded.config_value,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (config_key, config_value)
+            )
+            await db.commit()
 
 
 async def search_stills(
@@ -32,28 +135,17 @@ async def search_stills(
     """
     total_cost = 0.0
 
+    # Load configurable prompts
+    config = await get_sommelier_config()
+    parse_prompt_template = config.get("sommelier_parse_prompt", DEFAULT_PARSE_PROMPT)
+    rerank_prompt_template = config.get("sommelier_rerank_prompt", DEFAULT_RERANK_PROMPT)
+
     # Step 1: Parse query and generate search terms
-    parse_prompt = f"""You are a content search assistant. The user wants to find content stills for their content creation.
-
-USER QUERY: "{query}"
-
-Analyze this query and respond with JSON:
-{{
-    "understood_intent": "Brief description of what the user is looking for",
-    "search_keywords": ["keyword1", "keyword2", "keyword3"],
-    "still_types_preferred": ["data", "insight", "story", "problem", "solution", "quote"],
-    "topic_focus": "Main topic or theme"
-}}
-
-Important:
-- Generate 5-10 search keywords covering different phrasings
-- Include synonyms and related terms
-- Consider the types of content stills that would be useful
-- Be generous with keywords to maximize matches"""
+    parse_prompt = parse_prompt_template.format(query=query)
 
     response_text, input_tokens, output_tokens, model = await call_llm_text(
         prompt=parse_prompt,
-        step="distillation",  # Reuse distillation model for search
+        step="sommelier",  # Sommelier has its own model config
         response_format="json",
         job_id=None,
         user_id=user_id,
@@ -138,39 +230,16 @@ Important:
             })
 
     # Step 3: AI reranking with relevance explanations
-    rerank_prompt = f"""You are The Sommelier, an expert at matching content stills to user needs.
-
-USER IS LOOKING FOR: {understood_intent}
-PREFERRED STILL TYPES: {", ".join(preferred_types) if preferred_types else "any"}
-
-AVAILABLE STILLS:
-{json.dumps(stills_for_ranking, indent=2)}
-
-Rank these stills by relevance to the user's query. Return JSON:
-{{
-    "ranked_stills": [
-        {{
-            "id": <still_id>,
-            "relevance_score": 1-5,
-            "why_relevant": "Brief explanation of why this still matches the query"
-        }}
-    ]
-}}
-
-Guidelines:
-- Score 5 = Perfect match for their needs
-- Score 4 = Highly relevant
-- Score 3 = Moderately relevant
-- Score 2 = Somewhat related
-- Score 1 = Tangentially connected
-
-Only include stills with score 2 or higher.
-Return top {limit} most relevant stills.
-Write clear, helpful explanations for why each still is relevant."""
+    rerank_prompt = rerank_prompt_template.format(
+        understood_intent=understood_intent,
+        preferred_types=", ".join(preferred_types) if preferred_types else "any",
+        stills_json=json.dumps(stills_for_ranking, indent=2),
+        limit=limit
+    )
 
     response_text, input_tokens, output_tokens, model = await call_llm_text(
         prompt=rerank_prompt,
-        step="distillation",
+        step="sommelier",
         response_format="json",
         job_id=None,
         user_id=user_id,
@@ -193,6 +262,20 @@ Write clear, helpful explanations for why each still is relevant."""
         ], understood_intent, total_cost
 
     ranked_ids = {r["id"]: r for r in ranking_result.get("ranked_stills", [])}
+
+    logger.info(f"Sommelier: AI ranked {len(ranked_ids)} stills out of {len(stills_for_ranking)} keyword matches")
+
+    # Fallback: If AI reranking is too strict (returned <3 results from many matches),
+    # include keyword-matched stills with a default score
+    if len(ranked_ids) < 3 and len(stills_for_ranking) > 3:
+        logger.info(f"Sommelier: Reranking too strict, adding fallback keyword matches")
+        for still in stills_for_ranking[:limit]:
+            if still["id"] not in ranked_ids:
+                ranked_ids[still["id"]] = {
+                    "id": still["id"],
+                    "relevance_score": 2,
+                    "why_relevant": "Matched your search keywords"
+                }
 
     # Step 4: Build final results with full still data
     async with get_db() as db:

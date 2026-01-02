@@ -33,6 +33,7 @@ DEFAULT_MODELS = {
     "editing": "google/gemini-2.5-flash",
     "factcheck": "google/gemini-2.5-flash",
     "workshop_ai_edit": "google/gemini-2.5-flash",
+    "sommelier": "google/gemini-2.5-flash",
 }
 
 

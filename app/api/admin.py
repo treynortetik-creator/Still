@@ -13,6 +13,7 @@ from app.db_utils import execute, fetchone, fetchall
 from app.services import settings_manager
 from app.api.auth import verify_admin
 from app.services.ai_editor import get_editor_config, save_editor_config, DEFAULT_EDITOR_PROMPT
+from app.services.sommelier import get_sommelier_config, save_sommelier_config, DEFAULT_PARSE_PROMPT, DEFAULT_RERANK_PROMPT
 
 app_settings = get_settings()
 router = APIRouter()
@@ -471,6 +472,12 @@ class AIEditorConfigRequest(BaseModel):
     model: Optional[str] = None
 
 
+class SommelierConfigRequest(BaseModel):
+    """Request model for updating Sommelier config."""
+    parse_prompt: Optional[str] = None
+    rerank_prompt: Optional[str] = None
+
+
 @router.get("/settings")
 async def get_settings(_: bool = Depends(verify_admin)):
     """Get current settings including API key status and model config."""
@@ -848,3 +855,40 @@ async def reset_ai_editor_config(_: bool = Depends(verify_admin)):
     await save_editor_config("system_prompt", DEFAULT_EDITOR_PROMPT)
     await save_editor_config("model", "google/gemini-2.5-flash-preview")
     return {"message": "AI editor configuration reset to defaults"}
+
+
+# ========== Sommelier Configuration ==========
+
+@router.get("/sommelier-config")
+async def get_sommelier_config_endpoint(_: bool = Depends(verify_admin)):
+    """Get Sommelier configuration."""
+    config = await get_sommelier_config()
+    return {
+        "parse_prompt": config.get("sommelier_parse_prompt", DEFAULT_PARSE_PROMPT),
+        "rerank_prompt": config.get("sommelier_rerank_prompt", DEFAULT_RERANK_PROMPT),
+        "default_parse_prompt": DEFAULT_PARSE_PROMPT,
+        "default_rerank_prompt": DEFAULT_RERANK_PROMPT,
+    }
+
+
+@router.put("/sommelier-config")
+async def update_sommelier_config(
+    request: SommelierConfigRequest,
+    _: bool = Depends(verify_admin),
+):
+    """Update Sommelier configuration."""
+    if request.parse_prompt is not None:
+        await save_sommelier_config("sommelier_parse_prompt", request.parse_prompt)
+
+    if request.rerank_prompt is not None:
+        await save_sommelier_config("sommelier_rerank_prompt", request.rerank_prompt)
+
+    return {"message": "Sommelier configuration saved"}
+
+
+@router.post("/sommelier-config/reset")
+async def reset_sommelier_config(_: bool = Depends(verify_admin)):
+    """Reset Sommelier configuration to defaults."""
+    await save_sommelier_config("sommelier_parse_prompt", DEFAULT_PARSE_PROMPT)
+    await save_sommelier_config("sommelier_rerank_prompt", DEFAULT_RERANK_PROMPT)
+    return {"message": "Sommelier configuration reset to defaults"}
