@@ -13,10 +13,35 @@
     <div class="col-span-4">
         <div class="admin-card border rounded-lg shadow">
             <div class="px-4 py-3 border-b">
-                <h2 class="font-semibold">Templates</h2>
+                <h2 class="font-semibold">Pipeline Prompts</h2>
             </div>
             <div id="prompt-list" class="divide-y">
                 <div class="px-4 py-3" style="color: var(--admin-text-muted);">Loading...</div>
+            </div>
+
+            <!-- Separator for special prompts -->
+            <div class="px-4 py-2 border-t border-b" style="background-color: var(--admin-bg-alt); border-color: var(--admin-border);">
+                <h3 class="text-sm font-medium" style="color: var(--admin-text-muted);">Special Prompts</h3>
+            </div>
+            <div id="special-prompt-list" class="divide-y">
+                <button onclick="loadSpecialPrompt('ai_workshop')"
+                    class="w-full px-4 py-3 text-left hover:opacity-90 transition special-prompt-item"
+                    data-name="ai_workshop">
+                    <div class="font-medium">AI Workshop Editor</div>
+                    <div class="text-xs" style="color: var(--admin-text-muted);">System prompt for Workshop AI</div>
+                </button>
+                <button onclick="loadSpecialPrompt('sommelier_query_parse')"
+                    class="w-full px-4 py-3 text-left hover:opacity-90 transition special-prompt-item"
+                    data-name="sommelier_query_parse">
+                    <div class="font-medium">Sommelier Query Parse</div>
+                    <div class="text-xs" style="color: var(--admin-text-muted);">Extract keywords from queries</div>
+                </button>
+                <button onclick="loadSpecialPrompt('sommelier_rerank')"
+                    class="w-full px-4 py-3 text-left hover:opacity-90 transition special-prompt-item"
+                    data-name="sommelier_rerank">
+                    <div class="font-medium">Sommelier Rerank</div>
+                    <div class="text-xs" style="color: var(--admin-text-muted);">Score and order results</div>
+                </button>
             </div>
         </div>
     </div>
@@ -29,28 +54,47 @@
                     <h2 class="font-semibold" id="editor-title">Select a template</h2>
                     <div class="text-sm" style="color: var(--admin-text-muted);" id="editor-meta"></div>
                 </div>
-                <button id="save-btn" disabled
-                    class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                    Save Changes
-                </button>
+                <div class="flex gap-2">
+                    <button id="reset-btn" onclick="resetPrompt()" style="display: none;"
+                        class="px-4 py-2 border rounded hover:opacity-80" style="border-color: var(--admin-border); color: var(--admin-text);">
+                        Reset to Default
+                    </button>
+                    <button id="save-btn" disabled
+                        class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                        Save Changes
+                    </button>
+                </div>
             </div>
 
             <div class="p-6">
-                <!-- Variables -->
+                <!-- Selected Variables Display -->
                 <div class="mb-4">
-                    <label class="block text-sm font-medium mb-1" style="color: var(--admin-text);">Variables</label>
-                    <div id="prompt-variables" class="flex flex-wrap gap-2">
-                        <span class="text-sm" style="color: var(--admin-text-muted);">No variables</span>
+                    <label class="block text-sm font-medium mb-2" style="color: var(--admin-text);">Selected Variables</label>
+                    <div id="selected-variables" class="flex flex-wrap gap-2 min-h-[32px] p-2 border rounded" style="border-color: var(--admin-border); background-color: var(--admin-bg-alt);">
+                        <span class="text-sm" style="color: var(--admin-text-muted);">No variables selected</span>
                     </div>
                 </div>
 
                 <!-- Prompt Content -->
-                <div>
+                <div class="mb-4">
                     <label class="block text-sm font-medium mb-1" style="color: var(--admin-text);">Prompt Content</label>
-                    <textarea id="prompt-content" rows="20" disabled
+                    <textarea id="prompt-content" rows="16" disabled
                         class="w-full border rounded px-3 py-2 font-mono text-sm admin-card"
                         style="border-color: var(--admin-border);"
                         placeholder="Select a template to edit..."></textarea>
+                </div>
+
+                <!-- Variable Selector -->
+                <div id="variable-selector" class="border rounded" style="border-color: var(--admin-border); display: none;">
+                    <div class="px-4 py-2 border-b flex justify-between items-center" style="background-color: var(--admin-bg-alt); border-color: var(--admin-border);">
+                        <span class="text-sm font-medium" style="color: var(--admin-text);">Available Variables</span>
+                        <button onclick="toggleAllCategories()" class="text-xs px-2 py-1 rounded hover:opacity-80" style="color: var(--admin-text-muted);">
+                            Expand/Collapse All
+                        </button>
+                    </div>
+                    <div id="variable-categories" class="divide-y" style="border-color: var(--admin-border);">
+                        <!-- Categories will be populated by JavaScript -->
+                    </div>
                 </div>
             </div>
         </div>
@@ -61,11 +105,131 @@
 <div id="success-toast" class="hidden fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg">
     Changes saved successfully!
 </div>
+
+<!-- Error Toast -->
+<div id="error-toast" class="hidden fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg">
+    <span id="error-message">Failed to save</span>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 let currentTemplate = null;
+let currentType = null; // 'regular' or 'special'
+let selectedVariables = [];
+let variableCategories = {};
+let categoryCollapseState = JSON.parse(localStorage.getItem('promptEditorCollapseState') || '{}');
+
+// Initialize
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadVariableCategories();
+    await loadPrompts();
+});
+
+async function loadVariableCategories() {
+    try {
+        const response = await fetch('/api/admin/prompt-variables');
+        const data = await response.json();
+        variableCategories = data.categories;
+        renderVariableCategories();
+    } catch (err) {
+        console.error('Failed to load variable categories:', err);
+    }
+}
+
+function renderVariableCategories() {
+    const container = document.getElementById('variable-categories');
+    container.innerHTML = '';
+
+    for (const [categoryKey, category] of Object.entries(variableCategories)) {
+        const isCollapsed = categoryCollapseState[categoryKey] !== false; // Default collapsed
+        const selectedCount = category.variables.filter(v => selectedVariables.includes(v.key)).length;
+        const totalCount = category.variables.length;
+
+        const categoryHtml = `
+            <div class="category-section" data-category="${categoryKey}">
+                <button onclick="toggleCategory('${categoryKey}')"
+                    class="w-full px-4 py-2 flex justify-between items-center hover:opacity-90 text-left"
+                    style="background-color: var(--admin-bg);">
+                    <span class="font-medium text-sm" style="color: var(--admin-text);">
+                        <span class="category-arrow">${isCollapsed ? '▶' : '▼'}</span>
+                        ${category.label}
+                    </span>
+                    <span class="text-xs px-2 py-0.5 rounded" style="background-color: ${selectedCount > 0 ? 'rgb(79 70 229)' : 'var(--admin-border)'}; color: ${selectedCount > 0 ? 'white' : 'var(--admin-text-muted)'};">
+                        ${selectedCount}/${totalCount}
+                    </span>
+                </button>
+                <div class="category-content px-4 py-2 grid grid-cols-2 gap-2" style="display: ${isCollapsed ? 'none' : 'grid'}; background-color: var(--admin-bg-alt);">
+                    ${category.variables.map(v => `
+                        <label class="flex items-start gap-2 p-2 rounded hover:opacity-90 cursor-pointer" style="background-color: var(--admin-bg);">
+                            <input type="checkbox"
+                                class="mt-1 variable-checkbox"
+                                data-key="${v.key}"
+                                ${selectedVariables.includes(v.key) ? 'checked' : ''}
+                                onchange="toggleVariable('${v.key}')">
+                            <div>
+                                <div class="text-sm font-mono" style="color: var(--admin-text);">{${v.key}}</div>
+                                <div class="text-xs" style="color: var(--admin-text-muted);">${v.description}</div>
+                            </div>
+                        </label>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+        container.innerHTML += categoryHtml;
+    }
+}
+
+function toggleCategory(categoryKey) {
+    const section = document.querySelector(`[data-category="${categoryKey}"]`);
+    const content = section.querySelector('.category-content');
+    const arrow = section.querySelector('.category-arrow');
+
+    const isCurrentlyHidden = content.style.display === 'none';
+    content.style.display = isCurrentlyHidden ? 'grid' : 'none';
+    arrow.textContent = isCurrentlyHidden ? '▼' : '▶';
+
+    categoryCollapseState[categoryKey] = !isCurrentlyHidden;
+    localStorage.setItem('promptEditorCollapseState', JSON.stringify(categoryCollapseState));
+}
+
+function toggleAllCategories() {
+    const allCollapsed = Object.values(categoryCollapseState).every(v => v !== false);
+    const newState = allCollapsed ? false : true;
+
+    for (const key of Object.keys(variableCategories)) {
+        categoryCollapseState[key] = newState;
+    }
+    localStorage.setItem('promptEditorCollapseState', JSON.stringify(categoryCollapseState));
+    renderVariableCategories();
+}
+
+function toggleVariable(key) {
+    const index = selectedVariables.indexOf(key);
+    if (index === -1) {
+        selectedVariables.push(key);
+    } else {
+        selectedVariables.splice(index, 1);
+    }
+    updateSelectedVariablesDisplay();
+    renderVariableCategories(); // Re-render to update counts
+}
+
+function updateSelectedVariablesDisplay() {
+    const container = document.getElementById('selected-variables');
+
+    if (selectedVariables.length === 0) {
+        container.innerHTML = '<span class="text-sm" style="color: var(--admin-text-muted);">No variables selected</span>';
+        return;
+    }
+
+    container.innerHTML = selectedVariables.map(key => `
+        <span class="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-sm">
+            <code>{${key}}</code>
+            <button onclick="toggleVariable('${key}')" class="hover:text-indigo-600">&times;</button>
+        </span>
+    `).join('');
+}
 
 async function loadPrompts() {
     try {
@@ -92,32 +256,88 @@ async function loadPrompt(templateName) {
         const data = await response.json();
 
         currentTemplate = templateName;
+        currentType = 'regular';
 
         // Update UI
         document.getElementById('editor-title').textContent = templateName.replace(/_/g, ' ');
         document.getElementById('editor-meta').textContent = `Version ${data.version} | Updated ${new Date(data.updated_at).toLocaleDateString()}`;
 
-        // Variables
-        const varsDiv = document.getElementById('prompt-variables');
-        if (data.variables && data.variables.length > 0) {
-            varsDiv.innerHTML = data.variables.map(v =>
-                `<code class="px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-sm">{${v}}</code>`
-            ).join('');
-        } else {
-            varsDiv.innerHTML = '<span class="text-sm" style="color: var(--admin-text-muted);">No variables</span>';
-        }
+        // Load variables
+        selectedVariables = data.variables || [];
+        updateSelectedVariablesDisplay();
+        renderVariableCategories();
 
         document.getElementById('prompt-content').value = data.prompt_content;
         document.getElementById('prompt-content').disabled = false;
-
         document.getElementById('save-btn').disabled = false;
+        document.getElementById('reset-btn').style.display = 'none';
+        document.getElementById('variable-selector').style.display = 'block';
 
         // Highlight selected
-        document.querySelectorAll('.prompt-item').forEach(el => {
-            el.classList.toggle('bg-indigo-50', el.dataset.name === templateName);
+        document.querySelectorAll('.prompt-item, .special-prompt-item').forEach(el => {
+            el.classList.remove('bg-indigo-50');
+            el.style.backgroundColor = '';
         });
+        const selectedEl = document.querySelector(`.prompt-item[data-name="${templateName}"]`);
+        if (selectedEl) {
+            selectedEl.style.backgroundColor = 'var(--admin-bg-alt)';
+        }
     } catch (err) {
         console.error('Failed to load prompt:', err);
+    }
+}
+
+async function loadSpecialPrompt(promptType) {
+    try {
+        let data, title, meta;
+
+        if (promptType === 'ai_workshop') {
+            const response = await fetch('/api/admin/ai-editor-config');
+            data = await response.json();
+            title = 'AI Workshop Editor';
+            meta = 'System prompt for the Workshop AI assistant';
+            document.getElementById('prompt-content').value = data.system_prompt || '';
+        } else if (promptType === 'sommelier_query_parse') {
+            const response = await fetch('/api/admin/sommelier-config');
+            data = await response.json();
+            title = 'Sommelier Query Parse';
+            meta = 'Extracts keywords from user queries';
+            document.getElementById('prompt-content').value = data.parse_prompt || '';
+        } else if (promptType === 'sommelier_rerank') {
+            const response = await fetch('/api/admin/sommelier-config');
+            data = await response.json();
+            title = 'Sommelier Rerank';
+            meta = 'Scores and ranks search results';
+            document.getElementById('prompt-content').value = data.rerank_prompt || '';
+        }
+
+        currentTemplate = promptType;
+        currentType = 'special';
+
+        document.getElementById('editor-title').textContent = title;
+        document.getElementById('editor-meta').textContent = meta;
+
+        // Special prompts don't use the same variable system (yet)
+        // They have their own placeholders like {query}, {stills_json}, etc.
+        selectedVariables = [];
+        updateSelectedVariablesDisplay();
+        document.getElementById('variable-selector').style.display = 'none';
+
+        document.getElementById('prompt-content').disabled = false;
+        document.getElementById('save-btn').disabled = false;
+        document.getElementById('reset-btn').style.display = 'inline-block';
+
+        // Highlight selected
+        document.querySelectorAll('.prompt-item, .special-prompt-item').forEach(el => {
+            el.classList.remove('bg-indigo-50');
+            el.style.backgroundColor = '';
+        });
+        const selectedEl = document.querySelector(`.special-prompt-item[data-name="${promptType}"]`);
+        if (selectedEl) {
+            selectedEl.style.backgroundColor = 'var(--admin-bg-alt)';
+        }
+    } catch (err) {
+        console.error('Failed to load special prompt:', err);
     }
 }
 
@@ -127,38 +347,92 @@ async function savePrompt() {
     const content = document.getElementById('prompt-content').value;
 
     try {
-        const params = new URLSearchParams();
-        params.set('prompt_content', content);
+        let response;
 
-        const response = await fetch(`/api/admin/prompts/${currentTemplate}?${params}`, {
-            method: 'PUT'
-        });
+        if (currentType === 'regular') {
+            const params = new URLSearchParams();
+            params.set('prompt_content', content);
+            params.set('variables', JSON.stringify(selectedVariables));
+
+            response = await fetch(`/api/admin/prompts/${currentTemplate}?${params}`, {
+                method: 'PUT'
+            });
+        } else if (currentType === 'special') {
+            if (currentTemplate === 'ai_workshop') {
+                response = await fetch('/api/admin/ai-editor-config', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ system_prompt: content })
+                });
+            } else if (currentTemplate === 'sommelier_query_parse') {
+                response = await fetch('/api/admin/sommelier-config', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ parse_prompt: content })
+                });
+            } else if (currentTemplate === 'sommelier_rerank') {
+                response = await fetch('/api/admin/sommelier-config', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ rerank_prompt: content })
+                });
+            }
+        }
 
         if (response.ok) {
-            const data = await response.json();
+            showSuccess();
 
-            // Show success toast
-            const toast = document.getElementById('success-toast');
-            toast.classList.remove('hidden');
-            setTimeout(() => toast.classList.add('hidden'), 3000);
-
-            // Update version display
-            document.getElementById('editor-meta').textContent =
-                `Version ${data.version} | Updated just now`;
-
-            // Reload list to update version
-            loadPrompts();
+            if (currentType === 'regular') {
+                const data = await response.json();
+                document.getElementById('editor-meta').textContent = `Version ${data.version} | Updated just now`;
+                loadPrompts(); // Reload list to update version
+            }
         } else {
             throw new Error('Failed to save');
         }
     } catch (err) {
-        alert('Failed to save changes: ' + err.message);
+        showError('Failed to save changes: ' + err.message);
     }
 }
 
-document.getElementById('save-btn').addEventListener('click', savePrompt);
+async function resetPrompt() {
+    if (!currentTemplate || currentType !== 'special') return;
 
-// Initial load
-loadPrompts();
+    if (!confirm('Reset this prompt to its default value?')) return;
+
+    try {
+        let response;
+
+        if (currentTemplate === 'ai_workshop') {
+            response = await fetch('/api/admin/ai-editor-config/reset', { method: 'POST' });
+        } else if (currentTemplate.startsWith('sommelier_')) {
+            response = await fetch('/api/admin/sommelier-config/reset', { method: 'POST' });
+        }
+
+        if (response.ok) {
+            showSuccess();
+            loadSpecialPrompt(currentTemplate); // Reload the prompt
+        } else {
+            throw new Error('Failed to reset');
+        }
+    } catch (err) {
+        showError('Failed to reset: ' + err.message);
+    }
+}
+
+function showSuccess() {
+    const toast = document.getElementById('success-toast');
+    toast.classList.remove('hidden');
+    setTimeout(() => toast.classList.add('hidden'), 3000);
+}
+
+function showError(message) {
+    const toast = document.getElementById('error-toast');
+    document.getElementById('error-message').textContent = message;
+    toast.classList.remove('hidden');
+    setTimeout(() => toast.classList.add('hidden'), 3000);
+}
+
+document.getElementById('save-btn').addEventListener('click', savePrompt);
 </script>
 {% endblock %}

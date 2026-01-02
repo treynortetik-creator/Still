@@ -168,6 +168,7 @@ async def update_prompt(
     prompt_content: str,
     model: Optional[str] = None,
     max_tokens: Optional[int] = None,
+    variables: Optional[str] = None,
     _: bool = Depends(verify_admin),
 ):
     """
@@ -197,6 +198,10 @@ async def update_prompt(
             update_fields.append("max_tokens = ?")
             params.append(max_tokens)
 
+        if variables is not None:
+            update_fields.append("variables = ?")
+            params.append(variables)  # Already JSON string from frontend
+
         params.append(template_name)
 
         await execute(
@@ -212,6 +217,79 @@ async def update_prompt(
             await db.commit()
 
         return {"message": "Template updated", "version": new_version}
+
+
+# ========== Prompt Variables Master List ==========
+
+PROMPT_VARIABLES = {
+    "persona": {
+        "label": "Persona",
+        "variables": [
+            {"key": "persona_title", "description": "Audience title (e.g., 'CEO of Long-Term Care Facility')"},
+            {"key": "persona_pain_points", "description": "Comma-joined list of challenges"},
+            {"key": "persona_priorities", "description": "Comma-joined list of goals"},
+            {"key": "persona_language_level", "description": "Language complexity (Executive, Technical, Casual)"},
+            {"key": "persona_industry", "description": "Industry sector"},
+            {"key": "persona_content_preferences", "description": "Length, data density, tone preferences"},
+        ]
+    },
+    "brand_voice": {
+        "label": "Brand Voice",
+        "variables": [
+            {"key": "brand_company_name", "description": "Company name"},
+            {"key": "brand_mission", "description": "Mission statement"},
+            {"key": "brand_differentiators", "description": "What makes you unique"},
+            {"key": "brand_tone", "description": "Platform-specific tone"},
+            {"key": "brand_vocabulary_level", "description": "Vocabulary level (casual/professional/technical)"},
+            {"key": "brand_phrases_to_use", "description": "Signature expressions to include"},
+            {"key": "brand_phrases_to_avoid", "description": "Language to never use"},
+            {"key": "brand_voice_summary", "description": "AI-analyzed 2-3 sentence voice profile"},
+            {"key": "brand_tone_markers", "description": "Personality descriptors (e.g., data-driven, empathetic)"},
+        ]
+    },
+    "memory_style": {
+        "label": "Memory & Style",
+        "variables": [
+            {"key": "memory_rules", "description": "User's custom style guidelines"},
+            {"key": "style_dna", "description": "Patterns learned from swipe file"},
+        ]
+    },
+    "content": {
+        "label": "Content/Stills",
+        "variables": [
+            {"key": "cleaned_transcript", "description": "Processed source content"},
+            {"key": "source_summary", "description": "AI summary of source"},
+            {"key": "selected_atoms", "description": "Generic formatted stills"},
+            {"key": "problem_atoms", "description": "Problem-type stills only"},
+            {"key": "insight_atoms", "description": "Insight-type stills only"},
+            {"key": "solution_atoms", "description": "Solution-type stills only"},
+            {"key": "data_atoms", "description": "Data/stat stills only"},
+            {"key": "story_atoms", "description": "Story/example stills only"},
+            {"key": "quote_atoms", "description": "Quotes with attribution"},
+        ]
+    },
+    "drafts": {
+        "label": "Drafts",
+        "variables": [
+            {"key": "draft_from_step1", "description": "Initial draft to refine"},
+            {"key": "edited_draft_from_step2", "description": "Edited version for fact-check"},
+            {"key": "original_transcript", "description": "Raw transcript for verification"},
+        ]
+    },
+    "campaign": {
+        "label": "Campaign",
+        "variables": [
+            {"key": "campaign_name", "description": "Name of content campaign"},
+            {"key": "magic_words", "description": "Special user instructions"},
+        ]
+    },
+}
+
+
+@router.get("/prompt-variables")
+async def get_prompt_variables(_: bool = Depends(verify_admin)):
+    """Get the master list of available prompt variables organized by category."""
+    return {"categories": PROMPT_VARIABLES}
 
 
 @router.get("/clients")
