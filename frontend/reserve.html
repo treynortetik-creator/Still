@@ -642,8 +642,10 @@
         Auth.requireAuth();
 
         let allEntries = [];
+        let sommelierResults = [];  // Store Sommelier search results
         let selectedIds = new Set();
         let sommelierSelectedIds = new Set();
+        let generateFromSommelier = false;  // Track which selection source to use for generation
         let currentPage = 0;
         const pageSize = 24;
         let filterDebounceTimer = null;
@@ -922,6 +924,7 @@
                 const data = await response.json();
 
                 if (response.ok) {
+                    sommelierResults = data.results;  // Store results for modal preview
                     document.getElementById('sommelier-results').classList.remove('hidden');
                     renderSommelierResults(data.results, data.query_understood);
                 } else {
@@ -1149,12 +1152,16 @@
             }
         }
 
-        function openGenerateModal() {
+        function openGenerateModal(fromSommelier = false) {
+            generateFromSommelier = fromSommelier;
+            const idsToUse = fromSommelier ? sommelierSelectedIds : selectedIds;
+            const entriesToSearch = fromSommelier ? sommelierResults : allEntries;
+
             const previewList = document.getElementById('stills-preview-list');
             previewList.innerHTML = '';
 
-            const selectedEntries = allEntries.filter(e => selectedIds.has(e.id));
-            document.getElementById('modal-still-count').textContent = selectedIds.size;
+            const selectedEntries = entriesToSearch.filter(e => idsToUse.has(e.id));
+            document.getElementById('modal-still-count').textContent = idsToUse.size;
 
             selectedEntries.forEach(entry => {
                 const div = document.createElement('div');
@@ -1218,8 +1225,7 @@
         });
 
         document.getElementById('blend-selected-btn').addEventListener('click', () => {
-            const ids = Array.from(sommelierSelectedIds).join(',');
-            window.location.href = `/upload.html?blend_stills=${ids}`;
+            openGenerateModal(true);  // Use Sommelier selections
         });
 
         document.getElementById('generate-btn').addEventListener('click', openGenerateModal);
@@ -1246,11 +1252,12 @@
             }
 
             try {
+                const idsToUse = generateFromSommelier ? sommelierSelectedIds : selectedIds;
                 const response = await Auth.fetchWithAuth('/api/generate-from-library', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        still_ids: Array.from(selectedIds),
+                        still_ids: Array.from(idsToUse),
                         target_persona: persona,
                         asset_types: assetTypes,
                         asset_quantities: assetQuantities
