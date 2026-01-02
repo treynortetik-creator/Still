@@ -307,6 +307,24 @@ async def test_webhook_endpoint(
     return WebhookTestResponse(**result)
 
 
+@router.get("/webhooks/{webhook_id}/secret")
+async def get_webhook_secret(
+    webhook_id: int,
+    user_id: int = Depends(get_current_user_id),
+):
+    """Get the full secret key for a webhook. Requires authentication."""
+    async with get_db() as db:
+        webhook = await fetchone(
+            db,
+            "SELECT secret_key FROM webhooks WHERE id = ? AND user_id = ?",
+            (webhook_id, user_id)
+        )
+        if not webhook:
+            raise HTTPException(status_code=404, detail="Webhook not found")
+
+    return {"secret_key": webhook["secret_key"]}
+
+
 @router.post("/webhooks/{webhook_id}/regenerate-secret")
 async def regenerate_secret(
     webhook_id: int,

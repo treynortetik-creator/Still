@@ -6,6 +6,8 @@ from typing import TypeVar, Callable, Optional, Type
 from datetime import datetime
 
 from app.database import get_db
+from app.db_utils import execute
+from app.config import get_settings
 
 T = TypeVar('T')
 
@@ -26,15 +28,18 @@ async def log_error(
 ):
     """Log an error to the database for monitoring."""
     try:
+        settings = get_settings()
         async with get_db() as db:
-            await db.execute(
+            await execute(
+                db,
                 """
                 INSERT INTO error_logs (job_id, user_id, error_type, error_message, context)
                 VALUES (?, ?, ?, ?, ?)
                 """,
                 (job_id, user_id, error_type, error_message[:2000], context)
             )
-            await db.commit()
+            if not settings.use_postgres:
+                await db.commit()
     except Exception as e:
         # Don't let error logging failures break the app
         print(f"Failed to log error: {e}")

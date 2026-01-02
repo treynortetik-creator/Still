@@ -149,13 +149,6 @@
             <div id="atoms-container" class="grid md:grid-cols-2 gap-4"></div>
         </div>
 
-        <!-- Cost Info -->
-        <div class="mt-8 p-4 bg-still-card rounded-lg border border-still-border">
-            <div class="flex justify-between items-center">
-                <span class="text-still-muted">Processing Cost:</span>
-                <span class="font-semibold text-still-text" id="total-cost">$0.00</span>
-            </div>
-        </div>
     </div>
 
     <!-- Copy Toast -->
@@ -261,7 +254,7 @@
                 const data = await response.json();
                 if (response.ok) {
                     showEditPreview(outputId, data.original_content, data.adjusted_content, `Tone: ${tone}`);
-                    showToast(`Tone adjusted! Cost: $${data.cost.toFixed(4)}`);
+                    showToast('Tone adjusted!');
                 } else {
                     throw new Error(data.detail || 'Failed to adjust tone');
                 }
@@ -296,7 +289,7 @@
                 const data = await response.json();
                 if (response.ok) {
                     showEditPreview(outputId, data.original_content, data.edited_content, data.change_summary);
-                    showToast(`Edit applied! Cost: $${data.cost.toFixed(4)}`);
+                    showToast('Edit applied!');
                     input.value = '';
                 } else {
                     throw new Error(data.detail || 'Failed to apply edit');
@@ -924,7 +917,6 @@
                 document.getElementById('job-title').textContent = data.original_filename || 'Results';
                 document.getElementById('job-meta').textContent =
                     `${data.outputs.length} outputs generated | ${data.atoms.length} atoms extracted`;
-                document.getElementById('total-cost').textContent = `$${data.cost_incurred.toFixed(4)}`;
 
                 // Render outputs
                 renderOutputs(data.outputs);
