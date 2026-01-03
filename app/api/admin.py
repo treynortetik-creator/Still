@@ -14,6 +14,7 @@ from app.services import settings_manager
 from app.api.auth import verify_admin
 from app.services.ai_editor import get_editor_config, save_editor_config, DEFAULT_EDITOR_PROMPT
 from app.services.sommelier import get_sommelier_config, save_sommelier_config, DEFAULT_PARSE_PROMPT, DEFAULT_RERANK_PROMPT
+from app.services.lifecycle import check_expiring_stills, get_lifecycle_summary
 
 app_settings = get_settings()
 router = APIRouter()
@@ -1023,3 +1024,26 @@ async def reset_sommelier_config(_: bool = Depends(verify_admin)):
     await save_sommelier_config("sommelier_parse_prompt", DEFAULT_PARSE_PROMPT)
     await save_sommelier_config("sommelier_rerank_prompt", DEFAULT_RERANK_PROMPT)
     return {"message": "Sommelier configuration reset to defaults"}
+
+
+# ========== Lifecycle Management ==========
+
+@router.post("/lifecycle/check-expirations")
+async def trigger_expiration_check(
+    days: int = Query(30, description="Days before expiration to flag stills"),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Trigger check for expiring stills and flag them as needs_review.
+
+    This can be run manually or via cron job.
+    """
+    count = await check_expiring_stills(days)
+    return {"stills_flagged": count, "threshold_days": days}
+
+
+@router.get("/lifecycle/summary/{user_id}")
+async def get_user_lifecycle_summary(user_id: int, _: bool = Depends(verify_admin)):
+    """Get lifecycle status counts for a user."""
+    summary = await get_lifecycle_summary(user_id)
+    return summary
