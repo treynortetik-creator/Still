@@ -37,13 +37,49 @@ async def get_library(
     campaign: Optional[str] = Query(None, description="Filter by campaign name"),
     topic: Optional[str] = Query(None, description="Filter by topic"),
     job_id: Optional[str] = Query(None, description="Filter by source job ID"),
+    status: Optional[str] = Query(None, description="Filter by status (active, evergreen, needs_review, retired)"),
+    funnel_stage: Optional[str] = Query(None, description="Filter by funnel stage (awareness, consideration, decision)"),
+    sort_by: str = Query("newest", description="Sort order: newest, oldest, most_used, never_used, expiring_soon"),
     limit: int = Query(50, description="Number of results", ge=1, le=100),
     offset: int = Query(0, description="Offset for pagination", ge=0),
     user_id: int = Depends(get_current_user_id),
 ):
     """
-    Get content library entries with filtering.
+    Get content library entries with filtering and sorting.
+
+    Supports lifecycle filters (status, funnel_stage) and sorting options:
+    - newest: Most recently added first (default)
+    - oldest: Oldest first
+    - most_used: Most frequently used first
+    - never_used: Only entries never used, newest first
+    - expiring_soon: Entries with expiration dates, soonest first
     """
+    # Validate status filter
+    if status:
+        valid_statuses = {"active", "evergreen", "needs_review", "retired"}
+        if status not in valid_statuses:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status. Must be one of: {', '.join(sorted(valid_statuses))}"
+            )
+
+    # Validate funnel_stage filter
+    if funnel_stage:
+        valid_stages = {"awareness", "consideration", "decision"}
+        if funnel_stage not in valid_stages:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid funnel_stage. Must be one of: {', '.join(sorted(valid_stages))}"
+            )
+
+    # Validate sort_by
+    valid_sort_options = {"newest", "oldest", "most_used", "never_used", "expiring_soon"}
+    if sort_by not in valid_sort_options:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid sort_by. Must be one of: {', '.join(sorted(valid_sort_options))}"
+        )
+
     async with get_db() as db:
         # Build query with LEFT JOIN to get source file name from jobs table
         query = """
@@ -74,7 +110,30 @@ async def get_library(
             query += " AND cl.job_id = ?"
             params.append(job_id)
 
-        query += " ORDER BY cl.date_added DESC LIMIT ? OFFSET ?"
+        # Lifecycle filters
+        if status:
+            query += " AND cl.status = ?"
+            params.append(status)
+
+        if funnel_stage:
+            query += " AND cl.funnel_stage = ?"
+            params.append(funnel_stage)
+
+        # Handle sort_by with special filters for some options
+        if sort_by == "never_used":
+            query += " AND (cl.times_used = 0 OR cl.times_used IS NULL)"
+            order_clause = "ORDER BY cl.date_added DESC"
+        elif sort_by == "expiring_soon":
+            query += " AND cl.expiration_date IS NOT NULL"
+            order_clause = "ORDER BY cl.expiration_date ASC"
+        elif sort_by == "oldest":
+            order_clause = "ORDER BY cl.date_added ASC"
+        elif sort_by == "most_used":
+            order_clause = "ORDER BY COALESCE(cl.times_used, 0) DESC, cl.date_added DESC"
+        else:  # newest (default)
+            order_clause = "ORDER BY cl.date_added DESC"
+
+        query += f" {order_clause} LIMIT ? OFFSET ?"
         params.extend([limit, offset])
 
         rows = await fetchall(db, query, tuple(params))
@@ -88,6 +147,18 @@ async def get_library(
                 if persona_relevance[persona] < min_relevance:
                     continue
 
+            # Handle best_formats - it's a TEXT[] in PostgreSQL, may need conversion
+            best_formats = row.get("best_formats")
+            if best_formats is None:
+                best_formats = []
+            elif isinstance(best_formats, str):
+                # SQLite returns JSON string
+                try:
+                    best_formats = json.loads(best_formats)
+                except (json.JSONDecodeError, TypeError):
+                    best_formats = []
+            # PostgreSQL returns list directly, so no conversion needed
+
             entries.append({
                 "id": row["id"],
                 "entry_type": row["entry_type"],
@@ -98,16 +169,23 @@ async def get_library(
                 "date_added": row["date_added"],
                 "tags": json.loads(row["tags"]) if row["tags"] else [],
                 "persona_relevance": persona_relevance,
-                "times_used": row["times_used"],
+                "times_used": row["times_used"] or 0,
                 "last_used": row["last_used"],
                 "user_notes": row["user_notes"],
                 "campaign_name": row["campaign_name"],
                 "topics": json.loads(row["topics"]) if row["topics"] else [],
                 "source_file": row.get("source_file"),
                 "job_id": row.get("job_id"),
+                # Lifecycle fields
+                "status": row.get("status") or "active",
+                "best_formats": best_formats,
+                "funnel_stage": row.get("funnel_stage"),
+                "expiration_type": row.get("expiration_type"),
+                "expiration_date": str(row["expiration_date"]) if row.get("expiration_date") else None,
+                "performance": row.get("performance") or "untested",
             })
 
-        # Get total count
+        # Get total count (must match the same filters)
         count_query = "SELECT COUNT(*) FROM content_library WHERE user_id = ?"
         count_params = [user_id]
 
@@ -130,6 +208,21 @@ async def get_library(
         if job_id:
             count_query += " AND job_id = ?"
             count_params.append(job_id)
+
+        # Include lifecycle filters in count
+        if status:
+            count_query += " AND status = ?"
+            count_params.append(status)
+
+        if funnel_stage:
+            count_query += " AND funnel_stage = ?"
+            count_params.append(funnel_stage)
+
+        # Include sort_by filters that affect result set
+        if sort_by == "never_used":
+            count_query += " AND (times_used = 0 OR times_used IS NULL)"
+        elif sort_by == "expiring_soon":
+            count_query += " AND expiration_date IS NOT NULL"
 
         total = await fetchval(db, count_query, tuple(count_params))
 

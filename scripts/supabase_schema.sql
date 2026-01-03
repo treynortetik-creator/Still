@@ -133,7 +133,15 @@ CREATE TABLE IF NOT EXISTS content_library (
     last_used TIMESTAMP,
     user_notes TEXT,
     campaign_name TEXT,
-    topics JSONB
+    topics JSONB,
+    job_id TEXT REFERENCES jobs(id),
+    -- Lifecycle fields (added in migration 004)
+    status TEXT DEFAULT 'active' CHECK (status IS NULL OR status IN ('active', 'evergreen', 'needs_review', 'retired')),
+    best_formats TEXT[],
+    funnel_stage TEXT CHECK (funnel_stage IS NULL OR funnel_stage IN ('awareness', 'consideration', 'decision')),
+    expiration_type TEXT CHECK (expiration_type IS NULL OR expiration_type IN ('date_bound', 'event_bound', 'evergreen')),
+    expiration_date DATE,
+    performance TEXT DEFAULT 'untested' CHECK (performance IS NULL OR performance IN ('high', 'medium', 'low', 'untested'))
 );
 
 -- Prompt templates
@@ -438,3 +446,7 @@ CREATE INDEX IF NOT EXISTS idx_error_logs_type ON error_logs(user_id, error_type
 CREATE INDEX IF NOT EXISTS idx_stills_campaign ON stills(campaign_name);
 CREATE INDEX IF NOT EXISTS idx_outputs_campaign ON outputs(campaign_name);
 CREATE INDEX IF NOT EXISTS idx_content_library_campaign ON content_library(campaign_name);
+CREATE INDEX IF NOT EXISTS idx_content_library_status ON content_library(status);
+CREATE INDEX IF NOT EXISTS idx_content_library_funnel_stage ON content_library(funnel_stage);
+CREATE INDEX IF NOT EXISTS idx_content_library_expiration_date ON content_library(expiration_date);
+CREATE INDEX IF NOT EXISTS idx_content_library_times_used ON content_library(times_used);
