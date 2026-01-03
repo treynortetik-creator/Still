@@ -10,6 +10,8 @@ class JobStatus(str, Enum):
     UPLOADING = "uploading"
     TRANSCRIBING = "transcribing"
     CLEANING = "cleaning"
+    ANALYZING = "analyzing"
+    AWAITING_APPROVAL = "awaiting_approval"
     DISTILLING = "distilling"
     DRAFTING = "drafting"
     EDITING = "editing"
