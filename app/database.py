@@ -777,6 +777,8 @@ async def _init_sqlite_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 completed_at TIMESTAMP,
                 cost_incurred REAL DEFAULT 0.0,
+                source_id INTEGER REFERENCES sources(id),
+                auto_approve_source INTEGER DEFAULT 0,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             );
 
@@ -796,6 +798,7 @@ async def _init_sqlite_db():
                 last_used TIMESTAMP,
                 campaign_name TEXT,
                 topics JSON,
+                source_id INTEGER REFERENCES sources(id),
                 FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );
