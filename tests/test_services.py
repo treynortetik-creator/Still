@@ -137,3 +137,46 @@ class TestCostCalculation:
         """Test cost calculation with zero tokens."""
         cost = calculate_openrouter_cost("google/gemini-2.0-flash", 0, 0)
         assert cost == 0.0
+
+
+class TestStillTypes:
+    """Tests for still type enum."""
+
+    def test_all_still_types_exist(self):
+        """Test all 10 still types are defined."""
+        from app.models.stills import StillType
+
+        expected_types = [
+            'data', 'insight', 'story', 'problem', 'solution', 'quote',
+            'framework', 'definition', 'question', 'proof_point'
+        ]
+        actual_types = [t.value for t in StillType]
+
+        for expected in expected_types:
+            assert expected in actual_types, f"Missing still type: {expected}"
+
+        assert len(actual_types) == 10
+
+    def test_still_lifecycle_fields(self):
+        """Test still model has lifecycle fields."""
+        from app.models.stills import Still, StillStatus, FunnelStage, Performance
+        from datetime import datetime, date
+
+        still = Still(
+            id="test-001",
+            job_id="job-001",
+            user_id=1,
+            still_type="data",
+            content="40% improvement",
+            created_at=datetime.now(),
+            status=StillStatus.ACTIVE,
+            funnel_stage=FunnelStage.CONSIDERATION,
+            best_formats=["linkedin", "email"],
+            expiration_date=date(2025, 12, 31),
+            performance=Performance.UNTESTED
+        )
+
+        assert still.status == StillStatus.ACTIVE
+        assert still.funnel_stage == FunnelStage.CONSIDERATION
+        assert "linkedin" in still.best_formats
+        assert still.usage_count == 0
