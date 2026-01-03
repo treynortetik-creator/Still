@@ -36,6 +36,7 @@ async def get_library(
     search: Optional[str] = Query(None, description="Search in content", max_length=200),
     campaign: Optional[str] = Query(None, description="Filter by campaign name"),
     topic: Optional[str] = Query(None, description="Filter by topic"),
+    job_id: Optional[str] = Query(None, description="Filter by source job ID"),
     limit: int = Query(50, description="Number of results", ge=1, le=100),
     offset: int = Query(0, description="Offset for pagination", ge=0),
     user_id: int = Depends(get_current_user_id),
@@ -44,27 +45,36 @@ async def get_library(
     Get content library entries with filtering.
     """
     async with get_db() as db:
-        # Build query
-        query = "SELECT * FROM content_library WHERE user_id = ?"
+        # Build query with LEFT JOIN to get source file name from jobs table
+        query = """
+            SELECT cl.*, j.original_filename as source_file
+            FROM content_library cl
+            LEFT JOIN jobs j ON cl.job_id = j.id
+            WHERE cl.user_id = ?
+        """
         params = [user_id]
 
         if entry_type:
-            query += " AND entry_type = ?"
+            query += " AND cl.entry_type = ?"
             params.append(entry_type)
 
         if search:
-            query += " AND content LIKE ?"
+            query += " AND cl.content LIKE ?"
             params.append(f"%{search}%")
 
         if campaign:
-            query += " AND campaign_name = ?"
+            query += " AND cl.campaign_name = ?"
             params.append(campaign)
 
         if topic:
-            query += " AND topics LIKE ?"
+            query += " AND cl.topics LIKE ?"
             params.append(f'%"{topic}"%')  # JSON array contains check
 
-        query += " ORDER BY date_added DESC LIMIT ? OFFSET ?"
+        if job_id:
+            query += " AND cl.job_id = ?"
+            params.append(job_id)
+
+        query += " ORDER BY cl.date_added DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
 
         rows = await fetchall(db, query, tuple(params))
@@ -93,6 +103,8 @@ async def get_library(
                 "user_notes": row["user_notes"],
                 "campaign_name": row["campaign_name"],
                 "topics": json.loads(row["topics"]) if row["topics"] else [],
+                "source_file": row.get("source_file"),
+                "job_id": row.get("job_id"),
             })
 
         # Get total count
@@ -114,6 +126,10 @@ async def get_library(
         if topic:
             count_query += " AND topics LIKE ?"
             count_params.append(f'%"{topic}"%')  # JSON array contains check
+
+        if job_id:
+            count_query += " AND job_id = ?"
+            count_params.append(job_id)
 
         total = await fetchval(db, count_query, tuple(count_params))
 
@@ -214,6 +230,33 @@ async def get_library_filters(user_id: int = Depends(get_current_user_id)):
         return {
             "campaigns": campaigns,
             "topics": sorted(list(all_topics))
+        }
+
+
+@router.get("/library/sources")
+async def get_library_sources(user_id: int = Depends(get_current_user_id)):
+    """
+    Get list of unique sources (jobs) for user's stills.
+    Returns job_id and original_filename for populating source filter dropdown.
+    """
+    async with get_db() as db:
+        rows = await fetchall(
+            db,
+            """
+            SELECT DISTINCT cl.job_id, j.original_filename as source_file
+            FROM content_library cl
+            LEFT JOIN jobs j ON cl.job_id = j.id
+            WHERE cl.user_id = ? AND cl.job_id IS NOT NULL
+            ORDER BY j.original_filename
+            """,
+            (user_id,)
+        )
+
+        return {
+            "sources": [
+                {"job_id": row["job_id"], "source_file": row.get("source_file")}
+                for row in rows
+            ]
         }
 
 

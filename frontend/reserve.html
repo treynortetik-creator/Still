@@ -301,6 +301,14 @@
                     </select>
                 </div>
 
+                <!-- Source Filter -->
+                <div class="flex-1 min-w-[200px]">
+                    <label for="filter-source" class="form-label">Source</label>
+                    <select id="filter-source" class="input-premium select-premium">
+                        <option value="">All Sources</option>
+                    </select>
+                </div>
+
                 <!-- Topic Filter -->
                 <div class="flex-1 min-w-[200px]">
                     <label for="filter-topic" class="form-label">Topic</label>
@@ -791,10 +799,17 @@
 
                 card.innerHTML = `
                     <div class="flex justify-between items-start mb-3">
-                        <span class="badge text-xs font-semibold uppercase" style="background: ${colors.bg}; color: ${colors.text};">
-                            ${entry.entry_type}
-                        </span>
-                        <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-2 flex-1 min-w-0">
+                            <span class="badge text-xs font-semibold uppercase flex-shrink-0" style="background: ${colors.bg}; color: ${colors.text};">
+                                ${entry.entry_type}
+                            </span>
+                            ${entry.source_file ? `
+                                <span class="text-xs text-still-disabled truncate max-w-[120px]" title="${escapeHtml(entry.source_file)}">
+                                    ${escapeHtml(entry.source_file)}
+                                </span>
+                            ` : ''}
+                        </div>
+                        <div class="flex items-center gap-3 flex-shrink-0">
                             ${maxRelevance > 0 ? renderRelevanceDots(maxRelevance) : ''}
                             <input type="checkbox" ${isSelected ? 'checked' : ''}
                                    class="checkbox-premium" aria-label="Select this still"
@@ -1038,6 +1053,25 @@
             }
         }
 
+        async function loadSourceFilters() {
+            try {
+                const response = await Auth.fetchWithAuth('/api/library/sources');
+                const data = await response.json();
+
+                const sourceSelect = document.getElementById('filter-source');
+                sourceSelect.innerHTML = '<option value="">All Sources</option>';
+
+                data.sources.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.job_id;
+                    opt.textContent = s.source_file || `Job ${s.job_id.slice(0, 8)}...`;
+                    sourceSelect.appendChild(opt);
+                });
+            } catch (err) {
+                console.error('Failed to load source filters:', err);
+            }
+        }
+
         function updateResultsCount(total, filtered) {
             const countEl = document.getElementById('results-count');
             const clearBtn = document.getElementById('clear-filters');
@@ -1046,6 +1080,7 @@
                 document.getElementById('filter-persona').value ||
                 document.getElementById('filter-search').value ||
                 document.getElementById('filter-campaign').value ||
+                document.getElementById('filter-source').value ||
                 document.getElementById('filter-topic').value ||
                 document.getElementById('filter-relevance').value !== '1';
 
@@ -1066,6 +1101,7 @@
             document.getElementById('filter-relevance').value = '1';
             document.getElementById('filter-search').value = '';
             document.getElementById('filter-campaign').value = '';
+            document.getElementById('filter-source').value = '';
             document.getElementById('filter-topic').value = '';
             currentPage = 0;
             loadLibrary();
@@ -1077,6 +1113,7 @@
             const minRelevance = document.getElementById('filter-relevance').value;
             const search = document.getElementById('filter-search').value;
             const campaign = document.getElementById('filter-campaign').value;
+            const source = document.getElementById('filter-source').value;
             const topic = document.getElementById('filter-topic').value;
 
             const params = new URLSearchParams();
@@ -1086,7 +1123,9 @@
             if (search) params.set('search', search);
             if (campaign) params.set('campaign', campaign);
             if (topic) params.set('topic', topic);
-            if (jobIdFilter) params.set('job_id', jobIdFilter);
+            // Use source dropdown filter, or URL job_id filter (for Quick Distill redirect)
+            if (source) params.set('job_id', source);
+            else if (jobIdFilter) params.set('job_id', jobIdFilter);
             params.set('limit', pageSize);
             params.set('offset', currentPage * pageSize);
 
@@ -1191,6 +1230,11 @@
         });
 
         document.getElementById('filter-campaign').addEventListener('change', () => {
+            currentPage = 0;
+            loadLibrary();
+        });
+
+        document.getElementById('filter-source').addEventListener('change', () => {
             currentPage = 0;
             loadLibrary();
         });
@@ -1601,6 +1645,7 @@
         // Initial load
         loadPersonas();
         loadFilters();
+        loadSourceFilters();
         loadLibrary();
         loadExampleQueries();
     </script>

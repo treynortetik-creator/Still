@@ -302,6 +302,17 @@ async def _init_postgres_tables(conn: asyncpg.Connection):
         END $$;
     """)
 
+    # Add job_id to content_library if not exists
+    await conn.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                          WHERE table_name='content_library' AND column_name='job_id') THEN
+                ALTER TABLE content_library ADD COLUMN job_id TEXT REFERENCES jobs(id) ON DELETE SET NULL;
+            END IF;
+        END $$;
+    """)
+
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS outputs (
             id SERIAL PRIMARY KEY,
@@ -347,7 +358,8 @@ async def _init_postgres_tables(conn: asyncpg.Connection):
             last_used TIMESTAMP,
             user_notes TEXT,
             campaign_name TEXT,
-            topics JSONB
+            topics JSONB,
+            job_id TEXT REFERENCES jobs(id) ON DELETE SET NULL
         )
     """)
 
@@ -676,6 +688,7 @@ async def _init_postgres_tables(conn: asyncpg.Connection):
         "CREATE INDEX IF NOT EXISTS idx_sources_user ON sources(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_sources_approved ON sources(is_approved)",
         "CREATE INDEX IF NOT EXISTS idx_stills_source ON stills(source_id)",
+        "CREATE INDEX IF NOT EXISTS idx_content_library_job ON content_library(job_id)",
     ]
 
     for idx_sql in indexes:
@@ -852,7 +865,9 @@ async def _init_sqlite_db():
                 user_notes TEXT,
                 campaign_name TEXT,
                 topics JSON,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                job_id TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE SET NULL
             );
 
             CREATE TABLE IF NOT EXISTS prompt_templates (
@@ -1172,6 +1187,7 @@ async def _init_sqlite_db():
             CREATE INDEX IF NOT EXISTS idx_sources_user ON sources(user_id);
             CREATE INDEX IF NOT EXISTS idx_sources_approved ON sources(is_approved);
             CREATE INDEX IF NOT EXISTS idx_stills_source ON stills(source_id);
+            CREATE INDEX IF NOT EXISTS idx_content_library_job ON content_library(job_id);
         """)
 
         await db.commit()
@@ -1191,6 +1207,12 @@ async def _init_sqlite_db():
 
         if 'source_id' not in columns:
             await db.execute("ALTER TABLE stills ADD COLUMN source_id INTEGER REFERENCES sources(id)")
+
+        cursor = await db.execute("PRAGMA table_info(content_library)")
+        columns = [row[1] for row in await cursor.fetchall()]
+
+        if 'job_id' not in columns:
+            await db.execute("ALTER TABLE content_library ADD COLUMN job_id TEXT REFERENCES jobs(id)")
 
         await db.commit()
 

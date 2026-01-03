@@ -66,6 +66,7 @@ async def add_stills_to_library(
     user_id: int,
     source_file: Optional[str] = None,
     campaign_name: Optional[str] = None,
+    job_id: Optional[str] = None,
 ) -> int:
     """
     Add extracted stills to the Reserve (content library).
@@ -79,13 +80,16 @@ async def add_stills_to_library(
             # Validate and sanitize the still data
             validated = validate_still(still)
 
+            # Use job_id from parameter, or from still if available
+            still_job_id = job_id or validated.get("job_id")
+
             await execute(
                 db,
                 """
                 INSERT INTO content_library (
                     user_id, entry_type, content, source, source_timestamp,
-                    tags, persona_relevance, topics, campaign_name
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    tags, persona_relevance, topics, campaign_name, job_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     user_id,
@@ -97,6 +101,7 @@ async def add_stills_to_library(
                     json.dumps(validated["persona_relevance"]),
                     json.dumps(campaign_name and validated["topics"] or validated["topics"]),
                     campaign_name or validated["campaign_name"],
+                    still_job_id,
                 )
             )
             count += 1

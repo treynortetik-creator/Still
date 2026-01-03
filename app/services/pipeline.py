@@ -419,7 +419,7 @@ async def process_job(job_id: str):
 
         # Save stills to database and the Reserve
         await save_stills_to_db(stills, campaign_name=campaign_name, source_id=source_id)
-        await add_stills_to_library(stills, user_id, original_filename, campaign_name=campaign_name)
+        await add_stills_to_library(stills, user_id, original_filename, campaign_name=campaign_name, job_id=job_id)
 
         # Check if this is a Quick Distill job - if so, complete now
         processing_mode = job_data.get("processing_mode", "autopilot")
@@ -876,7 +876,7 @@ async def resume_pipeline_from_distillation(job_id: str):
 
         # Save stills to database and the Reserve (with source_id)
         await save_stills_to_db(stills, campaign_name=campaign_name, source_id=source_id)
-        await add_stills_to_library(stills, user_id, original_filename, campaign_name=campaign_name)
+        await add_stills_to_library(stills, user_id, original_filename, campaign_name=campaign_name, job_id=job_id)
 
         # Check if this is a Quick Distill job - if so, complete now
         processing_mode = job_data.get("processing_mode", "autopilot")
