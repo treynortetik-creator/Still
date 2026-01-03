@@ -112,6 +112,81 @@
             </div>
         </div>
 
+        <!-- Source of Truth Section -->
+        <section id="source-of-truth-section" class="bg-still-card rounded-lg shadow-md p-6 mb-6 hidden border border-still-border">
+            <div class="flex items-center justify-between cursor-pointer" onclick="toggleSourceOfTruth()">
+                <h2 class="text-xl font-semibold text-still-text flex items-center gap-2">
+                    Source of Truth
+                    <span id="sot-approval-badge" class="text-sm px-2 py-1 rounded"></span>
+                </h2>
+                <span id="sot-toggle-icon" class="text-still-muted">▼</span>
+            </div>
+
+            <div id="sot-content" class="mt-4 space-y-6">
+                <!-- Core Narratives -->
+                <div>
+                    <h3 class="font-medium text-still-muted mb-2">Core Narratives</h3>
+                    <ol id="sot-narratives" class="list-decimal list-inside space-y-2"></ol>
+                </div>
+
+                <!-- Statistics -->
+                <div>
+                    <h3 class="font-medium text-still-muted mb-2">
+                        Statistics <span id="sot-stats-count" class="text-sm text-still-disabled"></span>
+                    </h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-still-border/50">
+                                <tr>
+                                    <th class="px-3 py-2 text-left text-still-muted">Statistic</th>
+                                    <th class="px-3 py-2 text-left text-still-muted">Citation</th>
+                                    <th class="px-3 py-2 text-left text-still-muted">Expires</th>
+                                    <th class="px-3 py-2 text-left text-still-muted">Confidence</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sot-statistics"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Quotable Moments -->
+                <div>
+                    <h3 class="font-medium text-still-muted mb-2">Quotable Moments</h3>
+                    <div id="sot-quotes" class="grid gap-3"></div>
+                </div>
+
+                <!-- Pain Point & Promise -->
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="p-4 bg-still-error/10 rounded-lg border border-still-error/20">
+                        <h3 class="font-medium text-still-error mb-2">Primary Pain Point</h3>
+                        <p id="sot-pain-point" class="text-still-muted"></p>
+                    </div>
+                    <div class="p-4 bg-still-green/10 rounded-lg border border-still-green/20">
+                        <h3 class="font-medium text-still-green mb-2">The Promise</h3>
+                        <p id="sot-promise" class="text-still-muted"></p>
+                    </div>
+                </div>
+
+                <!-- Meta Info -->
+                <div class="flex flex-wrap gap-4 text-sm text-still-disabled">
+                    <span><strong class="text-still-muted">Funnel Stage:</strong> <span id="sot-funnel" class="capitalize"></span></span>
+                    <span><strong class="text-still-muted">Review Date:</strong> <span id="sot-review-date"></span></span>
+                </div>
+
+                <!-- Approval Actions (shown when awaiting) -->
+                <div id="sot-approval-actions" class="flex gap-3 pt-4 border-t border-still-border hidden">
+                    <button onclick="approveSourceOfTruth()"
+                            class="px-4 py-2 bg-still-green text-white rounded hover:opacity-90">
+                        Approve & Continue
+                    </button>
+                    <button onclick="window.location.href='/upload.html'"
+                            class="px-4 py-2 bg-still-border text-still-muted rounded hover:bg-still-card">
+                        Edit First
+                    </button>
+                </div>
+            </div>
+        </section>
+
         <!-- Tabs -->
         <div class="mb-6 border-b border-still-border" role="tablist" aria-label="Results view">
             <div class="flex space-x-8">
@@ -182,6 +257,137 @@
             }
         }
         loadTonePresets();
+
+        // Source of Truth functions
+        async function loadSourceOfTruth(jobId) {
+            try {
+                const response = await Auth.fetchWithAuth(`/api/jobs/${jobId}/source`);
+                if (!response.ok) {
+                    if (response.status === 404) return null;
+                    throw new Error('Failed to load Source of Truth');
+                }
+
+                const source = await response.json();
+                displaySourceOfTruth(source);
+                return source;
+            } catch (err) {
+                console.error('Error loading Source of Truth:', err);
+                return null;
+            }
+        }
+
+        function displaySourceOfTruth(source) {
+            const section = document.getElementById('source-of-truth-section');
+            section.classList.remove('hidden');
+
+            // Approval badge
+            const badge = document.getElementById('sot-approval-badge');
+            if (source.is_approved) {
+                badge.textContent = 'Approved';
+                badge.className = 'text-sm px-2 py-1 rounded bg-still-green/20 text-still-green';
+            } else {
+                badge.textContent = 'Pending';
+                badge.className = 'text-sm px-2 py-1 rounded bg-still-amber/20 text-still-amber';
+                document.getElementById('sot-approval-actions').classList.remove('hidden');
+            }
+
+            // Core narratives
+            const narrativesEl = document.getElementById('sot-narratives');
+            if (source.core_narratives && source.core_narratives.length > 0) {
+                narrativesEl.innerHTML = source.core_narratives.map(n => `
+                    <li class="text-still-muted">
+                        <strong class="text-still-text">${escapeHtml(n.narrative)}</strong>
+                        <p class="text-sm text-still-disabled ml-5">${escapeHtml(n.supporting_evidence)}</p>
+                    </li>
+                `).join('');
+            } else {
+                narrativesEl.innerHTML = '<li class="text-still-disabled">No narratives extracted</li>';
+            }
+
+            // Statistics
+            document.getElementById('sot-stats-count').textContent = `(${source.statistics?.length || 0})`;
+            const statsEl = document.getElementById('sot-statistics');
+            if (source.statistics && source.statistics.length > 0) {
+                statsEl.innerHTML = source.statistics.map(s => `
+                    <tr class="border-b border-still-border">
+                        <td class="px-3 py-2 text-still-muted">${escapeHtml(s.stat)}</td>
+                        <td class="px-3 py-2 text-still-disabled">${escapeHtml(s.citation || '-')}</td>
+                        <td class="px-3 py-2 text-still-disabled">${s.expiration_date || '-'}</td>
+                        <td class="px-3 py-2">
+                            <span class="px-2 py-1 rounded text-xs ${getConfidenceClass(s.confidence)}">
+                                ${s.confidence || 'unknown'}
+                            </span>
+                        </td>
+                    </tr>
+                `).join('');
+            } else {
+                statsEl.innerHTML = '<tr><td colspan="4" class="px-3 py-2 text-still-disabled">No statistics extracted</td></tr>';
+            }
+
+            // Quotes
+            const quotesEl = document.getElementById('sot-quotes');
+            if (source.quotable_moments && source.quotable_moments.length > 0) {
+                quotesEl.innerHTML = source.quotable_moments.map(q => `
+                    <blockquote class="border-l-4 border-still-copper pl-4 py-2 bg-still-copper/10 rounded-r">
+                        <p class="text-still-muted italic">"${escapeHtml(q.quote)}"</p>
+                        <footer class="text-sm text-still-disabled mt-1">
+                            — ${escapeHtml(q.speaker || 'Unknown')}
+                            ${q.timestamp ? `@ ${q.timestamp}` : ''}
+                        </footer>
+                    </blockquote>
+                `).join('');
+            } else {
+                quotesEl.innerHTML = '<p class="text-still-disabled">No quotable moments extracted</p>';
+            }
+
+            // Pain point & promise
+            document.getElementById('sot-pain-point').textContent = source.primary_pain_point || 'Not specified';
+            document.getElementById('sot-promise').textContent = source.the_promise || 'Not specified';
+
+            // Meta
+            document.getElementById('sot-funnel').textContent = source.funnel_stage || 'Not specified';
+            document.getElementById('sot-review-date').textContent = source.review_date || 'Not set';
+        }
+
+        function getConfidenceClass(confidence) {
+            switch (confidence) {
+                case 'verified': return 'bg-still-green/20 text-still-green';
+                case 'calculated': return 'bg-still-copper/20 text-still-copper';
+                case 'implied': return 'bg-still-amber/20 text-still-amber';
+                default: return 'bg-still-border text-still-muted';
+            }
+        }
+
+        function toggleSourceOfTruth() {
+            const content = document.getElementById('sot-content');
+            const icon = document.getElementById('sot-toggle-icon');
+            content.classList.toggle('hidden');
+            icon.textContent = content.classList.contains('hidden') ? '▶' : '▼';
+        }
+
+        async function approveSourceOfTruth() {
+            try {
+                const response = await Auth.fetchWithAuth(`/api/jobs/${jobId}/approve-source`, {
+                    method: 'POST'
+                });
+
+                if (!response.ok) throw new Error('Failed to approve');
+
+                showToast('Source of Truth approved! Pipeline resuming...');
+
+                // Update UI
+                document.getElementById('sot-approval-actions').classList.add('hidden');
+                const badge = document.getElementById('sot-approval-badge');
+                badge.textContent = 'Approved';
+                badge.className = 'text-sm px-2 py-1 rounded bg-still-green/20 text-still-green';
+
+                // Reload page after delay to show updated status
+                setTimeout(() => window.location.reload(), 2000);
+            } catch (err) {
+                showToast('Error approving Source of Truth');
+                console.error('Error approving Source of Truth:', err);
+            }
+        }
 
         // Feedback functions
         async function submitFeedback(outputId, feedbackType) {
@@ -934,6 +1140,7 @@
             }
         }
 
+        loadSourceOfTruth(jobId);
         loadResults();
     </script>
 </body>
