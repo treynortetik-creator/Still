@@ -1,59 +1,56 @@
 You are a content strategist performing a SECOND PASS extraction to find overlooked content stills.
 
-TARGET PERSONA: {target_persona_title}
+## SOURCE OF TRUTH CONTEXT:
+Core Narratives: {core_narratives}
+Primary Pain Point: {primary_pain_point}
+The Promise: {the_promise}
+
+## TARGET PERSONA: {target_persona_title}
 Pain points: {persona_pain_points}
 Priorities: {persona_priorities}
 
-FIRST PASS ALREADY EXTRACTED ({first_pass_count} stills):
+## FIRST PASS ALREADY EXTRACTED ({first_pass_count} stills):
 {first_pass_stills}
 
-SOURCE CONTENT (review again for missed content):
+## SOURCE CONTENT (review again for missed content):
 {cleaned_transcript}
 
-TASK: Find content stills that were MISSED in the first pass.
+## TASK: Find content stills that were MISSED in the first pass.
 
-WHAT TO LOOK FOR:
+## WHAT TO LOOK FOR:
 
-1. ADDITIONAL QUOTES
-   - Direct quotes from speakers not yet captured
-   - Memorable phrases or statements
-   - Quotable one-liners buried in longer passages
+### Overlooked Types (especially these often-missed categories):
 
-2. MISSED DATA POINTS
-   - Specific numbers, percentages, or metrics mentioned briefly
-   - Statistics that appeared in passing
-   - Time frames, dollar amounts, or quantities
+1. **FRAMEWORK** - Named methodologies buried in explanations
+2. **DEFINITION** - Terms explained in passing but valuable as standalone
+3. **QUESTION** - Objections or FAQs mentioned briefly
+4. **PROOF_POINT** - Third-party mentions, research citations, awards
 
-3. OVERLOOKED STORIES
-   - Brief anecdotes or examples glossed over
-   - Mini case studies or customer mentions
-   - Personal experiences shared
+### Also check for missed:
 
-4. SECONDARY PROBLEMS/SOLUTIONS
-   - Issues mentioned in passing (not the main topic)
-   - Quick recommendations or tips
-   - Supporting solutions to primary problems
+5. **QUOTE** - Direct quotes from speakers not yet captured
+6. **DATA** - Statistics mentioned in passing
+7. **STORY** - Brief anecdotes glossed over
+8. **PROBLEM** - Secondary issues mentioned
+9. **SOLUTION** - Quick recommendations or tips
+10. **INSIGHT** - Wisdom buried in transitions or asides
 
-5. BURIED INSIGHTS
-   - Important points hidden mid-paragraph
-   - Insights stated casually but valuable
-   - Wisdom in transitions or asides
+## OUTPUT FORMAT (same as first pass):
+{{
+  "type": "data|insight|story|problem|solution|quote|framework|definition|question|proof_point",
+  "content": "The extracted content",
+  "source_location": "timestamp or section",
+  "best_formats": ["linkedin", "blog", "email", "sales", "case_study", "carousel"],
+  "funnel_stage": "awareness|consideration|decision",
+  "expiration_date": "YYYY-MM-DD or null",
+  "relevance_to_persona": 1-5,
+  "why_relevant": "Brief explanation",
+  "tags": ["keyword1", "keyword2"]
+}}
 
-RULES:
+## RULES:
 - ONLY extract content NOT already in the first pass list above
 - Do NOT rephrase or duplicate existing stills
 - Quality over quantity - only genuinely new valuable content
 - Include source_location to prove it's different content
-- Tag each still with 2-3 relevant keywords
-- Include 2-3 topic keywords for discoverability
-
-EXTRACTION FORMAT:
-Same as first pass:
-- DATA: statistics, metrics, numbers
-- INSIGHT: frameworks, methods, tips
-- STORY: examples, case studies, anecdotes
-- PROBLEM: challenges, pain points
-- SOLUTION: recommendations, strategies
-- QUOTE: exact memorable statements (include speaker if known)
-
-Rank relevance to {target_persona_title} on 1-5 scale.
+- Aim for 3-10 additional stills depending on content richness

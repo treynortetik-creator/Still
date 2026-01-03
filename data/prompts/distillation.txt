@@ -1,48 +1,108 @@
 You are a content strategist distilling source material into reusable stills.
 
-TARGET PERSONA: {target_persona_title}
+## SOURCE OF TRUTH CONTEXT (anchor your extraction):
+Core Narratives: {core_narratives}
+Primary Pain Point: {primary_pain_point}
+The Promise: {the_promise}
+
+## TARGET PERSONA: {target_persona_title}
 Pain points: {persona_pain_points}
 Priorities: {persona_priorities}
 
-SOURCE CONTENT:
+## SOURCE CONTENT:
 {cleaned_transcript}
 
-TASK: Extract and categorize content stills:
+## TASK: Extract and categorize content stills into these 10 types:
 
-1. DATA STILLS (statistics, metrics, ROI figures)
-   - Look for specific numbers, percentages, time savings, cost reductions
-   - Format: {{"type": "data", "content": "40% improvement in X", "source_location": "14:32", "relevance_to_persona": 5, "why_relevant": "CEOs care about ROI"}}
+### 1. DATA (statistics, metrics, ROI figures)
+- Specific numbers, percentages, time savings, cost reductions
+- Example: "40% reduction in turnover"
 
-2. INSIGHT STILLS (frameworks, methods, actionable tips)
-   - Look for processes, best practices, how-to guidance
-   - Format: {{"type": "insight", "content": "3-step framework for...", "source_location": "section 2", "relevance_to_persona": 4}}
+### 2. INSIGHT (frameworks, methods, actionable tips)
+- Processes, best practices, how-to guidance
+- Example: "The 3-step recognition framework"
 
-3. STORY STILLS (customer examples, anecdotes, case studies)
-   - Look for real-world examples, before/after scenarios, named examples
-   - Format: {{"type": "story", "content": "Customer X achieved Y by doing Z", "source_location": "22:15", "relevance_to_persona": 5}}
+### 3. STORY (customer examples, anecdotes, case studies)
+- Real-world examples, before/after scenarios, named examples
+- Example: "Sunrise Senior Living reduced turnover from 85% to 52%"
 
-4. PROBLEM STILLS (challenges, pain points, obstacles)
-   - Look for problems the audience faces, industry challenges
-   - Format: {{"type": "problem", "content": "Teams struggling with staffing shortages", "source_location": "intro", "relevance_to_persona": 5}}
+### 4. PROBLEM (challenges, pain points, obstacles)
+- Problems the audience faces, industry challenges
+- Example: "Teams struggling with staffing shortages"
 
-5. SOLUTION STILLS (recommendations, strategies, tools)
-   - Look for proposed solutions, recommendations, tool suggestions
-   - Format: {{"type": "solution", "content": "Using ambient monitoring solves manual reporting burden", "source_location": "conclusion", "relevance_to_persona": 4}}
+### 5. SOLUTION (recommendations, strategies, tools)
+- Proposed solutions, recommendations, tool suggestions
+- Example: "Using ambient monitoring solves manual reporting burden"
 
-PRIORITIZATION:
-- Rank each still's relevance to {target_persona_title} on 1-5 scale
+### 6. QUOTE (memorable statements with attribution)
+- Direct quotes from speakers, testimonials
+- Example: "Investing in staff is the profitable thing to do" - Speaker Name
+
+### 7. FRAMEWORK (methodologies, step-by-step processes)
+- Named methodologies, numbered approaches, systems
+- Example: "The PADR Framework: Pillar, Atomize, Distribute, Refresh"
+
+### 8. DEFINITION (concept explanations, glossary-style)
+- Clear definitions of terms, jargon busters
+- Example: "Ambient monitoring refers to passive data collection..."
+
+### 9. QUESTION (FAQs, objections, common challenges)
+- Questions the audience might ask, objections to address
+- Example: "What about HIPAA compliance concerns?"
+
+### 10. PROOF_POINT (third-party validation, citations)
+- Research citations, awards, media mentions, certifications
+- Example: "As featured in Healthcare Weekly's Top 10 Innovations"
+
+## OUTPUT FORMAT (JSON array):
+For each still, include:
+{{
+  "type": "data|insight|story|problem|solution|quote|framework|definition|question|proof_point",
+  "content": "The extracted content, verbatim when possible",
+  "source_location": "timestamp or section reference",
+  "best_formats": ["linkedin", "blog", "email", "sales", "case_study", "carousel"],
+  "funnel_stage": "awareness|consideration|decision",
+  "expiration_date": "YYYY-MM-DD or null if evergreen",
+  "relevance_to_persona": 1-5,
+  "why_relevant": "Brief explanation",
+  "tags": ["keyword1", "keyword2"]
+}}
+
+## EXTRACTION SCALE (based on content length):
+- Short content (<2000 words): Extract 8-15 stills
+- Medium content (2000-5000 words): Extract 15-30 stills
+- Long content (>5000 words): Extract 30-50 stills
+
+## FIELD GUIDANCE:
+
+**best_formats**: Which output types this still works best for:
+- linkedin: Professional insights, data points, frameworks
+- blog: Stories, detailed explanations, case studies
+- email: Problems, solutions, questions, proof points
+- sales: Proof points, data, stories, objections
+- case_study: Stories, data, before/after
+- carousel: Frameworks, step-by-step, definitions
+
+**funnel_stage**:
+- awareness: Introduces problems, defines concepts, raises questions
+- consideration: Compares solutions, provides frameworks, shares stories
+- decision: Proof points, ROI data, objection handling
+
+**expiration_date**:
+- Set for time-bound statistics (e.g., "2024 data" expires end of 2025)
+- Set null for evergreen content (frameworks, definitions, timeless insights)
+
+## PRIORITIZATION:
+Rank each still's relevance to {target_persona_title} on 1-5 scale:
 - 5 = Directly addresses their top pain point or priority
 - 4 = Highly relevant to their role
 - 3 = Generally useful
 - 2 = Marginally relevant
 - 1 = Not specifically relevant but good content
 
-EXTRACTION RULES:
+## EXTRACTION RULES:
 - Extract VERBATIM quotes when possible (preserve exact wording)
 - Include enough context for the still to stand alone
 - Don't over-summarize - keep the richness of the original
-- Aim for 10-20 stills from a typical piece of content
-- Tag each still with 2-3 relevant keywords
-
-Consider their pain points: {persona_pain_points}
-Consider their priorities: {persona_priorities}
+- For QUOTE type, always include speaker attribution if known
+- For DATA type, always check if an expiration_date applies
