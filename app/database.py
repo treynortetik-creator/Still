@@ -229,6 +229,49 @@ async def _init_postgres_tables(conn: asyncpg.Connection):
     """)
 
     await conn.execute("""
+        CREATE TABLE IF NOT EXISTS sources (
+            id SERIAL PRIMARY KEY,
+            job_id TEXT NOT NULL UNIQUE REFERENCES jobs(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            core_narratives JSONB NOT NULL,
+            statistics JSONB NOT NULL,
+            quotable_moments JSONB NOT NULL,
+            primary_pain_point TEXT NOT NULL,
+            the_promise TEXT NOT NULL,
+            objections_qa JSONB,
+            key_visuals JSONB,
+            funnel_stage TEXT NOT NULL CHECK(funnel_stage IN ('awareness', 'consideration', 'decision')),
+            review_date DATE NOT NULL,
+            is_approved BOOLEAN DEFAULT FALSE,
+            approved_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW()
+        )
+    """)
+
+    # Add source_id to jobs if not exists
+    await conn.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                          WHERE table_name='jobs' AND column_name='source_id') THEN
+                ALTER TABLE jobs ADD COLUMN source_id INTEGER REFERENCES sources(id);
+            END IF;
+        END $$;
+    """)
+
+    # Add auto_approve_source to jobs if not exists
+    await conn.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                          WHERE table_name='jobs' AND column_name='auto_approve_source') THEN
+                ALTER TABLE jobs ADD COLUMN auto_approve_source BOOLEAN DEFAULT FALSE;
+            END IF;
+        END $$;
+    """)
+
+    await conn.execute("""
         CREATE TABLE IF NOT EXISTS stills (
             id TEXT PRIMARY KEY,
             job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
@@ -246,6 +289,17 @@ async def _init_postgres_tables(conn: asyncpg.Connection):
             campaign_name TEXT,
             topics JSONB
         )
+    """)
+
+    # Add source_id to stills if not exists
+    await conn.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                          WHERE table_name='stills' AND column_name='source_id') THEN
+                ALTER TABLE stills ADD COLUMN source_id INTEGER REFERENCES sources(id);
+            END IF;
+        END $$;
     """)
 
     await conn.execute("""
@@ -618,6 +672,10 @@ async def _init_postgres_tables(conn: asyncpg.Connection):
         "CREATE INDEX IF NOT EXISTS idx_brand_voice_config_user ON brand_voice_config(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_revoked_tokens_expires ON revoked_tokens(expires_at)",
         "CREATE INDEX IF NOT EXISTS idx_global_settings_key ON global_settings(setting_key)",
+        "CREATE INDEX IF NOT EXISTS idx_sources_job ON sources(job_id)",
+        "CREATE INDEX IF NOT EXISTS idx_sources_user ON sources(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_sources_approved ON sources(is_approved)",
+        "CREATE INDEX IF NOT EXISTS idx_stills_source ON stills(source_id)",
     ]
 
     for idx_sql in indexes:
