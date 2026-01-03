@@ -217,6 +217,8 @@
                     'uploading': 'bg-still-border text-still-muted',
                     'transcribing': 'bg-still-copper/20 text-still-copper',
                     'cleaning': 'bg-still-copper/20 text-still-copper',
+                    'analyzing': 'bg-still-copper/20 text-still-copper',
+                    'awaiting_approval': 'bg-still-amber/20 text-still-amber',
                     'atomizing': 'bg-still-amber/20 text-still-amber',
                     'drafting': 'bg-still-copper/20 text-still-copper',
                     'editing': 'bg-still-copper/20 text-still-copper',
@@ -228,7 +230,8 @@
                 const statusColor = statusColors[job.status] || 'bg-still-border text-still-muted';
                 const isComplete = job.status === 'complete';
                 const isFailed = job.status === 'failed';
-                const isProcessing = !isComplete && !isFailed;
+                const isAwaitingApproval = job.status === 'awaiting_approval';
+                const isProcessing = !isComplete && !isFailed && !isAwaitingApproval;
 
                 return `
                     <div class="bg-still-card rounded-lg shadow-sm border border-still-border p-4">
@@ -257,6 +260,16 @@
                         ${isFailed && job.error_message ? `
                             <div class="mt-2 p-2 bg-still-error/10 rounded text-sm text-still-error">
                                 ${escapeHtml(job.error_message)}
+                            </div>
+                        ` : ''}
+
+                        ${isAwaitingApproval ? `
+                            <div class="mt-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-700">
+                                <p class="text-sm text-amber-800 dark:text-amber-200 mb-2">Source of Truth ready for review</p>
+                                <a href="/results.html?job_id=${job.job_id}#source-of-truth"
+                                   class="text-sm text-still-copper hover:text-still-amber font-medium">
+                                    Review & Approve
+                                </a>
                             </div>
                         ` : ''}
 

@@ -226,6 +226,8 @@
             'uploading': { step: 0, text: 'Uploading file...' },
             'transcribing': { step: 1, text: 'Extracting content from file...' },
             'cleaning': { step: 1, text: 'Processing extracted content...' },
+            'analyzing': { step: 1.5, text: 'Analyzing Source of Truth...' },
+            'awaiting_approval': { step: 1.5, text: 'Awaiting your approval', showApprovalButton: true },
             'distilling': { step: 2, text: 'Distilling content stills...' },
             'drafting': { step: 3, text: 'Drafting content...' },
             'editing': { step: 4, text: 'Editing for audience...' },
@@ -297,6 +299,27 @@
                 }
 
                 updateStepUI(statusInfo.step);
+
+                // Handle awaiting_approval status - show approval prompt
+                const approvalSection = document.getElementById('approval-section');
+                if (data.status === 'awaiting_approval') {
+                    if (!approvalSection) {
+                        // Create approval section if it doesn't exist
+                        const approvalHtml = `
+                            <div id="approval-section" class="mt-6 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+                                <p class="text-amber-800 dark:text-amber-200 font-medium mb-3">Source of Truth ready for review</p>
+                                <a href="/results.html?job_id=${jobId}#source-of-truth"
+                                   class="inline-block btn btn-primary text-still-bg px-4 py-2 rounded-lg font-semibold transition">
+                                    Review & Approve
+                                </a>
+                            </div>
+                        `;
+                        document.getElementById('pro-tip-section').insertAdjacentHTML('afterend', approvalHtml);
+                    }
+                } else if (approvalSection) {
+                    // Remove approval section if status changed
+                    approvalSection.remove();
+                }
 
                 if (data.status === 'complete') {
                     // Success! Clear tip rotation
