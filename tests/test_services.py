@@ -301,3 +301,16 @@ class TestLibraryManager:
         }
         validated = validate_still(still)
         assert validated["best_formats"] == []
+
+
+class TestLifecycleService:
+    """Tests for lifecycle management."""
+
+    @pytest.mark.asyncio
+    async def test_check_expiring_stills_function_exists(self):
+        """Test lifecycle functions exist."""
+        from app.services.lifecycle import check_expiring_stills, get_lifecycle_summary, update_still_status
+
+        assert callable(check_expiring_stills)
+        assert callable(get_lifecycle_summary)
+        assert callable(update_still_status)
