@@ -1,7 +1,7 @@
 """Content library management service (The Reserve)."""
 import json
 import logging
-from typing import Optional
+from typing import Optional, List
 
 from app.config import get_settings
 from app.database import get_db
@@ -9,6 +9,31 @@ from app.db_utils import execute, fetchone, fetchall, fetchval
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
+
+
+def _extract_still_ids(stills_used: List) -> List[str]:
+    """
+    Extract still IDs from stills_used list.
+
+    The stills_used field can contain:
+    - String IDs directly: ["abc123", "def456"]
+    - Content snippets (from older outputs): ["Some insight text..."]
+
+    We only want actual still IDs (UUIDs or similar).
+    """
+    if not stills_used:
+        return []
+
+    still_ids = []
+    for item in stills_used:
+        if isinstance(item, str):
+            # Check if it looks like a still ID (contains hyphen for UUIDs,
+            # or is alphanumeric with underscore for generated IDs)
+            # IDs are typically short (< 50 chars) vs content snippets which are longer
+            if len(item) < 50 and ('-' in item or '_' in item or item.isalnum()):
+                still_ids.append(item)
+
+    return still_ids
 
 # All valid still types (10 total)
 VALID_STILL_TYPES = [
@@ -343,6 +368,12 @@ async def save_outputs_to_db(outputs: list[dict], job_id: str, campaign_name: Op
                 output_id = cursor.lastrowid
 
             count += 1
+
+            # Track still usage for this output
+            still_ids = _extract_still_ids(validated["stills_used"])
+            if still_ids:
+                from app.services.drafting import record_still_usage
+                await record_still_usage(still_ids, output_id)
 
             # Save image prompts if present
             image_prompts = output.get("image_prompts", [])

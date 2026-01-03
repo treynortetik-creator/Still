@@ -1,14 +1,17 @@
 """Content drafting service - Step 2 of the pipeline."""
+import json
 import logging
-from typing import Tuple, Dict, Optional
+from datetime import datetime
+from typing import Tuple, Dict, Optional, List
 
 from app.services.ai_client import call_llm_text, calculate_openrouter_cost
 from app.services.prompt_manager import get_rendered_prompt
 from app.services.persona_manager import get_persona_for_job
 from app.services.distillation import select_stills_for_content_type, group_stills_by_type
 from app.utils.json_parser import parse_llm_json
+from app.config import get_settings
 from app.database import get_db
-from app.db_utils import fetchall
+from app.db_utils import execute, fetchall
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +22,62 @@ DEFAULT_PERSONA = {
     "pain_points": ["common business challenges", "efficiency", "growth"],
     "content_preferences": {"tone": "Professional"},
 }
+
+
+async def record_still_usage(still_ids: List[str], output_id: int) -> None:
+    """
+    Increment usage counts and update timestamps for stills used in output.
+
+    Args:
+        still_ids: List of still IDs that were used
+        output_id: ID of the output they were used in
+    """
+    if not still_ids:
+        return
+
+    now = datetime.utcnow().isoformat()
+    settings = get_settings()
+
+    try:
+        async with get_db() as db:
+            if settings.use_postgres:
+                # PostgreSQL - update stills
+                await db.execute("""
+                    UPDATE stills
+                    SET usage_count = COALESCE(usage_count, 0) + 1,
+                        last_used_at = $1
+                    WHERE id = ANY($2)
+                """, now, still_ids)
+
+                # Update atoms_used on output
+                await db.execute("""
+                    UPDATE outputs
+                    SET atoms_used = $1
+                    WHERE id = $2
+                """, json.dumps(still_ids), output_id)
+            else:
+                # SQLite
+                placeholders = ','.join('?' * len(still_ids))
+                await db.execute(f"""
+                    UPDATE stills
+                    SET usage_count = COALESCE(usage_count, 0) + 1,
+                        last_used_at = ?
+                    WHERE id IN ({placeholders})
+                """, [now] + still_ids)
+
+                await db.execute("""
+                    UPDATE outputs
+                    SET atoms_used = ?
+                    WHERE id = ?
+                """, (json.dumps(still_ids), output_id))
+
+                await db.commit()
+
+        logger.info(f"Recorded usage of {len(still_ids)} stills for output {output_id}")
+
+    except Exception as e:
+        logger.error(f"Failed to record still usage: {e}")
+        # Don't re-raise - this is a non-critical operation
 
 
 async def get_user_context(user_id: int, content_type: str = None) -> str:
