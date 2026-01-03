@@ -10,18 +10,63 @@ from app.db_utils import execute, fetchone, fetchall, fetchval
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
+# All valid still types (10 total)
+VALID_STILL_TYPES = [
+    "data", "insight", "story", "problem", "solution", "quote",
+    "framework", "definition", "question", "proof_point"
+]
+
+# Valid funnel stages
+VALID_FUNNEL_STAGES = ["awareness", "consideration", "decision"]
+
 
 def validate_still(still: dict) -> dict:
     """
     Validate and sanitize a still before database insertion.
 
+    Validates all 10 still types and new lifecycle fields:
+    - best_formats: list of content format strings
+    - funnel_stage: awareness/consideration/decision
+    - expiration_date: YYYY-MM-DD string or None
+
     Returns sanitized still dict with proper types.
     """
+    # Validate still_type against known types
+    still_type = str(still.get("still_type", "insight"))[:50]
+    if still_type not in VALID_STILL_TYPES:
+        still_type = "insight"  # Default to insight if invalid
+
+    # Validate funnel_stage
+    funnel_stage = still.get("funnel_stage")
+    if funnel_stage and funnel_stage not in VALID_FUNNEL_STAGES:
+        funnel_stage = None
+
+    # Validate best_formats as list
+    best_formats = still.get("best_formats")
+    if not isinstance(best_formats, list):
+        best_formats = []
+
+    # Validate expiration_date format (should be YYYY-MM-DD string or None)
+    expiration_date = still.get("expiration_date")
+    if expiration_date:
+        if isinstance(expiration_date, str) and len(expiration_date) == 10:
+            # Basic format check
+            try:
+                parts = expiration_date.split("-")
+                if len(parts) == 3 and all(p.isdigit() for p in parts):
+                    pass  # Valid format
+                else:
+                    expiration_date = None
+            except (ValueError, AttributeError):
+                expiration_date = None
+        else:
+            expiration_date = None
+
     return {
         "id": str(still.get("id", "")) if still.get("id") else None,
         "job_id": str(still.get("job_id", "")) if still.get("job_id") else None,
         "user_id": int(still.get("user_id", 0)) if still.get("user_id") else None,
-        "still_type": str(still.get("still_type", "insight"))[:50],
+        "still_type": still_type,
         "content": str(still.get("content", ""))[:50000],  # Limit content size
         "source_location": str(still.get("source_location", ""))[:500] if still.get("source_location") else None,
         "source_file": str(still.get("source_file", ""))[:500] if still.get("source_file") else None,
@@ -30,6 +75,10 @@ def validate_still(still: dict) -> dict:
         "quote_attribution": str(still.get("quote_attribution", ""))[:200] if still.get("quote_attribution") else None,
         "topics": still.get("topics") if isinstance(still.get("topics"), list) else [],
         "campaign_name": str(still.get("campaign_name", ""))[:200] if still.get("campaign_name") else None,
+        # New lifecycle fields
+        "best_formats": best_formats,
+        "funnel_stage": funnel_stage,
+        "expiration_date": expiration_date,
     }
 
 

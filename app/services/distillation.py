@@ -1,7 +1,8 @@
 """Content distillation service - Step 0 of the pipeline."""
 import json
 import uuid
-from typing import Tuple
+from datetime import datetime
+from typing import Optional, Tuple
 
 from app.services.ai_client import call_llm_text, calculate_openrouter_cost
 from app.services.prompt_manager import get_rendered_prompt
@@ -9,17 +10,64 @@ from app.services.persona_manager import get_persona
 from app.utils.json_parser import parse_llm_json
 
 
+# All 10 still types
+ALL_STILL_TYPES = [
+    "data", "insight", "story", "problem", "solution", "quote",
+    "framework", "definition", "question", "proof_point"
+]
+
+
+def _parse_expiration_date(date_value) -> Optional[str]:
+    """
+    Parse expiration date from LLM response.
+
+    Accepts various formats and returns YYYY-MM-DD string or None.
+    """
+    if not date_value or date_value in ("null", "None", ""):
+        return None
+
+    if isinstance(date_value, str):
+        # Try to parse YYYY-MM-DD format
+        try:
+            parsed = datetime.strptime(date_value, "%Y-%m-%d")
+            return parsed.strftime("%Y-%m-%d")
+        except ValueError:
+            pass
+
+        # Try other common formats
+        for fmt in ["%m/%d/%Y", "%d/%m/%Y", "%Y/%m/%d"]:
+            try:
+                parsed = datetime.strptime(date_value, fmt)
+                return parsed.strftime("%Y-%m-%d")
+            except ValueError:
+                continue
+
+    return None
+
+
 async def distill_content(
     cleaned_transcript: str,
     target_persona_id: str,
     job_id: str,
     user_id: int,
+    source_of_truth: Optional[dict] = None,
 ) -> Tuple[list[dict], float]:
     """
     Extract reusable content stills from transcript.
 
-    Stills are categorized as: data, insight, story, problem, solution, quote.
+    Stills are categorized into 10 types: data, insight, story, problem, solution,
+    quote, framework, definition, question, proof_point.
     Each still is scored for relevance to the target persona (if provided).
+
+    Args:
+        cleaned_transcript: The transcript text to distill
+        target_persona_id: ID of target persona (optional)
+        job_id: ID of the processing job
+        user_id: ID of the user
+        source_of_truth: Optional dict with Source of Truth context containing:
+            - core_narratives: JSON array of narrative objects
+            - primary_pain_point: Main pain point string
+            - the_promise: Brand promise string
 
     Returns (stills_list, cost) tuple.
     """
@@ -28,6 +76,18 @@ async def distill_content(
     if target_persona_id and target_persona_id not in ("general", "none", ""):
         persona = await get_persona(target_persona_id, user_id=user_id)
 
+    # Extract Source of Truth values (with defaults)
+    sot = source_of_truth or {}
+    core_narratives = sot.get("core_narratives", [])
+    primary_pain_point = sot.get("primary_pain_point", "")
+    the_promise = sot.get("the_promise", "")
+
+    # Format core_narratives as JSON string if it's a list
+    if isinstance(core_narratives, list):
+        core_narratives_str = json.dumps(core_narratives, indent=2)
+    else:
+        core_narratives_str = str(core_narratives) if core_narratives else "[]"
+
     # Build variables based on whether we have a persona
     if persona:
         variables = {
@@ -35,6 +95,10 @@ async def distill_content(
             "persona_pain_points": ", ".join(persona["pain_points"]),
             "persona_priorities": ", ".join(persona["priorities"]),
             "cleaned_transcript": cleaned_transcript,
+            # Source of Truth context
+            "core_narratives": core_narratives_str,
+            "primary_pain_point": primary_pain_point,
+            "the_promise": the_promise,
         }
     else:
         # Generic distillation without persona context
@@ -43,6 +107,10 @@ async def distill_content(
             "persona_pain_points": "common business challenges, efficiency, growth, staying competitive",
             "persona_priorities": "actionable insights, practical solutions, valuable information",
             "cleaned_transcript": cleaned_transcript,
+            # Source of Truth context
+            "core_narratives": core_narratives_str,
+            "primary_pain_point": primary_pain_point,
+            "the_promise": the_promise,
         }
 
     prompt, config = await get_rendered_prompt("distillation", variables)
@@ -66,14 +134,17 @@ Return valid JSON with this structure:
 {
   "stills": [
     {
-      "type": "data|insight|story|problem|solution|quote",
+      "type": "data|insight|story|problem|solution|quote|framework|definition|question|proof_point",
       "content": "The actual content extracted (for quotes, use the exact verbatim text)",
       "source_location": "timestamp or section reference",
       "relevance_to_persona": 1-5,
       "why_relevant": "Brief explanation",
       "tags": ["tag1", "tag2"],
       "topics": ["topic1", "topic2"],
-      "speaker": "Name of person who said this (for quotes only, null otherwise)"
+      "speaker": "Name of person who said this (for quotes only, null otherwise)",
+      "best_formats": ["linkedin", "email", "blog"],
+      "funnel_stage": "awareness|consideration|decision",
+      "expiration_date": "YYYY-MM-DD or null if evergreen"
     }
   ],
   "summary": "Brief summary of what was extracted",
@@ -82,7 +153,19 @@ Return valid JSON with this structure:
     "blog": ["still indexes best for blog"],
     "email": ["still indexes best for email"]
   }
-}"""
+}
+
+STILL TYPE GUIDELINES:
+- data: Statistics, metrics, research findings
+- insight: Observations, analysis, lessons learned
+- story: Anecdotes, case studies, examples
+- problem: Pain points, challenges, obstacles
+- solution: Answers, fixes, approaches
+- quote: Direct verbatim quotes from speakers
+- framework: Step-by-step processes, methodologies
+- definition: Key term explanations, concepts
+- question: Thought-provoking questions, prompts
+- proof_point: Credentials, testimonials, social proof"""
 
     # Call LLM via unified client (no token limit - use model's maximum)
     response_text, input_tokens, output_tokens, model = await call_llm_text(
@@ -111,6 +194,21 @@ Return valid JSON with this structure:
     for still_data in still_data_list:
         # Build persona relevance - use "general" if no persona specified
         relevance_key = target_persona_id if persona else "general"
+
+        # Parse expiration_date if provided
+        expiration_date = _parse_expiration_date(still_data.get("expiration_date"))
+
+        # Parse best_formats - ensure it's a list
+        best_formats = still_data.get("best_formats", [])
+        if not isinstance(best_formats, list):
+            best_formats = []
+
+        # Parse funnel_stage - validate against known values
+        funnel_stage = still_data.get("funnel_stage")
+        valid_funnel_stages = ["awareness", "consideration", "decision"]
+        if funnel_stage and funnel_stage not in valid_funnel_stages:
+            funnel_stage = None
+
         still = {
             "id": str(uuid.uuid4()),
             "job_id": job_id,
@@ -125,6 +223,10 @@ Return valid JSON with this structure:
             },
             "why_relevant": still_data.get("why_relevant"),
             "quote_attribution": still_data.get("speaker"),  # For quote stills
+            # New lifecycle fields
+            "best_formats": best_formats,
+            "funnel_stage": funnel_stage,
+            "expiration_date": expiration_date,
         }
         stills.append(still)
 
@@ -155,6 +257,7 @@ async def distill_content_pass2(
     target_persona_id: str,
     job_id: str,
     user_id: int,
+    source_of_truth: Optional[dict] = None,
 ) -> Tuple[list[dict], float]:
     """
     Second pass extraction - finds content overlooked in first pass.
@@ -165,6 +268,15 @@ async def distill_content_pass2(
     - Brief anecdotes glossed over
     - Secondary problems/solutions
     - Insights buried in longer passages
+    - New still types: frameworks, definitions, questions, proof_points
+
+    Args:
+        cleaned_transcript: The transcript text to distill
+        first_pass_stills: Stills extracted in first pass
+        target_persona_id: ID of target persona (optional)
+        job_id: ID of the processing job
+        user_id: ID of the user
+        source_of_truth: Optional dict with Source of Truth context
 
     Returns (stills_list, cost) tuple.
     """
@@ -176,6 +288,18 @@ async def distill_content_pass2(
     # Format first pass stills for the prompt
     first_pass_summary = format_stills_for_review(first_pass_stills)
 
+    # Extract Source of Truth values (with defaults)
+    sot = source_of_truth or {}
+    core_narratives = sot.get("core_narratives", [])
+    primary_pain_point = sot.get("primary_pain_point", "")
+    the_promise = sot.get("the_promise", "")
+
+    # Format core_narratives as JSON string if it's a list
+    if isinstance(core_narratives, list):
+        core_narratives_str = json.dumps(core_narratives, indent=2)
+    else:
+        core_narratives_str = str(core_narratives) if core_narratives else "[]"
+
     # Build variables based on whether we have a persona
     if persona:
         variables = {
@@ -185,6 +309,10 @@ async def distill_content_pass2(
             "cleaned_transcript": cleaned_transcript,
             "first_pass_stills": first_pass_summary,
             "first_pass_count": len(first_pass_stills),
+            # Source of Truth context
+            "core_narratives": core_narratives_str,
+            "primary_pain_point": primary_pain_point,
+            "the_promise": the_promise,
         }
     else:
         variables = {
@@ -194,6 +322,10 @@ async def distill_content_pass2(
             "cleaned_transcript": cleaned_transcript,
             "first_pass_stills": first_pass_summary,
             "first_pass_count": len(first_pass_stills),
+            # Source of Truth context
+            "core_narratives": core_narratives_str,
+            "primary_pain_point": primary_pain_point,
+            "the_promise": the_promise,
         }
 
     prompt, config = await get_rendered_prompt("distillation_pass2", variables)
@@ -206,18 +338,33 @@ Return valid JSON with this structure:
 {
   "stills": [
     {
-      "type": "data|insight|story|problem|solution|quote",
+      "type": "data|insight|story|problem|solution|quote|framework|definition|question|proof_point",
       "content": "The actual content extracted (for quotes, use exact verbatim text)",
       "source_location": "timestamp or section reference",
       "relevance_to_persona": 1-5,
       "why_relevant": "Brief explanation",
       "tags": ["tag1", "tag2"],
       "topics": ["topic1", "topic2"],
-      "speaker": "Name of person who said this (for quotes only, null otherwise)"
+      "speaker": "Name of person who said this (for quotes only, null otherwise)",
+      "best_formats": ["linkedin", "email", "blog"],
+      "funnel_stage": "awareness|consideration|decision",
+      "expiration_date": "YYYY-MM-DD or null if evergreen"
     }
   ],
   "summary": "Brief summary of what additional content was found"
 }
+
+STILL TYPE GUIDELINES:
+- data: Statistics, metrics, research findings
+- insight: Observations, analysis, lessons learned
+- story: Anecdotes, case studies, examples
+- problem: Pain points, challenges, obstacles
+- solution: Answers, fixes, approaches
+- quote: Direct verbatim quotes from speakers
+- framework: Step-by-step processes, methodologies
+- definition: Key term explanations, concepts
+- question: Thought-provoking questions, prompts
+- proof_point: Credentials, testimonials, social proof
 
 Remember: ONLY include NEW stills not already in the first pass. Quality over quantity."""
 
@@ -244,6 +391,21 @@ Remember: ONLY include NEW stills not already in the first pass. Quality over qu
     still_data_list = result.get("stills", [])
     for still_data in still_data_list:
         relevance_key = target_persona_id if persona else "general"
+
+        # Parse expiration_date if provided
+        expiration_date = _parse_expiration_date(still_data.get("expiration_date"))
+
+        # Parse best_formats - ensure it's a list
+        best_formats = still_data.get("best_formats", [])
+        if not isinstance(best_formats, list):
+            best_formats = []
+
+        # Parse funnel_stage - validate against known values
+        funnel_stage = still_data.get("funnel_stage")
+        valid_funnel_stages = ["awareness", "consideration", "decision"]
+        if funnel_stage and funnel_stage not in valid_funnel_stages:
+            funnel_stage = None
+
         still = {
             "id": str(uuid.uuid4()),
             "job_id": job_id,
@@ -258,6 +420,10 @@ Remember: ONLY include NEW stills not already in the first pass. Quality over qu
             },
             "why_relevant": still_data.get("why_relevant"),
             "quote_attribution": still_data.get("speaker"),
+            # New lifecycle fields
+            "best_formats": best_formats,
+            "funnel_stage": funnel_stage,
+            "expiration_date": expiration_date,
         }
         stills.append(still)
 
@@ -310,15 +476,14 @@ def select_stills_for_content_type(
 
 
 def group_stills_by_type(stills: list[dict]) -> dict[str, list[dict]]:
-    """Group stills by their type for easier access in prompts."""
-    grouped = {
-        "data": [],
-        "insight": [],
-        "story": [],
-        "problem": [],
-        "solution": [],
-        "quote": [],
-    }
+    """Group stills by their type for easier access in prompts.
+
+    Includes all 10 still types:
+    - Original 6: data, insight, story, problem, solution, quote
+    - New 4: framework, definition, question, proof_point
+    """
+    # Initialize with all 10 still types
+    grouped = {still_type: [] for still_type in ALL_STILL_TYPES}
 
     for still in stills:
         still_type = still.get("still_type", "insight")

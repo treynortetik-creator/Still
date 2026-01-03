@@ -110,6 +110,39 @@ class TestDistillation:
         grouped = group_stills_by_type([])
         assert all(len(v) == 0 for v in grouped.values())
 
+    def test_group_stills_includes_new_types(self):
+        """Test grouping includes all 10 still types."""
+        stills = [
+            {"still_type": "framework", "content": "3-step process"},
+            {"still_type": "definition", "content": "Term means..."},
+            {"still_type": "question", "content": "What about X?"},
+            {"still_type": "proof_point", "content": "As featured in..."},
+        ]
+
+        grouped = group_stills_by_type(stills)
+
+        # Verify all 10 types exist in grouped result
+        expected_types = [
+            "data", "insight", "story", "problem", "solution", "quote",
+            "framework", "definition", "question", "proof_point"
+        ]
+        for still_type in expected_types:
+            assert still_type in grouped, f"Missing still type: {still_type}"
+
+        # Verify new types are properly grouped
+        assert "framework" in grouped
+        assert "definition" in grouped
+        assert "question" in grouped
+        assert "proof_point" in grouped
+        assert len(grouped["framework"]) == 1
+        assert len(grouped["definition"]) == 1
+        assert len(grouped["question"]) == 1
+        assert len(grouped["proof_point"]) == 1
+
+        # Verify empty types exist but have no entries
+        assert len(grouped["data"]) == 0
+        assert len(grouped["insight"]) == 0
+
 
 class TestCostCalculation:
     """Tests for cost calculation."""
@@ -180,3 +213,91 @@ class TestStillTypes:
         assert still.funnel_stage == FunnelStage.CONSIDERATION
         assert "linkedin" in still.best_formats
         assert still.usage_count == 0
+
+
+class TestLibraryManager:
+    """Tests for library manager validation."""
+
+    def test_validate_still_new_types(self):
+        """Test validation accepts all 10 still types."""
+        from app.services.library_manager import validate_still, VALID_STILL_TYPES
+
+        for still_type in VALID_STILL_TYPES:
+            still = {
+                "id": "test-001",
+                "job_id": "job-001",
+                "user_id": 1,
+                "still_type": still_type,
+                "content": f"Content for {still_type}",
+            }
+            validated = validate_still(still)
+            assert validated["still_type"] == still_type
+
+    def test_validate_still_invalid_type_defaults_to_insight(self):
+        """Test invalid still type defaults to insight."""
+        from app.services.library_manager import validate_still
+
+        still = {
+            "id": "test-001",
+            "still_type": "invalid_type",
+            "content": "Some content",
+        }
+        validated = validate_still(still)
+        assert validated["still_type"] == "insight"
+
+    def test_validate_still_lifecycle_fields(self):
+        """Test validation handles new lifecycle fields."""
+        from app.services.library_manager import validate_still
+
+        still = {
+            "id": "test-001",
+            "job_id": "job-001",
+            "user_id": 1,
+            "still_type": "framework",
+            "content": "3-step process",
+            "best_formats": ["linkedin", "email"],
+            "funnel_stage": "consideration",
+            "expiration_date": "2025-12-31",
+        }
+        validated = validate_still(still)
+
+        assert validated["still_type"] == "framework"
+        assert validated["best_formats"] == ["linkedin", "email"]
+        assert validated["funnel_stage"] == "consideration"
+        assert validated["expiration_date"] == "2025-12-31"
+
+    def test_validate_still_invalid_funnel_stage(self):
+        """Test invalid funnel stage is set to None."""
+        from app.services.library_manager import validate_still
+
+        still = {
+            "still_type": "data",
+            "content": "Some data",
+            "funnel_stage": "invalid_stage",
+        }
+        validated = validate_still(still)
+        assert validated["funnel_stage"] is None
+
+    def test_validate_still_invalid_expiration_date(self):
+        """Test invalid expiration date is set to None."""
+        from app.services.library_manager import validate_still
+
+        still = {
+            "still_type": "data",
+            "content": "Some data",
+            "expiration_date": "not-a-date",
+        }
+        validated = validate_still(still)
+        assert validated["expiration_date"] is None
+
+    def test_validate_still_best_formats_not_list(self):
+        """Test non-list best_formats is converted to empty list."""
+        from app.services.library_manager import validate_still
+
+        still = {
+            "still_type": "data",
+            "content": "Some data",
+            "best_formats": "linkedin",  # String instead of list
+        }
+        validated = validate_still(still)
+        assert validated["best_formats"] == []
