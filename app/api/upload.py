@@ -145,6 +145,10 @@ async def upload_content(
     # Parse generate_image_prompts boolean from string
     gen_img_prompts = generate_image_prompts.lower() in ("true", "1", "yes")
 
+    # Parse auto_approve_source boolean from form (default False)
+    # This will be passed via the form when we add frontend support
+    auto_approve_source = False  # Default for file uploads
+
     # Create job ID
     job_id = str(uuid.uuid4())
 
@@ -167,8 +171,8 @@ async def upload_content(
             INSERT INTO jobs (
                 id, user_id, status, original_filename, file_type, file_size,
                 target_persona, asset_types, asset_quantities, processing_mode,
-                campaign_name, magic_words, generate_image_prompts, current_step, progress
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                campaign_name, magic_words, generate_image_prompts, auto_approve_source, current_step, progress
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 job_id,
@@ -184,6 +188,7 @@ async def upload_content(
                 campaign_name,
                 magic_words,
                 gen_img_prompts,
+                auto_approve_source,
                 "Uploading file" if not is_quick_distill else "Uploading file for Quick Distill",
                 5,
             )
@@ -264,6 +269,10 @@ async def upload_text(
     # Parse generate_image_prompts boolean from string
     gen_img_prompts = generate_image_prompts.lower() in ("true", "1", "yes")
 
+    # Parse auto_approve_source boolean from form (default False)
+    # This will be passed via the form when we add frontend support
+    auto_approve_source = False  # Default for text uploads
+
     # Create job ID
     job_id = str(uuid.uuid4())
 
@@ -285,8 +294,8 @@ async def upload_text(
             INSERT INTO jobs (
                 id, user_id, status, original_filename, file_type, file_size,
                 target_persona, asset_types, asset_quantities, processing_mode,
-                campaign_name, magic_words, generate_image_prompts, current_step, progress, transcript
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                campaign_name, magic_words, generate_image_prompts, auto_approve_source, current_step, progress, transcript
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 job_id,
@@ -302,6 +311,7 @@ async def upload_text(
                 campaign_name,
                 magic_words,
                 gen_img_prompts,
+                auto_approve_source,
                 "Processing text content" if not is_quick_distill else "Processing text for Quick Distill",
                 10,
                 content,  # Text content is already the transcript
@@ -399,6 +409,9 @@ async def quick_distill(
                 target_persona = "general"  # Fallback
 
     # Create job in database with quick_distill processing mode
+    # Quick Distill auto-approves source by default since it's meant to be fast/automatic
+    auto_approve_source = True
+
     async with get_db() as db:
         await execute(
             db,
@@ -406,8 +419,8 @@ async def quick_distill(
             INSERT INTO jobs (
                 id, user_id, status, original_filename, file_type, file_size,
                 target_persona, asset_types, asset_quantities, processing_mode,
-                campaign_name, magic_words, current_step, progress
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                campaign_name, magic_words, auto_approve_source, current_step, progress
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 job_id,
@@ -422,6 +435,7 @@ async def quick_distill(
                 "quick_distill",  # Special processing mode
                 campaign_name,
                 magic_words,
+                auto_approve_source,
                 "Uploading file for Quick Distill",
                 5,
             )
