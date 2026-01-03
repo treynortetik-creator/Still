@@ -107,7 +107,11 @@ async def add_stills_to_library(
     return count
 
 
-async def save_stills_to_db(stills: list[dict], campaign_name: Optional[str] = None) -> int:
+async def save_stills_to_db(
+    stills: list[dict],
+    campaign_name: Optional[str] = None,
+    source_id: Optional[int] = None,
+) -> int:
     """
     Save stills to the stills table (job-specific tracking).
 
@@ -130,8 +134,8 @@ async def save_stills_to_db(stills: list[dict], campaign_name: Optional[str] = N
                 INSERT INTO stills (
                     id, job_id, user_id, still_type, content,
                     source_location, source_file, tags, persona_relevance,
-                    quote_attribution, topics, campaign_name
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    quote_attribution, topics, campaign_name, source_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     validated["id"],
@@ -146,6 +150,7 @@ async def save_stills_to_db(stills: list[dict], campaign_name: Optional[str] = N
                     validated["quote_attribution"],
                     json.dumps(validated["topics"]),
                     campaign_name or validated["campaign_name"],
+                    source_id,
                 )
             )
             count += 1

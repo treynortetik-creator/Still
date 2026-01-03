@@ -418,7 +418,7 @@ async def process_job(job_id: str):
             logger.warning(f"Job {job_id}: Summary step failed (non-fatal): {summary_err}")
 
         # Save stills to database and the Reserve
-        await save_stills_to_db(stills, campaign_name=campaign_name)
+        await save_stills_to_db(stills, campaign_name=campaign_name, source_id=source_id)
         await add_stills_to_library(stills, user_id, original_filename, campaign_name=campaign_name)
 
         # Check if this is a Quick Distill job - if so, complete now
