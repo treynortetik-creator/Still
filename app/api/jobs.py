@@ -380,3 +380,115 @@ async def get_usage_stats(request: Request, user_id: int = Depends(get_current_u
             "content_created": content_counts,
             "library_size": library_size,
         }
+
+
+@router.post("/jobs/{job_id}/approve-source")
+async def approve_job_source(
+    job_id: str,
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Approve Source of Truth and resume pipeline.
+
+    This endpoint is called when the user reviews and approves the
+    Source of Truth, allowing the pipeline to continue to distillation.
+    """
+    import asyncio
+    from app.services.source_of_truth import approve_source_of_truth
+    from app.services.pipeline import resume_pipeline_from_distillation
+
+    # Get job and verify ownership
+    async with get_db() as db:
+        job = await fetchone(
+            db,
+            "SELECT id, user_id, status, source_id FROM jobs WHERE id = ?",
+            (job_id,)
+        )
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    if job["status"] != "awaiting_approval":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Job is not awaiting approval (current status: {job['status']})"
+        )
+
+    if not job["source_id"]:
+        raise HTTPException(status_code=400, detail="No Source of Truth found for this job")
+
+    # Approve the source
+    await approve_source_of_truth(job["source_id"])
+
+    # Resume pipeline in background
+    asyncio.create_task(resume_pipeline_from_distillation(job_id))
+
+    return {
+        "status": "approved",
+        "message": "Source of Truth approved. Pipeline resuming.",
+        "job_id": job_id
+    }
+
+
+@router.get("/jobs/{job_id}/source")
+async def get_job_source(
+    job_id: str,
+    user_id: int = Depends(get_current_user_id),
+):
+    """Get the Source of Truth for a job."""
+    from app.services.source_of_truth import get_source_of_truth_by_job
+
+    # Verify job ownership
+    async with get_db() as db:
+        job = await fetchone(
+            db,
+            "SELECT user_id FROM jobs WHERE id = ?",
+            (job_id,)
+        )
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    source = await get_source_of_truth_by_job(job_id)
+
+    if not source:
+        raise HTTPException(status_code=404, detail="No Source of Truth found")
+
+    return source
+
+
+@router.put("/jobs/{job_id}/source")
+async def update_job_source(
+    job_id: str,
+    updates: dict,
+    user_id: int = Depends(get_current_user_id),
+):
+    """Update the Source of Truth for a job (before approval)."""
+    from app.services.source_of_truth import update_source_of_truth
+
+    # Verify job ownership
+    async with get_db() as db:
+        job = await fetchone(
+            db,
+            "SELECT user_id, source_id FROM jobs WHERE id = ?",
+            (job_id,)
+        )
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    if not job["source_id"]:
+        raise HTTPException(status_code=404, detail="No Source of Truth found")
+
+    await update_source_of_truth(job["source_id"], updates)
+
+    return {"status": "updated", "message": "Source of Truth updated"}
