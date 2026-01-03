@@ -284,10 +284,20 @@ async def _init_postgres_tables(conn: asyncpg.Connection):
             persona_relevance JSONB,
             quote_attribution TEXT,
             created_at TIMESTAMP DEFAULT NOW(),
-            times_used INTEGER DEFAULT 0,
-            last_used TIMESTAMP,
+            usage_count INTEGER DEFAULT 0,
+            last_used_at TIMESTAMP,
             campaign_name TEXT,
-            topics JSONB
+            topics JSONB,
+            status TEXT DEFAULT 'active',
+            best_formats TEXT[],
+            funnel_stage TEXT,
+            expiration_type TEXT,
+            expiration_date DATE,
+            performance TEXT DEFAULT 'untested',
+            CHECK (status IS NULL OR status IN ('active', 'evergreen', 'needs_review', 'retired')),
+            CHECK (funnel_stage IS NULL OR funnel_stage IN ('awareness', 'consideration', 'decision')),
+            CHECK (expiration_type IS NULL OR expiration_type IN ('date_bound', 'event_bound', 'evergreen')),
+            CHECK (performance IS NULL OR performance IN ('high', 'medium', 'low', 'untested'))
         )
     """)
 
@@ -689,6 +699,9 @@ async def _init_postgres_tables(conn: asyncpg.Connection):
         "CREATE INDEX IF NOT EXISTS idx_sources_approved ON sources(is_approved)",
         "CREATE INDEX IF NOT EXISTS idx_stills_source ON stills(source_id)",
         "CREATE INDEX IF NOT EXISTS idx_content_library_job ON content_library(job_id)",
+        "CREATE INDEX IF NOT EXISTS idx_stills_status ON stills(status)",
+        "CREATE INDEX IF NOT EXISTS idx_stills_funnel_stage ON stills(funnel_stage)",
+        "CREATE INDEX IF NOT EXISTS idx_stills_expiration ON stills(expiration_date)",
     ]
 
     for idx_sql in indexes:
@@ -794,11 +807,21 @@ async def _init_sqlite_db():
                 persona_relevance JSON,
                 quote_attribution TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                times_used INTEGER DEFAULT 0,
-                last_used TIMESTAMP,
+                usage_count INTEGER DEFAULT 0,
+                last_used_at TIMESTAMP,
                 campaign_name TEXT,
                 topics JSON,
                 source_id INTEGER REFERENCES sources(id),
+                status TEXT DEFAULT 'active',
+                best_formats JSON,
+                funnel_stage TEXT,
+                expiration_type TEXT,
+                expiration_date DATE,
+                performance TEXT DEFAULT 'untested',
+                CHECK (status IS NULL OR status IN ('active', 'evergreen', 'needs_review', 'retired')),
+                CHECK (funnel_stage IS NULL OR funnel_stage IN ('awareness', 'consideration', 'decision')),
+                CHECK (expiration_type IS NULL OR expiration_type IN ('date_bound', 'event_bound', 'evergreen')),
+                CHECK (performance IS NULL OR performance IN ('high', 'medium', 'low', 'untested')),
                 FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );
@@ -1183,6 +1206,9 @@ async def _init_sqlite_db():
             CREATE INDEX IF NOT EXISTS idx_autopilot_items_user_status ON autopilot_items(user_id, processing_status);
             CREATE INDEX IF NOT EXISTS idx_error_logs_type ON error_logs(user_id, error_type, created_at);
             CREATE INDEX IF NOT EXISTS idx_stills_campaign ON stills(campaign_name);
+            CREATE INDEX IF NOT EXISTS idx_stills_status ON stills(status);
+            CREATE INDEX IF NOT EXISTS idx_stills_funnel_stage ON stills(funnel_stage);
+            CREATE INDEX IF NOT EXISTS idx_stills_expiration ON stills(expiration_date);
             CREATE INDEX IF NOT EXISTS idx_outputs_campaign ON outputs(campaign_name);
             CREATE INDEX IF NOT EXISTS idx_content_library_campaign ON content_library(campaign_name);
             CREATE INDEX IF NOT EXISTS idx_global_settings_key ON global_settings(setting_key);
@@ -1210,6 +1236,39 @@ async def _init_sqlite_db():
 
         if 'source_id' not in columns:
             await db.execute("ALTER TABLE stills ADD COLUMN source_id INTEGER REFERENCES sources(id)")
+
+        # Lifecycle fields migration - add new columns if they don't exist
+        # Note: SQLite doesn't support RENAME COLUMN in older versions, so we add new columns
+        # and migrate data if old columns exist
+        if 'usage_count' not in columns and 'times_used' in columns:
+            await db.execute("ALTER TABLE stills ADD COLUMN usage_count INTEGER DEFAULT 0")
+            await db.execute("UPDATE stills SET usage_count = times_used")
+        elif 'usage_count' not in columns:
+            await db.execute("ALTER TABLE stills ADD COLUMN usage_count INTEGER DEFAULT 0")
+
+        if 'last_used_at' not in columns and 'last_used' in columns:
+            await db.execute("ALTER TABLE stills ADD COLUMN last_used_at TIMESTAMP")
+            await db.execute("UPDATE stills SET last_used_at = last_used")
+        elif 'last_used_at' not in columns:
+            await db.execute("ALTER TABLE stills ADD COLUMN last_used_at TIMESTAMP")
+
+        if 'status' not in columns:
+            await db.execute("ALTER TABLE stills ADD COLUMN status TEXT DEFAULT 'active'")
+
+        if 'best_formats' not in columns:
+            await db.execute("ALTER TABLE stills ADD COLUMN best_formats JSON")
+
+        if 'funnel_stage' not in columns:
+            await db.execute("ALTER TABLE stills ADD COLUMN funnel_stage TEXT")
+
+        if 'expiration_type' not in columns:
+            await db.execute("ALTER TABLE stills ADD COLUMN expiration_type TEXT")
+
+        if 'expiration_date' not in columns:
+            await db.execute("ALTER TABLE stills ADD COLUMN expiration_date DATE")
+
+        if 'performance' not in columns:
+            await db.execute("ALTER TABLE stills ADD COLUMN performance TEXT DEFAULT 'untested'")
 
         cursor = await db.execute("PRAGMA table_info(content_library)")
         columns = [row[1] for row in await cursor.fetchall()]
