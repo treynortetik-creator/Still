@@ -129,6 +129,47 @@
             animation: shimmer 1.5s infinite linear;
             border-radius: var(--radius-lg);
         }
+        /* Status badges */
+        .status-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: capitalize;
+        }
+        .status-badge.needs_review {
+            background: rgba(251, 191, 36, 0.2);
+            color: #FBBF24;
+            border: 1px solid rgba(251, 191, 36, 0.4);
+        }
+        .status-badge.retired {
+            background: rgba(100, 100, 100, 0.2);
+            color: #888;
+            text-decoration: line-through;
+        }
+        .status-badge.evergreen {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22C55E;
+        }
+        /* Funnel stage badge */
+        .funnel-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            background: rgba(255,255,255,0.08);
+            color: #999;
+            text-transform: capitalize;
+        }
+        /* Expiration warnings */
+        .expiration-warning {
+            color: #FBBF24;
+            font-size: 0.7rem;
+        }
+        .expiration-critical {
+            color: #F87171;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
     </style>
     <script>
         window.addEventListener('load', () => {
@@ -738,6 +779,20 @@
             'proof_point': { bg: 'rgba(34, 197, 94, 0.15)', text: '#22C55E' }
         };
 
+        function formatRelativeDate(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+            if (diffDays === 0) return 'today';
+            if (diffDays === 1) return 'yesterday';
+            if (diffDays < 7) return `${diffDays}d ago`;
+            if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+            if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
+            return `${Math.floor(diffDays / 365)}y ago`;
+        }
+
         function setTypeFilter(type) {
             // Update chip states
             document.querySelectorAll('.filter-chip').forEach(chip => {
@@ -873,6 +928,9 @@
                             <span class="badge text-xs font-semibold uppercase flex-shrink-0" style="background: ${colors.bg}; color: ${colors.text};">
                                 ${entry.entry_type}
                             </span>
+                            ${entry.status && entry.status !== 'active' ? `
+                                <span class="status-badge ${entry.status}">${entry.status.replace('_', ' ')}</span>
+                            ` : ''}
                             ${entry.source_file ? `
                                 <span class="text-xs text-still-disabled truncate max-w-[120px]" title="${escapeHtml(entry.source_file)}">
                                     ${escapeHtml(entry.source_file)}
@@ -881,6 +939,9 @@
                         </div>
                         <div class="flex items-center gap-3 flex-shrink-0">
                             ${maxRelevance > 0 ? renderRelevanceDots(maxRelevance) : ''}
+                            ${entry.funnel_stage ? `
+                                <span class="funnel-badge">${entry.funnel_stage}</span>
+                            ` : ''}
                             <input type="checkbox" ${isSelected ? 'checked' : ''}
                                    class="checkbox-premium" aria-label="Select this still"
                                    onclick="event.stopPropagation(); toggleSelect(${entry.id})">
@@ -910,8 +971,23 @@
                         </div>
                     ` : ''}
                     <div class="flex justify-between items-center text-xs text-still-disabled pt-3 border-t" style="border-color: var(--glass-border);">
-                        <span>Used ${entry.times_used || 0}x</span>
-                        ${relevanceInfo ? `<span class="text-still-muted">${relevanceInfo}</span>` : ''}
+                        <div class="flex items-center gap-3">
+                            <span>Used ${entry.usage_count || entry.times_used || 0}x</span>
+                            ${entry.last_used_at ? `<span class="text-still-muted">Last: ${formatRelativeDate(entry.last_used_at)}</span>` : ''}
+                        </div>
+                        ${entry.expiration_date ? (() => {
+                            const expDate = new Date(entry.expiration_date);
+                            const now = new Date();
+                            const daysUntil = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
+                            if (daysUntil <= 0) {
+                                return '<span class="expiration-critical">Expired</span>';
+                            } else if (daysUntil <= 7) {
+                                return `<span class="expiration-critical">Expires in ${daysUntil}d</span>`;
+                            } else if (daysUntil <= 30) {
+                                return `<span class="expiration-warning">Expires in ${daysUntil}d</span>`;
+                            }
+                            return '';
+                        })() : ''}
                     </div>
                 `;
 
