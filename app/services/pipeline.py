@@ -533,7 +533,7 @@ async def process_job(job_id: str):
         total_cost = 0
 
         factchecked_drafts, fc_cost = await batch_factcheck_content(
-            edited_drafts, cleaned_transcript, job_id, user_id
+            edited_drafts, cleaned_transcript, job_id, user_id, source_id=source_id
         )
         total_cost += fc_cost
 
@@ -989,7 +989,7 @@ async def resume_pipeline_from_distillation(job_id: str):
         total_cost = 0
 
         factchecked_drafts, fc_cost = await batch_factcheck_content(
-            edited_drafts, cleaned_transcript, job_id, user_id
+            edited_drafts, cleaned_transcript, job_id, user_id, source_id=source_id
         )
         total_cost += fc_cost
 

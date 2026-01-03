@@ -84,12 +84,26 @@ async def batch_factcheck_content(
     original_transcript: str,
     job_id: str = None,
     user_id: int = None,
+    source_id: int = None,
 ) -> Tuple[list[dict], float]:
     """
     Fact-check multiple edited drafts.
 
     Returns (factchecked_drafts, total_cost) tuple.
     """
+    # Get Source of Truth statistics if available
+    source_of_truth_section = ""
+    if source_id:
+        from app.services.source_of_truth import get_statistics_for_factcheck
+        stats = await get_statistics_for_factcheck(source_id)
+        if stats:
+            source_of_truth_section = "VERIFIED STATISTICS FROM SOURCE OF TRUTH:\n"
+            for stat in stats:
+                citation = stat.get('citation', 'N/A')
+                confidence = stat.get('confidence', 'N/A')
+                source_of_truth_section += f"- {stat.get('stat', '')} [Citation: {citation}] (Confidence: {confidence})\n"
+            source_of_truth_section += "\nCheck claims against these verified statistics FIRST before checking the source transcript.\n\n"
+
     factchecked_results = []
     total_cost = 0.0
 
@@ -100,8 +114,10 @@ async def batch_factcheck_content(
             factchecked_results.append(draft)
             continue
 
+        # Prepend Source of Truth statistics to transcript for fact-checking
+        augmented_transcript = source_of_truth_section + original_transcript
         result, cost = await factcheck_content(
-            content, original_transcript, job_id, user_id
+            content, augmented_transcript, job_id, user_id
         )
         total_cost += cost
 
