@@ -254,6 +254,13 @@ PROMPT_VARIABLES = {
             {"key": "style_dna", "description": "Patterns learned from swipe file"},
         ]
     },
+    "source_of_truth": {
+        "label": "Source of Truth",
+        "variables": [
+            {"key": "cleaned_transcript", "description": "Processed source content"},
+            {"key": "today_date", "description": "Current date (YYYY-MM-DD) for review date calculation"},
+        ]
+    },
     "content": {
         "label": "Content/Stills",
         "variables": [
@@ -266,6 +273,12 @@ PROMPT_VARIABLES = {
             {"key": "data_atoms", "description": "Data/stat stills only"},
             {"key": "story_atoms", "description": "Story/example stills only"},
             {"key": "quote_atoms", "description": "Quotes with attribution"},
+            {"key": "source_core_narratives", "description": "3 core themes from Source of Truth"},
+            {"key": "source_statistics", "description": "All verified statistics with citations"},
+            {"key": "source_quotable_moments", "description": "Best quotes with attribution"},
+            {"key": "source_pain_point", "description": "Primary pain point identified"},
+            {"key": "source_promise", "description": "The promise / CTA foundation"},
+            {"key": "source_funnel_stage", "description": "awareness/consideration/decision"},
         ]
     },
     "drafts": {
