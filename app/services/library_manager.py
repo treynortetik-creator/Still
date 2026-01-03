@@ -19,15 +19,27 @@ VALID_STILL_TYPES = [
 # Valid funnel stages
 VALID_FUNNEL_STAGES = ["awareness", "consideration", "decision"]
 
+# Valid status values
+VALID_STATUSES = ["active", "evergreen", "needs_review", "retired"]
+
+# Valid expiration types
+VALID_EXPIRATION_TYPES = ["date_bound", "event_bound", "evergreen"]
+
+# Valid performance values
+VALID_PERFORMANCE_VALUES = ["high", "medium", "low", "untested"]
+
 
 def validate_still(still: dict) -> dict:
     """
     Validate and sanitize a still before database insertion.
 
-    Validates all 10 still types and new lifecycle fields:
+    Validates all 10 still types and lifecycle fields:
     - best_formats: list of content format strings
     - funnel_stage: awareness/consideration/decision
     - expiration_date: YYYY-MM-DD string or None
+    - status: active/evergreen/needs_review/retired
+    - expiration_type: date_bound/event_bound/evergreen
+    - performance: high/medium/low/untested
 
     Returns sanitized still dict with proper types.
     """
@@ -62,6 +74,21 @@ def validate_still(still: dict) -> dict:
         else:
             expiration_date = None
 
+    # Validate status
+    status = still.get("status", "active")
+    if status not in VALID_STATUSES:
+        status = "active"
+
+    # Validate expiration_type
+    expiration_type = still.get("expiration_type")
+    if expiration_type and expiration_type not in VALID_EXPIRATION_TYPES:
+        expiration_type = None
+
+    # Validate performance
+    performance = still.get("performance", "untested")
+    if performance not in VALID_PERFORMANCE_VALUES:
+        performance = "untested"
+
     return {
         "id": str(still.get("id", "")) if still.get("id") else None,
         "job_id": str(still.get("job_id", "")) if still.get("job_id") else None,
@@ -75,10 +102,13 @@ def validate_still(still: dict) -> dict:
         "quote_attribution": str(still.get("quote_attribution", ""))[:200] if still.get("quote_attribution") else None,
         "topics": still.get("topics") if isinstance(still.get("topics"), list) else [],
         "campaign_name": str(still.get("campaign_name", ""))[:200] if still.get("campaign_name") else None,
-        # New lifecycle fields
+        # Lifecycle fields
         "best_formats": best_formats,
         "funnel_stage": funnel_stage,
         "expiration_date": expiration_date,
+        "status": status,
+        "expiration_type": expiration_type,
+        "performance": performance,
     }
 
 
@@ -182,14 +212,22 @@ async def save_stills_to_db(
                 logger.warning(f"Skipping still with missing required fields: {still.get('id')}")
                 continue
 
+            # Handle best_formats: PostgreSQL uses TEXT[], SQLite uses JSON
+            if settings.use_postgres:
+                best_formats_value = validated["best_formats"]  # Pass as list for PostgreSQL array
+            else:
+                best_formats_value = json.dumps(validated["best_formats"])  # JSON for SQLite
+
             await execute(
                 db,
                 """
                 INSERT INTO stills (
                     id, job_id, user_id, still_type, content,
                     source_location, source_file, tags, persona_relevance,
-                    quote_attribution, topics, campaign_name, source_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    quote_attribution, topics, campaign_name, source_id,
+                    best_formats, funnel_stage, expiration_date,
+                    status, expiration_type, performance
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     validated["id"],
@@ -205,6 +243,12 @@ async def save_stills_to_db(
                     json.dumps(validated["topics"]),
                     campaign_name or validated["campaign_name"],
                     source_id,
+                    best_formats_value,
+                    validated["funnel_stage"],
+                    validated["expiration_date"],
+                    validated["status"],
+                    validated["expiration_type"],
+                    validated["performance"],
                 )
             )
             count += 1
