@@ -15,6 +15,28 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
+def _row_to_source_dict(row) -> Dict:
+    """Convert database row to Source of Truth dict."""
+    return {
+        "id": row["id"],
+        "job_id": row["job_id"],
+        "user_id": row["user_id"],
+        "core_narratives": json.loads(row["core_narratives"]) if row["core_narratives"] else [],
+        "statistics": json.loads(row["statistics"]) if row["statistics"] else [],
+        "quotable_moments": json.loads(row["quotable_moments"]) if row["quotable_moments"] else [],
+        "primary_pain_point": row["primary_pain_point"],
+        "the_promise": row["the_promise"],
+        "objections_qa": json.loads(row["objections_qa"]) if row["objections_qa"] else [],
+        "key_visuals": json.loads(row["key_visuals"]) if row["key_visuals"] else [],
+        "funnel_stage": row["funnel_stage"],
+        "review_date": row["review_date"],
+        "is_approved": row["is_approved"],
+        "approved_at": row["approved_at"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
 async def generate_source_of_truth(
     cleaned_transcript: str,
     job_id: str,
@@ -53,7 +75,12 @@ async def generate_source_of_truth(
     )
 
     # Parse response
-    result = parse_llm_json(response_text, context="source of truth")
+    try:
+        result = parse_llm_json(response_text, context="source of truth")
+    except ValueError as e:
+        logger.error(f"Failed to parse Source of Truth JSON: {e}")
+        # Return minimal valid structure
+        result = {}
 
     # Ensure required fields have defaults
     if not result.get("core_narratives"):
@@ -180,83 +207,21 @@ async def approve_source_of_truth(source_id: int) -> None:
 
 
 async def get_source_of_truth(source_id: int) -> Optional[Dict]:
-    """
-    Get Source of Truth by ID.
-
-    Args:
-        source_id: The source ID
-
-    Returns:
-        Source of Truth data dict or None
-    """
+    """Get Source of Truth by ID."""
     async with get_db() as db:
-        row = await fetchone(
-            db,
-            "SELECT * FROM sources WHERE id = ?",
-            (source_id,)
-        )
-
+        row = await fetchone(db, "SELECT * FROM sources WHERE id = ?", (source_id,))
         if not row:
             return None
-
-        return {
-            "id": row["id"],
-            "job_id": row["job_id"],
-            "user_id": row["user_id"],
-            "core_narratives": json.loads(row["core_narratives"]) if row["core_narratives"] else [],
-            "statistics": json.loads(row["statistics"]) if row["statistics"] else [],
-            "quotable_moments": json.loads(row["quotable_moments"]) if row["quotable_moments"] else [],
-            "primary_pain_point": row["primary_pain_point"],
-            "the_promise": row["the_promise"],
-            "objections_qa": json.loads(row["objections_qa"]) if row["objections_qa"] else [],
-            "key_visuals": json.loads(row["key_visuals"]) if row["key_visuals"] else [],
-            "funnel_stage": row["funnel_stage"],
-            "review_date": row["review_date"],
-            "is_approved": row["is_approved"],
-            "approved_at": row["approved_at"],
-            "created_at": row["created_at"],
-            "updated_at": row["updated_at"],
-        }
+        return _row_to_source_dict(row)
 
 
 async def get_source_of_truth_by_job(job_id: str) -> Optional[Dict]:
-    """
-    Get Source of Truth by job ID.
-
-    Args:
-        job_id: The job ID
-
-    Returns:
-        Source of Truth data dict or None
-    """
+    """Get Source of Truth by job ID."""
     async with get_db() as db:
-        row = await fetchone(
-            db,
-            "SELECT * FROM sources WHERE job_id = ?",
-            (job_id,)
-        )
-
+        row = await fetchone(db, "SELECT * FROM sources WHERE job_id = ?", (job_id,))
         if not row:
             return None
-
-        return {
-            "id": row["id"],
-            "job_id": row["job_id"],
-            "user_id": row["user_id"],
-            "core_narratives": json.loads(row["core_narratives"]) if row["core_narratives"] else [],
-            "statistics": json.loads(row["statistics"]) if row["statistics"] else [],
-            "quotable_moments": json.loads(row["quotable_moments"]) if row["quotable_moments"] else [],
-            "primary_pain_point": row["primary_pain_point"],
-            "the_promise": row["the_promise"],
-            "objections_qa": json.loads(row["objections_qa"]) if row["objections_qa"] else [],
-            "key_visuals": json.loads(row["key_visuals"]) if row["key_visuals"] else [],
-            "funnel_stage": row["funnel_stage"],
-            "review_date": row["review_date"],
-            "is_approved": row["is_approved"],
-            "approved_at": row["approved_at"],
-            "created_at": row["created_at"],
-            "updated_at": row["updated_at"],
-        }
+        return _row_to_source_dict(row)
 
 
 async def update_source_of_truth(
