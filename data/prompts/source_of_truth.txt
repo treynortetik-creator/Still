@@ -1,0 +1,96 @@
+You are a content strategist creating a Source of Truth document that will anchor all derivative content from this source material.
+
+SOURCE CONTENT:
+{cleaned_transcript}
+
+TASK: Analyze this content comprehensively and extract a structured Source of Truth.
+
+## EXTRACTION REQUIREMENTS:
+
+### 1. CORE NARRATIVES (exactly 3)
+Identify the 3 central themes that anchor all messaging. Each narrative should:
+- Be expressible in one sentence
+- Represent a distinct angle/theme from the content
+- Be supported by evidence from the source
+
+Format:
+{{"narrative": "One-sentence theme", "supporting_evidence": "Key points that support this"}}
+
+### 2. STATISTICS (extract ALL - be exhaustive)
+Extract EVERY statistic, metric, percentage, or numerical claim. For each:
+- Capture the exact figure and context
+- Note the citation/source location
+- Estimate expiration date (when this data might become stale)
+- Rate confidence: "verified" (explicitly stated), "calculated" (derived), "implied" (suggested but not stated)
+
+Format:
+{{"stat": "40% of facilities report X", "citation": "Source @ 14:32", "expiration_date": "2026-06-01", "confidence": "verified"}}
+
+### 3. QUOTABLE MOMENTS (3-5 best)
+Extract the most memorable, shareable statements. Prioritize:
+- Surprising or counterintuitive insights
+- Emotionally resonant statements
+- Actionable wisdom
+- Include speaker attribution when known
+
+Format:
+{{"quote": "Exact quote here", "speaker": "Name or role", "context": "What prompted this", "timestamp": "Location in source"}}
+
+### 4. PRIMARY PAIN POINT
+Identify the SINGLE most pressing problem this content addresses. This should be:
+- The core frustration the audience faces
+- Specific enough to be actionable
+- Validated by evidence in the source
+
+### 5. THE PROMISE
+What becomes possible when this pain point is solved? This is the CTA foundation:
+- The transformation the audience can achieve
+- The positive outcome they're working toward
+- Should connect emotionally
+
+### 6. OBJECTIONS & Q&A
+If the source addresses objections, concerns, or Q&A:
+- Capture each objection and its response
+- These become FAQ content and sales enablement
+
+Format:
+{{"objection": "But what about X?", "response": "The answer is Y because..."}}
+
+### 7. KEY VISUALS
+Describe any frameworks, diagrams, charts, or visual concepts mentioned:
+- What does it show?
+- How is it structured?
+- This guides image prompt generation later
+
+Format:
+{{"description": "3-step framework showing X→Y→Z", "type": "framework|chart|diagram|process"}}
+
+### 8. FUNNEL STAGE
+Classify where this content fits:
+- "awareness": Introduces a problem or concept
+- "consideration": Compares solutions or approaches
+- "decision": Drives action, addresses final objections
+
+### 9. REVIEW DATE
+Suggest when this Source of Truth should be reviewed for staleness.
+Default: 6 months from today ({today_date}).
+Earlier if content contains time-sensitive data.
+
+OUTPUT FORMAT (valid JSON):
+{{
+  "core_narratives": [...],
+  "statistics": [...],
+  "quotable_moments": [...],
+  "primary_pain_point": "string",
+  "the_promise": "string",
+  "objections_qa": [...],
+  "key_visuals": [...],
+  "funnel_stage": "awareness|consideration|decision",
+  "review_date": "YYYY-MM-DD"
+}}
+
+IMPORTANT:
+- Be EXHAUSTIVE with statistics - capture every number mentioned
+- Quotes must be verbatim, not paraphrased
+- If something isn't present in the source, use empty array [] or null
+- The Promise should inspire action, not just describe benefits
