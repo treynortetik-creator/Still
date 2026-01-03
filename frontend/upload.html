@@ -424,6 +424,23 @@
                             <div class="toggle-knob"></div>
                         </div>
                     </label>
+
+                    <!-- Auto-Approve Source of Truth Toggle -->
+                    <label class="flex items-center justify-between cursor-pointer p-4 rounded-xl mt-3" style="background: var(--surface-elevated);">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-5 h-5 text-still-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <span class="font-medium text-still-text">Auto-Approve Source of Truth</span>
+                            </div>
+                            <p class="text-sm text-still-muted mt-1 ml-7">Skip review step and proceed directly to content generation</p>
+                        </div>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="auto-approve-source" aria-label="Auto-approve Source of Truth">
+                            <div class="toggle-knob"></div>
+                        </div>
+                    </label>
                 </div>
 
                 <!-- Processing Time Estimate -->
@@ -738,6 +755,7 @@
                 const magicWords = document.getElementById('magic-words').value.trim();
                 const campaignName = document.getElementById('campaign-name').value.trim();
                 const generateImagePrompts = document.getElementById('generate-image-prompts')?.checked || false;
+                const autoApproveSource = document.getElementById('auto-approve-source')?.checked || false;
 
                 if (uploadMode === 'file') {
                     const formData = new FormData();
@@ -747,6 +765,7 @@
                     formData.append('processing_mode', processingMode);
                     formData.append('campaign_name', campaignName);
                     formData.append('generate_image_prompts', generateImagePrompts);
+                    formData.append('auto_approve_source', autoApproveSource);
                     if (magicWords) {
                         formData.append('magic_words', magicWords);
                     }
@@ -785,6 +804,7 @@
                     formData.append('campaign_name', campaignName);
                     formData.append('content_name', document.getElementById('content-name').value || 'pasted_content.txt');
                     formData.append('generate_image_prompts', generateImagePrompts);
+                    formData.append('auto_approve_source', autoApproveSource);
                     if (magicWords) {
                         formData.append('magic_words', magicWords);
                     }
