@@ -274,6 +274,22 @@
                     <span class="w-2 h-2 rounded-full" style="background: #FBBF24;"></span>
                     Quote
                 </button>
+                <button class="filter-chip" data-type="framework" onclick="setTypeFilter('framework')">
+                    <span class="w-2 h-2 rounded-full" style="background: #2DD4BF;"></span>
+                    Framework
+                </button>
+                <button class="filter-chip" data-type="definition" onclick="setTypeFilter('definition')">
+                    <span class="w-2 h-2 rounded-full" style="background: #94A3B8;"></span>
+                    Definition
+                </button>
+                <button class="filter-chip" data-type="question" onclick="setTypeFilter('question')">
+                    <span class="w-2 h-2 rounded-full" style="background: #F472B6;"></span>
+                    Question
+                </button>
+                <button class="filter-chip" data-type="proof_point" onclick="setTypeFilter('proof_point')">
+                    <span class="w-2 h-2 rounded-full" style="background: #22C55E;"></span>
+                    Proof Point
+                </button>
             </div>
 
             <div class="flex flex-wrap gap-4">
@@ -318,6 +334,41 @@
                     <label for="filter-topic" class="form-label">Topic</label>
                     <select id="filter-topic" class="input-premium select-premium">
                         <option value="">All Topics</option>
+                    </select>
+                </div>
+
+                <!-- Status Filter -->
+                <div class="flex-1 min-w-[150px]">
+                    <label for="filter-status" class="form-label">Status</label>
+                    <select id="filter-status" class="input-premium select-premium">
+                        <option value="">All Statuses</option>
+                        <option value="active">Active</option>
+                        <option value="evergreen">Evergreen</option>
+                        <option value="needs_review">Needs Review</option>
+                        <option value="retired">Retired</option>
+                    </select>
+                </div>
+
+                <!-- Funnel Stage Filter -->
+                <div class="flex-1 min-w-[150px]">
+                    <label for="filter-funnel" class="form-label">Funnel Stage</label>
+                    <select id="filter-funnel" class="input-premium select-premium">
+                        <option value="">All Stages</option>
+                        <option value="awareness">Awareness</option>
+                        <option value="consideration">Consideration</option>
+                        <option value="decision">Decision</option>
+                    </select>
+                </div>
+
+                <!-- Sort By -->
+                <div class="w-40">
+                    <label for="sort-by" class="form-label">Sort By</label>
+                    <select id="sort-by" class="input-premium select-premium">
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="most_used">Most Used</option>
+                        <option value="never_used">Never Used</option>
+                        <option value="expiring_soon">Expiring Soon</option>
                     </select>
                 </div>
 
@@ -782,7 +833,10 @@
                     document.getElementById('filter-search').value ||
                     document.getElementById('filter-campaign').value ||
                     document.getElementById('filter-topic').value ||
-                    document.getElementById('filter-relevance').value !== '1';
+                    document.getElementById('filter-status').value ||
+                    document.getElementById('filter-funnel').value ||
+                    document.getElementById('filter-relevance').value !== '1' ||
+                    document.getElementById('sort-by').value !== 'newest';
 
                 if (hasFilters) {
                     noResults.classList.remove('hidden');
@@ -1098,7 +1152,10 @@
                 document.getElementById('filter-campaign').value ||
                 document.getElementById('filter-source').value ||
                 document.getElementById('filter-topic').value ||
-                document.getElementById('filter-relevance').value !== '1';
+                document.getElementById('filter-status').value ||
+                document.getElementById('filter-funnel').value ||
+                document.getElementById('filter-relevance').value !== '1' ||
+                document.getElementById('sort-by').value !== 'newest';
 
             if (hasFilters) {
                 countEl.textContent = `Showing ${filtered} of ${total} stills`;
@@ -1119,6 +1176,9 @@
             document.getElementById('filter-campaign').value = '';
             document.getElementById('filter-source').value = '';
             document.getElementById('filter-topic').value = '';
+            document.getElementById('filter-status').value = '';
+            document.getElementById('filter-funnel').value = '';
+            document.getElementById('sort-by').value = 'newest';
             currentPage = 0;
             loadLibrary();
         }
@@ -1131,6 +1191,9 @@
             const campaign = document.getElementById('filter-campaign').value;
             const source = document.getElementById('filter-source').value;
             const topic = document.getElementById('filter-topic').value;
+            const status = document.getElementById('filter-status').value;
+            const funnel = document.getElementById('filter-funnel').value;
+            const sortBy = document.getElementById('sort-by').value;
 
             const params = new URLSearchParams();
             if (type) params.set('entry_type', type);
@@ -1139,6 +1202,9 @@
             if (search) params.set('search', search);
             if (campaign) params.set('campaign', campaign);
             if (topic) params.set('topic', topic);
+            if (status) params.set('status', status);
+            if (funnel) params.set('funnel_stage', funnel);
+            if (sortBy) params.set('sort_by', sortBy);
             // Use source dropdown filter, or URL job_id filter (for Quick Distill redirect)
             if (source) params.set('job_id', source);
             else if (jobIdFilter) params.set('job_id', jobIdFilter);
@@ -1256,6 +1322,21 @@
         });
 
         document.getElementById('filter-topic').addEventListener('change', () => {
+            currentPage = 0;
+            loadLibrary();
+        });
+
+        document.getElementById('filter-status').addEventListener('change', () => {
+            currentPage = 0;
+            loadLibrary();
+        });
+
+        document.getElementById('filter-funnel').addEventListener('change', () => {
+            currentPage = 0;
+            loadLibrary();
+        });
+
+        document.getElementById('sort-by').addEventListener('change', () => {
             currentPage = 0;
             loadLibrary();
         });
