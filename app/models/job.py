@@ -39,6 +39,10 @@ class JobCreate(BaseModel):
         default=None,
         description="Optional name for this campaign"
     )
+    auto_approve_source: bool = Field(
+        default=False,
+        description="Skip Source of Truth review and auto-proceed to distillation"
+    )
 
 
 class Job(BaseModel):
