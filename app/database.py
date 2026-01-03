@@ -787,6 +787,27 @@ async def _init_sqlite_db():
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS sources (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_id TEXT NOT NULL UNIQUE,
+                user_id INTEGER NOT NULL,
+                core_narratives JSON NOT NULL,
+                statistics JSON NOT NULL,
+                quotable_moments JSON NOT NULL,
+                primary_pain_point TEXT NOT NULL,
+                the_promise TEXT NOT NULL,
+                objections_qa JSON,
+                key_visuals JSON,
+                funnel_stage TEXT NOT NULL CHECK(funnel_stage IN ('awareness', 'consideration', 'decision')),
+                review_date DATE NOT NULL,
+                is_approved BOOLEAN DEFAULT 0,
+                approved_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+
             CREATE TABLE IF NOT EXISTS outputs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 job_id TEXT NOT NULL,
@@ -1147,7 +1168,29 @@ async def _init_sqlite_db():
             CREATE INDEX IF NOT EXISTS idx_outputs_campaign ON outputs(campaign_name);
             CREATE INDEX IF NOT EXISTS idx_content_library_campaign ON content_library(campaign_name);
             CREATE INDEX IF NOT EXISTS idx_global_settings_key ON global_settings(setting_key);
+            CREATE INDEX IF NOT EXISTS idx_sources_job ON sources(job_id);
+            CREATE INDEX IF NOT EXISTS idx_sources_user ON sources(user_id);
+            CREATE INDEX IF NOT EXISTS idx_sources_approved ON sources(is_approved);
+            CREATE INDEX IF NOT EXISTS idx_stills_source ON stills(source_id);
         """)
+
+        await db.commit()
+
+        # Migrate existing tables - add new columns if they don't exist
+        cursor = await db.execute("PRAGMA table_info(jobs)")
+        columns = [row[1] for row in await cursor.fetchall()]
+
+        if 'source_id' not in columns:
+            await db.execute("ALTER TABLE jobs ADD COLUMN source_id INTEGER REFERENCES sources(id)")
+
+        if 'auto_approve_source' not in columns:
+            await db.execute("ALTER TABLE jobs ADD COLUMN auto_approve_source INTEGER DEFAULT 0")
+
+        cursor = await db.execute("PRAGMA table_info(stills)")
+        columns = [row[1] for row in await cursor.fetchall()]
+
+        if 'source_id' not in columns:
+            await db.execute("ALTER TABLE stills ADD COLUMN source_id INTEGER REFERENCES sources(id)")
 
         await db.commit()
 
