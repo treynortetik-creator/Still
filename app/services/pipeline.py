@@ -20,6 +20,11 @@ from app.services.drafting import draft_linkedin_posts, draft_blog_post, draft_e
 from app.services.hook_generator import batch_generate_hooks
 from app.services.editing import batch_edit_content
 from app.services.factcheck import batch_factcheck_content
+from app.services.source_of_truth import (
+    generate_source_of_truth,
+    save_source_of_truth,
+    approve_source_of_truth,
+)
 from app.services.library_manager import (
     add_stills_to_library,
     save_stills_to_db,
@@ -325,6 +330,38 @@ async def process_job(job_id: str):
                     )
                     if not settings.use_postgres:
                         await db.commit()
+
+        # ======== STEP 0c: SOURCE OF TRUTH GENERATION ========
+        await update_job_status(
+            job_id, JobStatus.ANALYZING,
+            "Step 0c: Generating Source of Truth", 22, total_cost
+        )
+        total_cost = 0
+
+        source_data, sot_cost = await generate_source_of_truth(
+            cleaned_transcript, job_id, user_id
+        )
+        total_cost += sot_cost
+        logger.info(f"Job {job_id}: Generated Source of Truth with {len(source_data.get('statistics', []))} statistics")
+
+        # Save Source of Truth to database
+        source_id = await save_source_of_truth(job_id, user_id, source_data)
+
+        # Check if auto-approve is enabled
+        auto_approve = job_data.get("auto_approve_source", False)
+
+        if auto_approve:
+            # Mark as approved and continue immediately
+            await approve_source_of_truth(source_id)
+            logger.info(f"Job {job_id}: Auto-approved Source of Truth")
+        else:
+            # Pause for user review
+            await update_job_status(
+                job_id, JobStatus.AWAITING_APPROVAL,
+                "Awaiting Source of Truth approval", 24, total_cost
+            )
+            logger.info(f"Job {job_id}: Paused for Source of Truth approval")
+            return  # Exit pipeline - user must approve via API to continue
 
         # ======== STEP 1: DISTILLATION (Pass 1) + SUMMARIZATION (parallel) ========
         await update_job_status(
