@@ -824,11 +824,11 @@ async def resume_pipeline_from_distillation(job_id: str):
         if not cleaned_transcript:
             raise ValueError("No cleaned transcript found - cannot resume pipeline")
 
-        # Get source_id from sources_of_truth table
+        # Get source_id from sources table
         async with get_db() as db:
             source_row = await fetchone(
                 db,
-                "SELECT id FROM sources_of_truth WHERE job_id = ?",
+                "SELECT id FROM sources WHERE job_id = ?",
                 (job_id,)
             )
             source_id = source_row["id"] if source_row else None
