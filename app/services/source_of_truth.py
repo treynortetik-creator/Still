@@ -1,7 +1,7 @@
 """Source of Truth generation service."""
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Tuple, Optional, Dict
 
 from app.config import get_settings
@@ -122,6 +122,10 @@ async def save_source_of_truth(
     async with get_db() as db:
         # Insert source record
         if settings.use_postgres:
+            # Convert review_date string to date object for PostgreSQL
+            review_date_str = source_data.get("review_date")
+            review_date = date.fromisoformat(review_date_str) if review_date_str else date.today() + timedelta(days=180)
+
             row = await db.fetchrow(
                 """
                 INSERT INTO sources (
@@ -141,7 +145,7 @@ async def save_source_of_truth(
                 json.dumps(source_data.get("objections_qa", [])),
                 json.dumps(source_data.get("key_visuals", [])),
                 source_data.get("funnel_stage", "awareness"),
-                source_data.get("review_date"),
+                review_date,
             )
             source_id = row["id"]
         else:

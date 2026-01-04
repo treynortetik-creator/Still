@@ -127,7 +127,7 @@ async def bulk_extend_review(
     if not request.source_ids:
         raise HTTPException(status_code=400, detail="No source IDs provided")
 
-    new_date = (datetime.now() + timedelta(days=request.days)).date().isoformat()
+    new_date = (datetime.now() + timedelta(days=request.days)).date()
 
     async with get_db() as db:
         placeholders = ",".join(["?" for _ in request.source_ids])
@@ -142,7 +142,7 @@ async def bulk_extend_review(
         if not get_settings().use_postgres:
             await db.commit()
 
-    return {"success": True, "extended_count": len(request.source_ids), "new_date": new_date}
+    return {"success": True, "extended_count": len(request.source_ids), "new_date": new_date.isoformat()}
 
 
 @router.get("/refresh/export-stale")

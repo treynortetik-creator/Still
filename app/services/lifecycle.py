@@ -32,7 +32,7 @@ async def check_expiring_stills(days_threshold: int = 30) -> int:
                       AND expiration_date IS NOT NULL
                       AND expiration_date <= $1
                     RETURNING id
-                """, threshold_date.isoformat())
+                """, threshold_date)
                 return len(cursor)
             else:
                 # SQLite: run UPDATE then count affected rows
