@@ -175,7 +175,7 @@
     </div>
 
     <!-- Source of Truth Modal -->
-    <div id="sot-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+    <div id="sot-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="sot-modal-title">
         <div class="bg-still-card rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] flex flex-col border border-still-border">
             <!-- Modal Header -->
             <div class="p-4 border-b border-still-border flex justify-between items-center">
@@ -210,9 +210,9 @@
                             <table class="w-full text-sm">
                                 <thead>
                                     <tr class="border-b border-still-border">
-                                        <th class="text-left px-2 py-1 text-still-muted">Stat</th>
-                                        <th class="text-left px-2 py-1 text-still-muted">Citation</th>
-                                        <th class="text-left px-2 py-1 text-still-muted">Confidence</th>
+                                        <th scope="col" class="text-left px-2 py-1 text-still-muted">Stat</th>
+                                        <th scope="col" class="text-left px-2 py-1 text-still-muted">Citation</th>
+                                        <th scope="col" class="text-left px-2 py-1 text-still-muted">Confidence</th>
                                     </tr>
                                 </thead>
                                 <tbody id="sot-modal-statistics"></tbody>
@@ -246,17 +246,17 @@
                 </div>
 
                 <!-- Edit Form (hidden by default) -->
-                <div id="sot-edit-form" class="hidden space-y-4">
+                <div id="sot-edit-form" class="hidden space-y-4" aria-hidden="true">
                     <div>
-                        <label class="block text-sm font-medium text-still-text mb-1">Primary Pain Point</label>
+                        <label for="edit-pain-point" class="block text-sm font-medium text-still-text mb-1">Primary Pain Point</label>
                         <textarea id="edit-pain-point" rows="2" class="w-full input-premium"></textarea>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-still-text mb-1">The Promise</label>
+                        <label for="edit-promise" class="block text-sm font-medium text-still-text mb-1">The Promise</label>
                         <textarea id="edit-promise" rows="2" class="w-full input-premium"></textarea>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-still-text mb-1">Funnel Stage</label>
+                        <label for="edit-funnel" class="block text-sm font-medium text-still-text mb-1">Funnel Stage</label>
                         <select id="edit-funnel" class="input-premium select-premium">
                             <option value="awareness">Awareness</option>
                             <option value="consideration">Consideration</option>
