@@ -144,6 +144,92 @@
             </div>
         </div>
 
+        <!-- Split View Container (shown after approval during processing) -->
+        <div id="split-view-wrapper" class="hidden mb-6">
+            <div class="split-view-container">
+                <!-- Left: Source of Truth (read-only) -->
+                <div class="split-view-left">
+                    <div class="bg-still-card rounded-lg shadow-md p-6 border border-still-border">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-xl font-bold text-still-text flex items-center gap-2">
+                                <svg class="w-5 h-5 text-still-copper" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                Source of Truth
+                            </h2>
+                            <span class="text-sm px-2 py-1 rounded bg-still-green/20 text-still-green">Approved</span>
+                        </div>
+                        <div id="split-sot-content" class="space-y-4 text-sm">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Processing Status -->
+                <div class="split-view-right">
+                    <div class="bg-still-card rounded-lg shadow-md p-6 border border-still-border">
+                        <h2 class="text-xl font-bold text-still-text mb-4">Processing Content</h2>
+
+                        <!-- Progress Bar -->
+                        <div class="mb-6">
+                            <div class="flex justify-between text-sm mb-2">
+                                <span id="split-current-step" class="text-still-muted">Initializing...</span>
+                                <span id="split-progress-percent" class="text-still-copper font-semibold">0%</span>
+                            </div>
+                            <div class="w-full bg-still-border rounded-full h-2">
+                                <div id="split-progress-bar" class="copper-gradient h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Processing Steps -->
+                        <div id="split-steps" class="space-y-2">
+                            <div class="status-step" data-step="distilling">
+                                <div class="status-step-icon status-step-pending">
+                                    <span class="text-xs">1</span>
+                                </div>
+                                <span class="text-still-muted">Distilling content stills</span>
+                            </div>
+                            <div class="status-step" data-step="drafting">
+                                <div class="status-step-icon status-step-pending">
+                                    <span class="text-xs">2</span>
+                                </div>
+                                <span class="text-still-muted">Drafting content</span>
+                            </div>
+                            <div class="status-step" data-step="editing">
+                                <div class="status-step-icon status-step-pending">
+                                    <span class="text-xs">3</span>
+                                </div>
+                                <span class="text-still-muted">Editing for audience</span>
+                            </div>
+                            <div class="status-step" data-step="factchecking">
+                                <div class="status-step-icon status-step-pending">
+                                    <span class="text-xs">4</span>
+                                </div>
+                                <span class="text-still-muted">Fact-checking</span>
+                            </div>
+                        </div>
+
+                        <!-- Completion Message (hidden until complete) -->
+                        <div id="split-complete" class="hidden mt-6 p-4 bg-still-green/10 rounded-lg border border-still-green/30">
+                            <p class="text-still-green font-semibold mb-2">Processing Complete!</p>
+                            <button onclick="window.location.reload()" class="btn btn-primary text-white px-4 py-2 rounded-lg">
+                                View Results
+                            </button>
+                        </div>
+
+                        <!-- Error Message (hidden unless error) -->
+                        <div id="split-error" class="hidden mt-6 p-4 bg-still-error/10 rounded-lg border border-still-error/30">
+                            <p class="text-still-error font-semibold mb-2">Processing Failed</p>
+                            <p id="split-error-message" class="text-still-muted text-sm mb-3"></p>
+                            <button onclick="window.location.reload()" class="px-4 py-2 border border-still-border rounded-lg text-still-text hover:bg-still-border">
+                                Refresh Page
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Source of Truth Section -->
         <section id="source-of-truth-section" class="bg-still-card rounded-lg shadow-md p-6 mb-6 hidden border border-still-border">
             <div class="flex items-center justify-between cursor-pointer" onclick="toggleSourceOfTruth()">
