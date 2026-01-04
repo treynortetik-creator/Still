@@ -177,31 +177,31 @@
                                 <span id="split-progress-percent" class="text-still-copper font-semibold">0%</span>
                             </div>
                             <div class="w-full bg-still-border rounded-full h-2">
-                                <div id="split-progress-bar" class="copper-gradient h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                                <div id="split-progress-bar" class="copper-gradient h-2 rounded-full transition-all duration-500" style="width: 0%" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Processing progress"></div>
                             </div>
                         </div>
 
                         <!-- Processing Steps -->
-                        <div id="split-steps" class="space-y-2">
-                            <div class="status-step" data-step="distilling">
+                        <div id="split-steps" class="space-y-2" role="list" aria-label="Processing steps">
+                            <div class="status-step" data-step="distilling" role="listitem">
                                 <div class="status-step-icon status-step-pending">
                                     <span class="text-xs">1</span>
                                 </div>
                                 <span class="text-still-muted">Distilling content stills</span>
                             </div>
-                            <div class="status-step" data-step="drafting">
+                            <div class="status-step" data-step="drafting" role="listitem">
                                 <div class="status-step-icon status-step-pending">
                                     <span class="text-xs">2</span>
                                 </div>
                                 <span class="text-still-muted">Drafting content</span>
                             </div>
-                            <div class="status-step" data-step="editing">
+                            <div class="status-step" data-step="editing" role="listitem">
                                 <div class="status-step-icon status-step-pending">
                                     <span class="text-xs">3</span>
                                 </div>
                                 <span class="text-still-muted">Editing for audience</span>
                             </div>
-                            <div class="status-step" data-step="factchecking">
+                            <div class="status-step" data-step="factchecking" role="listitem">
                                 <div class="status-step-icon status-step-pending">
                                     <span class="text-xs">4</span>
                                 </div>
@@ -212,7 +212,7 @@
                         <!-- Completion Message (hidden until complete) -->
                         <div id="split-complete" class="hidden mt-6 p-4 bg-still-green/10 rounded-lg border border-still-green/30">
                             <p class="text-still-green font-semibold mb-2">Processing Complete!</p>
-                            <button onclick="window.location.reload()" class="btn btn-primary text-white px-4 py-2 rounded-lg">
+                            <button type="button" onclick="window.location.reload()" class="btn btn-primary text-white px-4 py-2 rounded-lg">
                                 View Results
                             </button>
                         </div>
@@ -221,7 +221,7 @@
                         <div id="split-error" class="hidden mt-6 p-4 bg-still-error/10 rounded-lg border border-still-error/30">
                             <p class="text-still-error font-semibold mb-2">Processing Failed</p>
                             <p id="split-error-message" class="text-still-muted text-sm mb-3"></p>
-                            <button onclick="window.location.reload()" class="px-4 py-2 border border-still-border rounded-lg text-still-text hover:bg-still-border">
+                            <button type="button" onclick="window.location.reload()" class="px-4 py-2 border border-still-border rounded-lg text-still-text hover:bg-still-border">
                                 Refresh Page
                             </button>
                         </div>
