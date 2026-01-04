@@ -712,6 +712,9 @@ async def get_error_logs(
                             error_type TEXT,
                             error_message TEXT,
                             stack_trace TEXT,
+                            source TEXT DEFAULT 'backend',
+                            endpoint TEXT,
+                            additional_context JSONB,
                             created_at TIMESTAMP DEFAULT NOW()
                         )
                     """)
@@ -724,6 +727,9 @@ async def get_error_logs(
                             error_type TEXT,
                             error_message TEXT,
                             stack_trace TEXT,
+                            source TEXT DEFAULT 'backend',
+                            endpoint TEXT,
+                            additional_context TEXT,
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         )
                     """)
