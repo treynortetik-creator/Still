@@ -379,8 +379,17 @@
                 card.innerHTML = `
                     <div class="flex justify-between items-start mb-2">
                         <span class="text-xs font-semibold ${textClass} uppercase">${entry.entry_type}</span>
-                        <input type="checkbox" ${isSelected ? 'checked' : ''}
-              class="rounded border-still-border input-premium" onclick="event.stopPropagation(); toggleSelect(${entry.id}, '${entry.content.replace(/'/g, "\\'")}')">
+                        <div class="flex items-center gap-2">
+                            ${entry.source_id ? `
+                                <button type="button" onclick="event.stopPropagation(); openSOTModal('${entry.job_id}', ${entry.source_id}, ${entry.source_approved || false})"
+                                    class="text-xs px-2 py-1 rounded ${entry.source_approved ? 'bg-still-copper/20 text-still-copper' : 'bg-still-amber/20 text-still-amber'} hover:opacity-80"
+                                    title="View Source of Truth">
+                                    SOT
+                                </button>
+                            ` : ''}
+                            <input type="checkbox" ${isSelected ? 'checked' : ''}
+                                class="rounded border-still-border input-premium" onclick="event.stopPropagation(); toggleSelect(${entry.id}, '${entry.content.replace(/'/g, "\\'")}')">
+                        </div>
                     </div>
                     <p class="text-still-text text-sm line-clamp-3">${escapeHtml(entry.content)}</p>
                     <div class="mt-3 flex flex-wrap gap-1">
