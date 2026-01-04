@@ -67,6 +67,7 @@ function renderStills() {
     const stills = dashboardData.stills_needing_attention || {};
 
     const categories = [
+        { key: 'duplicates', label: 'Duplicates Found', isDuplicate: true },
         { key: 'expired', label: 'Expired' },
         { key: 'needs_review', label: 'Needs Review' },
         { key: 'never_used', label: 'Never Used (30+ days)' },
@@ -79,6 +80,29 @@ function renderStills() {
         totalCount += items.length;
 
         if (items.length === 0) return '';
+
+        // Special rendering for duplicates (pairs)
+        if (cat.isDuplicate) {
+            return `
+                <div class="still-category mb-4">
+                    <h3 class="text-sm font-medium text-still-amber mb-2">
+                        ${cat.label} (${items.length} pairs)
+                    </h3>
+                    <div class="space-y-2">
+                        ${items.slice(0, 5).map((pair, idx) => `
+                            <div class="duplicate-item p-2 bg-still-card rounded border border-still-amber/30 cursor-pointer hover:border-still-amber transition-colors"
+                                 onclick="showDuplicateComparison(${idx})">
+                                <div class="flex justify-between items-center">
+                                    <p class="text-sm text-still-text truncate flex-1">${Utils.escapeHtml(pair.still_a.content.substring(0, 60))}...</p>
+                                    <span class="badge badge-amber text-xs ml-2">${Math.round(pair.similarity * 100)}%</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                        ${items.length > 5 ? `<p class="text-xs text-still-muted">+${items.length - 5} more pairs</p>` : ''}
+                    </div>
+                </div>
+            `;
+        }
 
         return `
             <div class="still-category mb-4">
@@ -134,6 +158,7 @@ function setupEventListeners() {
     document.getElementById('bulk-retire-btn').addEventListener('click', bulkRetire);
     document.getElementById('bulk-extend-btn').addEventListener('click', bulkExtend);
     document.getElementById('export-csv-btn').addEventListener('click', exportCSV);
+    document.getElementById('find-duplicates-btn').addEventListener('click', findDuplicates);
 }
 
 async function runMaintenance() {
@@ -155,6 +180,39 @@ async function runMaintenance() {
         }
     } catch (error) {
         Utils.showToast('Maintenance failed', 'error');
+    }
+}
+
+async function findDuplicates() {
+    const btn = document.getElementById('find-duplicates-btn');
+    const originalText = btn.textContent;
+    btn.textContent = 'Scanning...';
+    btn.disabled = true;
+
+    try {
+        const response = await fetch('/api/refresh/find-duplicates', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+
+        if (!response.ok) throw new Error('Scan failed');
+
+        const data = await response.json();
+
+        if (data.duplicates.length > 0) {
+            // Add duplicates to dashboard data
+            dashboardData.stills_needing_attention.duplicates = data.duplicates;
+            renderStills();
+            Utils.showToast(`Found ${data.duplicates.length} duplicate pairs (${data.stills_scanned} stills scanned)`, 'success');
+        } else {
+            Utils.showToast(`No duplicates found above ${Math.round(data.threshold_used * 100)}% similarity (${data.stills_scanned} stills scanned)`, 'info');
+        }
+    } catch (error) {
+        console.error('Find duplicates error:', error);
+        Utils.showToast('Failed to scan for duplicates', 'error');
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
     }
 }
 
@@ -481,4 +539,111 @@ function formatDate(dateStr) {
 
 function getToken() {
     return localStorage.getItem('auth_token') || '';
+}
+
+function showDuplicateComparison(pairIndex) {
+    const pairs = dashboardData.stills_needing_attention.duplicates || [];
+    if (pairIndex >= pairs.length) return;
+
+    const pair = pairs[pairIndex];
+    const modal = document.getElementById('duplicate-modal');
+    const body = document.getElementById('duplicate-modal-body');
+
+    body.innerHTML = `
+        <p class="text-still-amber text-center mb-4 font-medium">${Math.round(pair.similarity * 100)}% similar</p>
+        <div class="grid grid-cols-2 gap-4">
+            <!-- Still A -->
+            <div class="border border-still-border rounded-lg p-4">
+                <h3 class="font-semibold text-still-text mb-3">Still A</h3>
+                <div class="space-y-2 text-sm">
+                    <p><span class="text-still-muted">Created:</span> <span class="text-still-text">${formatDate(pair.still_a.created_at)}</span></p>
+                    <p><span class="text-still-muted">Type:</span> <span class="text-still-text">${Utils.escapeHtml(pair.still_a.still_type)}</span></p>
+                    <p><span class="text-still-muted">Used:</span> <span class="text-still-text">${pair.still_a.usage_count || 0} times</span></p>
+                    <p><span class="text-still-muted">Source:</span> <span class="text-still-text">${Utils.escapeHtml(pair.still_a.source_file || 'Unknown')}</span></p>
+                </div>
+                <div class="mt-4 p-3 bg-still-bg rounded text-still-text text-sm max-h-40 overflow-y-auto">
+                    ${Utils.escapeHtml(pair.still_a.content)}
+                </div>
+                <button onclick="mergeDuplicates('${pair.still_a.id}', '${pair.still_b.id}', ${pairIndex})"
+                        class="mt-4 w-full btn btn-primary">
+                    Keep This One
+                </button>
+            </div>
+
+            <!-- Still B -->
+            <div class="border border-still-border rounded-lg p-4">
+                <h3 class="font-semibold text-still-text mb-3">Still B</h3>
+                <div class="space-y-2 text-sm">
+                    <p><span class="text-still-muted">Created:</span> <span class="text-still-text">${formatDate(pair.still_b.created_at)}</span></p>
+                    <p><span class="text-still-muted">Type:</span> <span class="text-still-text">${Utils.escapeHtml(pair.still_b.still_type)}</span></p>
+                    <p><span class="text-still-muted">Used:</span> <span class="text-still-text">${pair.still_b.usage_count || 0} times</span></p>
+                    <p><span class="text-still-muted">Source:</span> <span class="text-still-text">${Utils.escapeHtml(pair.still_b.source_file || 'Unknown')}</span></p>
+                </div>
+                <div class="mt-4 p-3 bg-still-bg rounded text-still-text text-sm max-h-40 overflow-y-auto">
+                    ${Utils.escapeHtml(pair.still_b.content)}
+                </div>
+                <button onclick="mergeDuplicates('${pair.still_b.id}', '${pair.still_a.id}', ${pairIndex})"
+                        class="mt-4 w-full btn btn-primary">
+                    Keep This One
+                </button>
+            </div>
+        </div>
+        <div class="mt-4 text-center">
+            <button onclick="skipDuplicate(${pairIndex})" class="btn btn-secondary">
+                Skip - Not Duplicates
+            </button>
+        </div>
+    `;
+
+    modal.classList.remove('hidden');
+}
+
+function closeDuplicateModal() {
+    document.getElementById('duplicate-modal').classList.add('hidden');
+}
+
+async function mergeDuplicates(winnerId, loserId, pairIndex) {
+    try {
+        const response = await fetch('/api/refresh/merge-duplicates', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ winner_id: winnerId, loser_id: loserId })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Merge failed');
+        }
+
+        // Remove pair from list
+        dashboardData.stills_needing_attention.duplicates.splice(pairIndex, 1);
+
+        // If no more duplicates, remove the category
+        if (dashboardData.stills_needing_attention.duplicates.length === 0) {
+            delete dashboardData.stills_needing_attention.duplicates;
+        }
+
+        renderStills();
+        closeDuplicateModal();
+        Utils.showToast('Merged - 1 still retired', 'success');
+    } catch (error) {
+        console.error('Merge error:', error);
+        Utils.showToast(error.message || 'Failed to merge duplicates', 'error');
+    }
+}
+
+function skipDuplicate(pairIndex) {
+    // Just remove from current view without merging
+    dashboardData.stills_needing_attention.duplicates.splice(pairIndex, 1);
+
+    if (dashboardData.stills_needing_attention.duplicates.length === 0) {
+        delete dashboardData.stills_needing_attention.duplicates;
+    }
+
+    renderStills();
+    closeDuplicateModal();
+    Utils.showToast('Skipped - pair removed from list', 'info');
 }
