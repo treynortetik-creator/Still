@@ -363,6 +363,7 @@
         let allAtoms = [];
         let tonePresets = [];
         let feedbackData = {};
+        let currentSource = null;
 
         // Load tone presets on startup
         async function loadTonePresets() {
@@ -386,6 +387,7 @@
                 }
 
                 const source = await response.json();
+                currentSource = source;
                 displaySourceOfTruth(source);
                 return source;
             } catch (err) {
@@ -493,18 +495,136 @@
 
                 showToast('Source of Truth approved! Pipeline resuming...');
 
-                // Update UI
+                // Update UI - hide approval actions
                 document.getElementById('sot-approval-actions').classList.add('hidden');
                 const badge = document.getElementById('sot-approval-badge');
                 badge.textContent = 'Approved';
                 badge.className = 'text-sm px-2 py-1 rounded bg-still-green/20 text-still-green';
 
-                // Reload page after delay to show updated status
-                setTimeout(() => window.location.reload(), 2000);
+                // Switch to split view mode
+                activateSplitView();
             } catch (err) {
                 showToast('Error approving Source of Truth');
                 console.error('Error approving Source of Truth:', err);
             }
+        }
+
+        function activateSplitView() {
+            // Hide the regular SOT section
+            document.getElementById('source-of-truth-section').classList.add('hidden');
+
+            // Show split view
+            const splitWrapper = document.getElementById('split-view-wrapper');
+            splitWrapper.classList.remove('hidden');
+
+            // Populate left panel with SOT summary
+            populateSplitSOT();
+
+            // Start polling for status
+            startSplitViewPolling();
+        }
+
+        function populateSplitSOT() {
+            const content = document.getElementById('split-sot-content');
+            if (!currentSource) return;
+
+            content.innerHTML = `
+                <div>
+                    <h4 class="font-semibold text-still-text mb-1">Core Narratives</h4>
+                    <ul class="list-disc list-inside text-still-muted">
+                        ${currentSource.core_narratives?.slice(0, 3).map(n =>
+                            `<li>${escapeHtml(n.narrative)}</li>`
+                        ).join('') || '<li>None</li>'}
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-still-text mb-1">Pain Point</h4>
+                    <p class="text-still-muted">${escapeHtml(currentSource.primary_pain_point || 'Not specified')}</p>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-still-text mb-1">Promise</h4>
+                    <p class="text-still-muted">${escapeHtml(currentSource.the_promise || 'Not specified')}</p>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-still-text mb-1">Statistics</h4>
+                    <p class="text-still-disabled">${currentSource.statistics?.length || 0} extracted</p>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-still-text mb-1">Funnel Stage</h4>
+                    <p class="text-still-muted capitalize">${escapeHtml(currentSource.funnel_stage || 'Not specified')}</p>
+                </div>
+            `;
+        }
+
+        let splitPollInterval = null;
+
+        function startSplitViewPolling() {
+            // Poll every 3 seconds
+            splitPollInterval = setInterval(pollSplitStatus, 3000);
+            // Also poll immediately
+            pollSplitStatus();
+        }
+
+        async function pollSplitStatus() {
+            try {
+                const response = await Auth.fetchWithAuth(`/api/job/${jobId}/status`);
+                if (!response.ok) throw new Error('Failed to fetch status');
+
+                const data = await response.json();
+                updateSplitViewStatus(data);
+
+                if (data.status === 'complete') {
+                    clearInterval(splitPollInterval);
+                    document.getElementById('split-complete').classList.remove('hidden');
+                } else if (data.status === 'failed') {
+                    clearInterval(splitPollInterval);
+                    document.getElementById('split-error').classList.remove('hidden');
+                    document.getElementById('split-error-message').textContent = data.error || 'An error occurred';
+                }
+            } catch (err) {
+                console.error('Split view poll error:', err);
+            }
+        }
+
+        function updateSplitViewStatus(data) {
+            // Update progress bar
+            document.getElementById('split-current-step').textContent = data.current_step || 'Processing...';
+            document.getElementById('split-progress-percent').textContent = `${data.progress || 0}%`;
+            document.getElementById('split-progress-bar').style.width = `${data.progress || 0}%`;
+
+            // Update ARIA for accessibility
+            document.getElementById('split-progress-bar').setAttribute('aria-valuenow', data.progress || 0);
+
+            // Update step indicators
+            const stepOrder = ['distilling', 'drafting', 'editing', 'factchecking'];
+            const currentStepIndex = stepOrder.indexOf(data.status);
+
+            document.querySelectorAll('#split-steps .status-step').forEach((stepEl, index) => {
+                const icon = stepEl.querySelector('.status-step-icon');
+                const text = stepEl.querySelector('span:last-child');
+
+                icon.classList.remove('status-step-pending', 'status-step-active', 'status-step-complete');
+
+                if (index < currentStepIndex) {
+                    // Complete
+                    icon.classList.add('status-step-complete');
+                    icon.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>';
+                    text.classList.remove('text-still-muted');
+                    text.classList.add('text-still-green');
+                } else if (index === currentStepIndex) {
+                    // Active
+                    icon.classList.add('status-step-active');
+                    icon.innerHTML = '<div class="w-2 h-2 bg-white rounded-full animate-pulse"></div>';
+                    text.classList.remove('text-still-muted');
+                    text.classList.add('text-still-copper', 'font-semibold');
+                } else {
+                    // Pending
+                    icon.classList.add('status-step-pending');
+                    icon.innerHTML = `<span class="text-xs">${index + 1}</span>`;
+                    text.classList.add('text-still-muted');
+                    text.classList.remove('text-still-copper', 'text-still-green', 'font-semibold');
+                }
+            });
         }
 
         // Feedback functions
