@@ -1104,12 +1104,12 @@
                 `;
 
                 card.addEventListener('click', (e) => {
-                    if (e.target.type === 'checkbox') {
-                        // Checkbox click - toggle selection
+                    // If clicking on checkbox, SOT button, or any button - let the event handle itself
+                    if (e.target.type === 'checkbox' || e.target.tagName === 'BUTTON' || e.target.closest('button')) {
                         return;
                     }
-                    // Card click - open edit modal
-                    openEditStillModal(entry);
+                    // Card click - toggle selection (matching library.html behavior)
+                    toggleSelect(entry.id);
                 });
 
                 container.appendChild(card);
@@ -1455,6 +1455,9 @@
                         pagination.appendChild(nextBtn);
                     }
                 }
+
+                // Ensure button states are synced after render
+                updateSelectedCount();
 
             } catch (err) {
                 console.error('Failed to load Reserve:', err);
