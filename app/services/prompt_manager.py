@@ -79,6 +79,14 @@ async def init_prompts_from_files():
             "max_tokens": 500,
             "variables": ["transcript"],
         },
+        "still_matching": {
+            "model": "gemini-2.5-flash",
+            "max_tokens": 2000,
+            "variables": [
+                "old_still_content", "old_still_type",
+                "new_still_candidates", "source_context"
+            ],
+        },
     }
 
     async with get_db() as db:

@@ -1,0 +1,36 @@
+You are comparing content stills to find matches between an old source and a new version.
+
+OLD STILL:
+{old_still_content}
+Type: {old_still_type}
+
+NEW STILL CANDIDATES:
+{new_still_candidates}
+
+SOURCE CONTEXT:
+{source_context}
+
+Determine if any of the new still candidates are an updated version of the old still.
+Consider:
+- Same core statistic with updated numbers (e.g., "40% ROI" -> "52% ROI")
+- Same quote with minor wording changes
+- Same insight reframed or expanded
+- Same story with additional details
+
+A match means the NEW still is an UPDATE of the OLD still, not just similar content.
+
+OUTPUT FORMAT (valid JSON):
+{{
+  "match_found": true,
+  "matched_candidate_index": 0,
+  "confidence": "high",
+  "reasoning": "Both stills reference the same ROI statistic, with updated percentage"
+}}
+
+If no match found:
+{{
+  "match_found": false,
+  "matched_candidate_index": null,
+  "confidence": "high",
+  "reasoning": "No candidates appear to be updates of the old still"
+}}
