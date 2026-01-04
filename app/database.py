@@ -718,6 +718,22 @@ async def _init_postgres_tables(conn: asyncpg.Connection):
             "default@contentmultiplier.com", "pro"
         )
 
+    # Insert default refresh settings
+    refresh_settings = [
+        ('still_matching_model', 'google/gemini-flash-1.5', 'string', 'AI model for matching stills during refresh'),
+        ('fuzzy_match_high_threshold', '0.85', 'float', 'High confidence threshold for fuzzy matching'),
+        ('fuzzy_match_low_threshold', '0.50', 'float', 'Low confidence threshold for fuzzy matching'),
+        ('auto_retire_expired', 'true', 'boolean', 'Automatically retire expired stills'),
+        ('expiration_warning_days', '30', 'integer', 'Days before expiration to show warning'),
+    ]
+    for key, value, setting_type, description in refresh_settings:
+        await conn.execute(
+            """INSERT INTO global_settings (setting_key, setting_value, setting_type, description)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT (setting_key) DO NOTHING""",
+            key, value, setting_type, description
+        )
+
     print("PostgreSQL tables initialized")
 
 
@@ -1286,6 +1302,22 @@ async def _init_sqlite_db():
                 ("default@contentmultiplier.com", "pro")
             )
             await db.commit()
+
+        # Insert default refresh settings
+        refresh_settings = [
+            ('still_matching_model', 'google/gemini-flash-1.5', 'string', 'AI model for matching stills during refresh'),
+            ('fuzzy_match_high_threshold', '0.85', 'float', 'High confidence threshold for fuzzy matching'),
+            ('fuzzy_match_low_threshold', '0.50', 'float', 'Low confidence threshold for fuzzy matching'),
+            ('auto_retire_expired', 'true', 'boolean', 'Automatically retire expired stills'),
+            ('expiration_warning_days', '30', 'integer', 'Days before expiration to show warning'),
+        ]
+        for key, value, setting_type, description in refresh_settings:
+            await db.execute(
+                """INSERT OR IGNORE INTO global_settings (setting_key, setting_value, setting_type, description)
+                   VALUES (?, ?, ?, ?)""",
+                (key, value, setting_type, description)
+            )
+        await db.commit()
 
 
 # =============================================================================
