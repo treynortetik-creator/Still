@@ -19,3 +19,20 @@ class MarkPerformerRequest(BaseModel):
 class RefreshCounts(BaseModel):
     sources: int
     stills: int
+
+
+class MergeDuplicatesRequest(BaseModel):
+    winner_id: str
+    loser_id: str
+
+
+class DuplicatePair(BaseModel):
+    still_a: dict
+    still_b: dict
+    similarity: float
+
+
+class FindDuplicatesResponse(BaseModel):
+    duplicates: List[DuplicatePair]
+    threshold_used: float
+    stills_scanned: int
