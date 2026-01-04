@@ -1,6 +1,6 @@
 """Tests for error logger service."""
 import pytest
-from app.services.error_logger import log_error
+from app.services.error_logger import log_error, log_exception
 from app.database import get_db
 from app.db_utils import fetchall
 
@@ -51,3 +51,24 @@ async def test_log_error_never_raises(test_db):
     )
     # If we get here, test passes
     assert True
+
+
+@pytest.mark.asyncio
+async def test_log_exception_captures_stack_trace(test_db):
+    """log_exception should capture exception message and stack trace."""
+    try:
+        raise ValueError("Test exception message")
+    except ValueError as e:
+        await log_exception(
+            error_type="test_exception",
+            exception=e,
+            source="backend",
+            endpoint="/api/test"
+        )
+
+    async with get_db() as db:
+        rows = await fetchall(db, "SELECT * FROM error_logs WHERE error_type = ?", ("test_exception",))
+        assert len(rows) == 1
+        assert "Test exception message" in rows[0]["error_message"]
+        assert rows[0]["stack_trace"] is not None
+        assert "ValueError" in rows[0]["stack_trace"]
