@@ -4,10 +4,18 @@ import os
 from datetime import datetime, timedelta, date
 from fastapi import APIRouter, HTTPException, Query, Body, Depends
 from typing import Optional, Dict
-from pydantic import BaseModel
 import httpx
 
 from app.config import get_settings
+from app.models.admin import (
+    ApiKeyRequest,
+    OpenRouterToggle,
+    ModelConfig,
+    AIEditorConfigRequest,
+    SommelierConfigRequest,
+    RefreshSettingsRequest,
+    AIModelConfigRequest,
+)
 from app.database import get_db
 from app.db_utils import execute, fetchone, fetchall
 from app.services import settings_manager
@@ -537,39 +545,6 @@ async def get_logs(
         return {"logs": logs}
 
 
-# Pydantic models for settings endpoints
-class ApiKeyRequest(BaseModel):
-    provider: str
-    key: str
-
-
-class OpenRouterToggle(BaseModel):
-    enabled: bool
-
-
-class ModelConfig(BaseModel):
-    transcription: str
-    distillation: str  # Frontend uses distillation, aliased to atomization
-    distillation_pass2: str
-    summarization: str
-    drafting: str
-    editing: str
-    factcheck: str
-    workshop_ai_edit: str
-
-
-class AIEditorConfigRequest(BaseModel):
-    """Request model for updating AI editor config."""
-    system_prompt: Optional[str] = None
-    model: Optional[str] = None
-
-
-class SommelierConfigRequest(BaseModel):
-    """Request model for updating Sommelier config."""
-    parse_prompt: Optional[str] = None
-    rerank_prompt: Optional[str] = None
-
-
 @router.get("/settings")
 async def get_settings_endpoint(_: bool = Depends(verify_admin)):
     """Get current settings including API key status, model config, and refresh settings."""
@@ -664,15 +639,6 @@ async def save_model_config(config: ModelConfig, _: bool = Depends(verify_admin)
         "workshop_ai_edit": config.workshop_ai_edit,
     })
     return {"status": "ok", "models": config.model_dump()}
-
-
-class RefreshSettingsRequest(BaseModel):
-    """Request model for refresh settings."""
-    still_matching_model: Optional[str] = None
-    fuzzy_match_high_threshold: Optional[float] = 0.85
-    fuzzy_match_low_threshold: Optional[float] = 0.50
-    auto_retire_expired: Optional[bool] = True
-    expiration_warning_days: Optional[int] = 30
 
 
 @router.post("/settings/refresh")
@@ -849,16 +815,6 @@ async def get_openrouter_models(_: bool = Depends(verify_admin)):
 
 
 # ========== AI Model Configuration (Database-backed) ==========
-
-class AIModelConfigRequest(BaseModel):
-    """Request model for updating AI model config."""
-    model_id: str
-    display_name: Optional[str] = None
-    cost_per_1k_input: Optional[float] = 0.0
-    cost_per_1k_output: Optional[float] = 0.0
-    max_tokens: Optional[int] = 4096
-    is_active: Optional[bool] = True
-
 
 # Service names that can have models configured
 PIPELINE_SERVICES = [

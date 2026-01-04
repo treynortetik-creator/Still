@@ -20,6 +20,7 @@ from app.models.job import JobStatus
 from app.models.batch import BatchResponse, BatchStatusResponse, BatchJobStatus, BatchListResponse, BatchListItem
 from app.api.auth import get_current_user_id
 from app.utils.security import sanitize_filename
+from app.utils.file_utils import get_file_type
 
 router = APIRouter()
 settings = get_settings()
@@ -27,22 +28,6 @@ limiter = Limiter(key_func=get_remote_address)
 
 # Max files per batch
 MAX_BATCH_FILES = 5
-
-# Allowed file extensions
-ALLOWED_EXTENSIONS = {
-    "video": [".mp4", ".mov", ".avi", ".webm", ".mkv"],
-    "audio": [".mp3", ".wav", ".m4a", ".ogg", ".flac"],
-    "document": [".pdf", ".txt", ".md", ".docx", ".png", ".jpg", ".jpeg", ".gif", ".webp"],
-}
-
-
-def get_file_type(filename: str) -> Optional[str]:
-    """Determine file type category from filename."""
-    ext = Path(filename).suffix.lower()
-    for file_type, extensions in ALLOWED_EXTENSIONS.items():
-        if ext in extensions:
-            return file_type
-    return None
 
 
 @router.post("/batch/upload", response_model=BatchResponse)

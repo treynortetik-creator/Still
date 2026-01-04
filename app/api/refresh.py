@@ -6,11 +6,16 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 
 from app.api.auth import get_current_user_id
 from app.database import get_db
 from app.db_utils import execute, fetchall, fetchone
+from app.models.refresh import (
+    BulkRetireRequest,
+    BulkExtendReviewRequest,
+    MarkPerformerRequest,
+    RefreshCounts,
+)
 from app.services.refresh_tasks import (
     get_stills_needing_attention,
     get_sources_needing_review,
@@ -20,25 +25,6 @@ from app.services.refresh_tasks import (
 )
 
 router = APIRouter()
-
-
-# Request/Response models
-class BulkRetireRequest(BaseModel):
-    still_ids: List[str]
-
-
-class BulkExtendReviewRequest(BaseModel):
-    source_ids: List[int]
-    days: int = 180
-
-
-class MarkPerformerRequest(BaseModel):
-    still_ids: List[str]
-
-
-class RefreshCounts(BaseModel):
-    sources: int
-    stills: int
 
 
 # Endpoints

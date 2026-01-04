@@ -1,11 +1,14 @@
 """Retry utilities with exponential backoff."""
 import asyncio
 import functools
+import logging
 import traceback
 from typing import TypeVar, Callable, Optional, Type
 from datetime import datetime
 
 from app.database import get_db
+
+logger = logging.getLogger(__name__)
 from app.db_utils import execute
 from app.config import get_settings
 
@@ -42,7 +45,7 @@ async def log_error(
                 await db.commit()
     except Exception as e:
         # Don't let error logging failures break the app
-        print(f"Failed to log error: {e}")
+        logger.error(f"Failed to log error: {e}")
 
 
 async def retry_async(
@@ -92,7 +95,7 @@ async def retry_async(
 
                 # Log the retry attempt
                 error_msg = f"Attempt {attempt + 1}/{max_retries + 1} failed: {str(e)}"
-                print(f"[Retry] {context or 'Unknown'}: {error_msg}, retrying in {delay:.1f}s")
+                logger.warning(f"[Retry] {context or 'Unknown'}: {error_msg}, retrying in {delay:.1f}s")
 
                 await log_error(
                     error_type="retry",

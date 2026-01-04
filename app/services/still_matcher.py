@@ -11,16 +11,6 @@ from app.utils.json_parser import parse_llm_json
 logger = logging.getLogger(__name__)
 
 
-async def get_setting(key: str, default: str) -> str:
-    """
-    Get a setting value with a default fallback.
-
-    Wraps get_global_setting for convenience.
-    """
-    value = await get_global_setting(key)
-    return value if value is not None else default
-
-
 def fuzzy_match_score(text1: str, text2: str) -> float:
     """
     Calculate similarity score between two text strings.
@@ -80,7 +70,7 @@ async def llm_match(
     Returns match result dict.
     """
     # Get model from settings
-    model = await get_setting('still_matching_model', 'google/gemini-flash-1.5')
+    model = await get_global_setting('still_matching_model', 'google/gemini-flash-1.5')
 
     # Format candidates for prompt
     candidates_text = "\n".join([
@@ -158,8 +148,8 @@ async def match_stills(
         - orphans: List of old stills with no match (should be retired)
     """
     # Get thresholds from settings
-    high_threshold = float(await get_setting('fuzzy_match_high_threshold', '0.85'))
-    low_threshold = float(await get_setting('fuzzy_match_low_threshold', '0.50'))
+    high_threshold = float(await get_global_setting('fuzzy_match_high_threshold', '0.85'))
+    low_threshold = float(await get_global_setting('fuzzy_match_low_threshold', '0.50'))
 
     matches = []
     matched_old_ids = set()

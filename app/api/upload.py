@@ -17,6 +17,7 @@ from app.db_utils import execute, fetchval
 from app.models.job import JobResponse, JobStatus
 from app.api.auth import get_current_user_id
 from app.utils.security import sanitize_filename
+from app.utils.file_utils import get_file_type, ALLOWED_EXTENSIONS
 from app.utils.validation import (
     validate_text_length,
     validate_json_field,
@@ -30,32 +31,6 @@ settings = get_settings()
 
 # Rate limiter (uses app state limiter)
 limiter = Limiter(key_func=get_remote_address)
-
-# Allowed file types
-ALLOWED_EXTENSIONS = {
-    "video": [".mp4", ".mov", ".avi", ".webm", ".mkv"],
-    "audio": [".mp3", ".wav", ".m4a", ".ogg", ".flac"],
-    "document": [".pdf", ".txt", ".md", ".docx", ".png", ".jpg", ".jpeg", ".gif", ".webp"],
-}
-
-ALLOWED_MIME_TYPES = {
-    "video/mp4", "video/quicktime", "video/x-msvideo", "video/webm",
-    "audio/mpeg", "audio/wav", "audio/x-m4a", "audio/ogg", "audio/flac",
-    "application/pdf", "text/plain", "text/markdown",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "image/png", "image/jpeg", "image/gif", "image/webp",
-}
-
-
-def get_file_type(filename: str, content_type: str) -> Optional[str]:
-    """Determine file type category from filename and content type."""
-    ext = Path(filename).suffix.lower()
-
-    for file_type, extensions in ALLOWED_EXTENSIONS.items():
-        if ext in extensions:
-            return file_type
-
-    return None
 
 
 def generate_campaign_from_filename(filename: str) -> str:

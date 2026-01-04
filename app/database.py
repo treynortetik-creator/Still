@@ -2,11 +2,14 @@
 
 Supports both PostgreSQL (Supabase) and SQLite (local development).
 """
+import logging
 import ssl
 import socket
 import aiosqlite
 import asyncpg
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 from typing import AsyncGenerator, Optional, Union
 from contextlib import asynccontextmanager
 from urllib.parse import urlparse, parse_qs, unquote
@@ -64,15 +67,15 @@ async def init_postgres_pool():
         host = db_params["host"]
         port = db_params["port"]
 
-        print(f"Attempting to connect to {host}:{port}")
+        logger.info(f"Attempting to connect to {host}:{port}")
 
         # Resolve hostname to IPv4 to avoid IPv6 issues on some platforms
         try:
             # Get IPv4 address explicitly
             ipv4_addr = socket.gethostbyname(host)
-            print(f"Resolved {host} to IPv4: {ipv4_addr}")
+            logger.info(f"Resolved {host} to IPv4: {ipv4_addr}")
         except socket.gaierror as e:
-            print(f"Warning: Could not resolve {host}: {e}")
+            logger.warning(f"Could not resolve {host}: {e}")
             ipv4_addr = host  # Fall back to hostname
 
         try:
@@ -89,10 +92,10 @@ async def init_postgres_pool():
                 command_timeout=60,  # 60 second timeout for commands
                 timeout=30,  # 30 second connection timeout
             )
-            print(f"PostgreSQL pool initialized (min=2, max=10)")
+            logger.info("PostgreSQL pool initialized (min=2, max=10)")
         except Exception as e:
-            print(f"Failed to initialize PostgreSQL pool: {e}")
-            print(f"Connection details: host={ipv4_addr}, port={port}, user={db_params['user']}, database={db_params['database']}")
+            logger.error(f"Failed to initialize PostgreSQL pool: {e}")
+            logger.error(f"Connection details: host={ipv4_addr}, port={port}, user={db_params['user']}, database={db_params['database']}")
             raise
     return _pg_pool
 
@@ -126,9 +129,9 @@ async def init_db():
             # Mask password in logs
             import re
             masked_url = re.sub(r':([^@]+)@', ':****@', db_url)
-            print(f"Connecting to PostgreSQL: {masked_url}")
+            logger.info(f"Connecting to PostgreSQL: {masked_url}")
         else:
-            print("ERROR: DATABASE_URL is empty but use_postgres is True!")
+            logger.error("DATABASE_URL is empty but use_postgres is True!")
             raise ValueError("DATABASE_URL environment variable is not set")
 
         # PostgreSQL - create tables and verify connection
@@ -137,23 +140,23 @@ async def init_db():
             async with pool.acquire() as conn:
                 # Test connection
                 result = await conn.fetchval("SELECT 1")
-                print(f"PostgreSQL connection verified (result: {result})")
+                logger.info(f"PostgreSQL connection verified (result: {result})")
 
                 # Create tables if they don't exist
                 await _init_postgres_tables(conn)
         except Exception as e:
-            print(f"ERROR: Failed to connect to PostgreSQL: {e}")
-            print("Check that DATABASE_URL is correct and Supabase is accessible")
+            logger.error(f"Failed to connect to PostgreSQL: {e}")
+            logger.error("Check that DATABASE_URL is correct and Supabase is accessible")
             raise
     else:
         # SQLite - create tables
-        print("Using SQLite database (local development mode)")
+        logger.info("Using SQLite database (local development mode)")
         await _init_sqlite_db()
 
 
 async def _init_postgres_tables(conn: asyncpg.Connection):
     """Initialize PostgreSQL database with schema (creates tables if not exist)."""
-    print("Checking/creating PostgreSQL tables...")
+    logger.info("Checking/creating PostgreSQL tables...")
 
     # Create all tables using PostgreSQL syntax
     await conn.execute("""
@@ -734,7 +737,7 @@ async def _init_postgres_tables(conn: asyncpg.Connection):
             key, value, setting_type, description
         )
 
-    print("PostgreSQL tables initialized")
+    logger.info("PostgreSQL tables initialized")
 
 
 async def _init_sqlite_db():

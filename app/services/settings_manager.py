@@ -141,8 +141,16 @@ async def refresh_settings_cache():
                 _settings_cache["models"] = DEFAULT_MODELS.copy()
 
 
-async def get_global_setting(key: str) -> Optional[str]:
-    """Get a global setting value from database."""
+async def get_global_setting(key: str, default: Optional[str] = None) -> Optional[str]:
+    """Get a global setting value from database.
+
+    Args:
+        key: The setting key to look up
+        default: Value to return if setting is not found (default: None)
+
+    Returns:
+        The setting value if found, otherwise the default value
+    """
     from app.config import get_settings as get_app_settings
     from app.database import get_db
     from app.db_utils import fetchone
@@ -162,7 +170,7 @@ async def get_global_setting(key: str) -> Optional[str]:
                 (key,)
             )
 
-        return row["setting_value"] if row else None
+        return row["setting_value"] if row else default
 
 
 async def set_global_setting(key: str, value: str, setting_type: str = "string", description: str = None):

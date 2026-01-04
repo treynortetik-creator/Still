@@ -129,7 +129,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 async def lifespan(app: FastAPI):
     """Application lifespan events."""
     # Startup
-    print("Starting ContentMultiplier...")
+    logger.info("Starting ContentMultiplier...")
 
     # Ensure directories exist
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
@@ -140,17 +140,17 @@ async def lifespan(app: FastAPI):
 
     # Initialize database
     await init_db()
-    print("Database initialized")
+    logger.info("Database initialized")
 
     # Initialize prompt templates from files
     from app.services.prompt_manager import init_prompts_from_files
     await init_prompts_from_files()
-    print("Prompt templates loaded")
+    logger.info("Prompt templates loaded")
 
     # Initialize settings from database (or create defaults)
     from app.services import settings_manager
     await settings_manager.init_default_settings()
-    print("Settings initialized from database")
+    logger.info("Settings initialized from database")
 
     # Start autopilot scheduler
     from app.services.scheduler import start_scheduler, stop_scheduler
@@ -159,7 +159,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown
-    print("Shutting down ContentMultiplier...")
+    logger.info("Shutting down ContentMultiplier...")
 
     # Stop autopilot scheduler
     await stop_scheduler()
@@ -167,7 +167,7 @@ async def lifespan(app: FastAPI):
     # Close PostgreSQL connection pool
     if settings.use_postgres:
         await close_postgres_pool()
-        print("PostgreSQL pool closed")
+        logger.info("PostgreSQL pool closed")
 
 
 app = FastAPI(

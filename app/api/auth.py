@@ -2,13 +2,13 @@
 import json
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Header, Request
-from pydantic import BaseModel, EmailStr
 from typing import Optional
 
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.database import get_db
+from app.models.auth import UserRegister, UserLogin, TokenResponse, UserResponse
 from app.db_utils import execute, fetchone, execute_insert_returning_id
 from app.services.auth import (
     get_password_hash,
@@ -23,34 +23,6 @@ from app.services.auth import (
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
-
-
-class UserRegister(BaseModel):
-    """User registration request."""
-    email: str
-    password: str
-    confirm_password: str
-
-
-class UserLogin(BaseModel):
-    """User login request."""
-    email: str
-    password: str
-
-
-class TokenResponse(BaseModel):
-    """Token response."""
-    access_token: str
-    token_type: str = "bearer"
-    user: dict
-
-
-class UserResponse(BaseModel):
-    """User response."""
-    id: int
-    email: str
-    subscription_tier: str
-    created_at: str
 
 
 @router.post("/register", response_model=TokenResponse)

@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 from app.config import get_settings
 from app.database import get_db
 from app.db_utils import execute, fetchall, fetchone
+from app.services.settings_manager import get_global_setting
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -18,13 +19,6 @@ def get_date_param(dt: datetime) -> date:
     if isinstance(dt, datetime):
         return dt.date()
     return dt
-
-
-async def get_setting(key: str, default: str = None) -> str:
-    """Get a setting value from the database."""
-    async with get_db() as db:
-        row = await fetchone(db, "SELECT setting_value FROM global_settings WHERE setting_key = ?", (key,))
-        return row["setting_value"] if row else default
 
 
 async def get_stills_needing_attention(user_id: int) -> Dict[str, List[dict]]:
@@ -151,8 +145,8 @@ async def run_refresh_maintenance(user_id: int = None) -> Dict[str, int]:
     }
 
     # Get settings
-    warning_days = int(await get_setting('expiration_warning_days', '30'))
-    auto_retire = (await get_setting('auto_retire_expired', 'true')).lower() == 'true'
+    warning_days = int(await get_global_setting('expiration_warning_days', '30'))
+    auto_retire = (await get_global_setting('auto_retire_expired', 'true')).lower() == 'true'
 
     warning_date = (datetime.now() + timedelta(days=warning_days)).date()
     today = datetime.now().date()
