@@ -77,6 +77,21 @@
             </div>
 
             <div>
+                <label class="block text-sm font-medium mb-1" style="color: var(--admin-text);">Source of Truth Model</label>
+                <div class="flex gap-2">
+                    <select id="model-source_of_truth" class="flex-1 border rounded px-3 py-2 admin-card" style="border-color: var(--admin-border);">
+                        <option value="">-- Select a model --</option>
+                    </select>
+                    <button onclick="loadOpenRouterModels('source_of_truth')"
+                        class="px-3 py-2 rounded whitespace-nowrap hover:opacity-80" style="background-color: var(--admin-border); color: var(--admin-text);">
+                        Load
+                    </button>
+                </div>
+                <p class="text-xs mt-1" style="color: var(--admin-text-muted);">Generates Source of Truth document (narratives, stats, quotes)</p>
+                <p id="status-source_of_truth" class="text-xs mt-1"></p>
+            </div>
+
+            <div>
                 <label class="block text-sm font-medium mb-1" style="color: var(--admin-text);">Distillation Model (Pass 1)</label>
                 <div class="flex gap-2">
                     <select id="model-distillation" class="flex-1 border rounded px-3 py-2 admin-card" style="border-color: var(--admin-border);">
@@ -355,6 +370,7 @@ async function loadSettings() {
         // Model selections - save them for later restoration
         if (data.models) {
             if (data.models.transcription) document.getElementById('model-transcription').dataset.savedValue = data.models.transcription;
+            if (data.models.source_of_truth) document.getElementById('model-source_of_truth').dataset.savedValue = data.models.source_of_truth;
             if (data.models.distillation) document.getElementById('model-distillation').dataset.savedValue = data.models.distillation;
             if (data.models.distillation_pass2) document.getElementById('model-distillation_pass2').dataset.savedValue = data.models.distillation_pass2;
             if (data.models.summarization) document.getElementById('model-summarization').dataset.savedValue = data.models.summarization;
@@ -411,6 +427,7 @@ async function saveApiKey(provider) {
 async function saveModelConfig() {
     const models = {
         transcription: document.getElementById('model-transcription').value,
+        source_of_truth: document.getElementById('model-source_of_truth').value,
         distillation: document.getElementById('model-distillation').value,
         distillation_pass2: document.getElementById('model-distillation_pass2').value,
         summarization: document.getElementById('model-summarization').value,
