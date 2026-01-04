@@ -428,8 +428,10 @@ async def process_job(job_id: str):
         except Exception as summary_err:
             logger.warning(f"Job {job_id}: Summary step failed (non-fatal): {summary_err}")
 
-        # Save stills to database and the Reserve
-        await save_stills_to_db(stills, campaign_name=campaign_name, source_id=source_id)
+        # Save stills to database and the Reserve (with duplicate detection)
+        save_result = await save_stills_to_db(stills, campaign_name=campaign_name, source_id=source_id)
+        if save_result["skipped_duplicates"] > 0:
+            logger.info(f"Job {job_id}: {save_result['skipped_duplicates']} duplicate stills skipped, {save_result['saved']} new stills saved")
         await add_stills_to_library(stills, user_id, original_filename, campaign_name=campaign_name, job_id=job_id)
 
         # Check if this is a Quick Distill job - if so, complete now
@@ -885,8 +887,10 @@ async def resume_pipeline_from_distillation(job_id: str):
         except Exception as summary_err:
             logger.warning(f"Job {job_id}: Summary step failed (non-fatal): {summary_err}")
 
-        # Save stills to database and the Reserve (with source_id)
-        await save_stills_to_db(stills, campaign_name=campaign_name, source_id=source_id)
+        # Save stills to database and the Reserve (with source_id and duplicate detection)
+        save_result = await save_stills_to_db(stills, campaign_name=campaign_name, source_id=source_id)
+        if save_result["skipped_duplicates"] > 0:
+            logger.info(f"Job {job_id}: {save_result['skipped_duplicates']} duplicate stills skipped, {save_result['saved']} new stills saved")
         await add_stills_to_library(stills, user_id, original_filename, campaign_name=campaign_name, job_id=job_id)
 
         # Check if this is a Quick Distill job - if so, complete now

@@ -1,14 +1,104 @@
 """Content library management service (The Reserve)."""
 import json
 import logging
-from typing import Optional, List
+from typing import Optional, List, Tuple
+from difflib import SequenceMatcher
 
 from app.config import get_settings
 from app.database import get_db
 from app.db_utils import execute, fetchone, fetchall, fetchval
+from app.services.settings_manager import get_global_setting
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
+
+
+# Duplicate detection thresholds
+DUPLICATE_HIGH_THRESHOLD = 0.90  # Almost identical - skip
+DUPLICATE_MEDIUM_THRESHOLD = 0.75  # Very similar - merge metadata
+
+
+def calculate_similarity(text1: str, text2: str) -> float:
+    """
+    Calculate similarity score between two text strings.
+    Returns float between 0.0 (no match) and 1.0 (identical).
+    """
+    if not text1 or not text2:
+        return 0.0
+    t1 = text1.lower().strip()
+    t2 = text2.lower().strip()
+    return SequenceMatcher(None, t1, t2).ratio()
+
+
+async def find_duplicate_still(
+    content: str,
+    still_type: str,
+    user_id: int,
+    exclude_job_id: Optional[str] = None
+) -> Tuple[Optional[dict], float]:
+    """
+    Find if a duplicate still already exists in the database.
+
+    Args:
+        content: The content of the new still
+        still_type: The type of the new still
+        user_id: User ID to search within
+        exclude_job_id: Optional job_id to exclude (current job)
+
+    Returns:
+        Tuple of (matching_still, similarity_score) or (None, 0.0)
+    """
+    async with get_db() as db:
+        # Get existing stills of the same type for this user
+        if exclude_job_id:
+            rows = await fetchall(
+                db,
+                """
+                SELECT id, content, still_type, usage_count, performance, status
+                FROM stills
+                WHERE user_id = ? AND still_type = ? AND job_id != ? AND status != 'retired'
+                """,
+                (user_id, still_type, exclude_job_id)
+            )
+        else:
+            rows = await fetchall(
+                db,
+                """
+                SELECT id, content, still_type, usage_count, performance, status
+                FROM stills
+                WHERE user_id = ? AND still_type = ? AND status != 'retired'
+                """,
+                (user_id, still_type)
+            )
+
+        best_match = None
+        best_score = 0.0
+
+        for row in rows:
+            score = calculate_similarity(content, row["content"])
+            if score > best_score:
+                best_score = score
+                best_match = dict(row)
+
+        return best_match, best_score
+
+
+async def get_existing_stills_for_dedup(user_id: int) -> List[dict]:
+    """
+    Get all active stills for a user for duplicate detection.
+    """
+    async with get_db() as db:
+        rows = await fetchall(
+            db,
+            """
+            SELECT id, content, still_type, usage_count, performance, status, job_id
+            FROM stills
+            WHERE user_id = ? AND status != 'retired'
+            ORDER BY created_at DESC
+            """,
+            (user_id,)
+        )
+        return [dict(row) for row in rows]
 
 
 def _extract_still_ids(stills_used: List) -> List[str]:
@@ -220,15 +310,33 @@ async def save_stills_to_db(
     stills: list[dict],
     campaign_name: Optional[str] = None,
     source_id: Optional[int] = None,
-) -> int:
+    skip_duplicates: bool = True,
+) -> dict:
     """
     Save stills to the stills table (job-specific tracking).
 
-    Returns the number of stills saved.
-    """
-    async with get_db() as db:
-        count = 0
+    Args:
+        stills: List of stills to save
+        campaign_name: Optional campaign name
+        source_id: Optional source ID
+        skip_duplicates: If True, skip stills that are >90% similar to existing ones
 
+    Returns:
+        Dict with 'saved', 'skipped_duplicates', and 'duplicate_details' counts
+    """
+    result = {
+        "saved": 0,
+        "skipped_duplicates": 0,
+        "duplicate_details": []
+    }
+
+    # Get duplicate detection setting (default to enabled)
+    dedup_enabled = skip_duplicates
+    if skip_duplicates:
+        setting = await get_global_setting('skip_duplicate_stills', 'true')
+        dedup_enabled = setting.lower() == 'true'
+
+    async with get_db() as db:
         for still in stills:
             # Validate and sanitize the still data
             validated = validate_still(still)
@@ -236,6 +344,30 @@ async def save_stills_to_db(
             if not validated["id"] or not validated["job_id"] or not validated["user_id"]:
                 logger.warning(f"Skipping still with missing required fields: {still.get('id')}")
                 continue
+
+            # Check for duplicates if enabled
+            if dedup_enabled:
+                duplicate, score = await find_duplicate_still(
+                    content=validated["content"],
+                    still_type=validated["still_type"],
+                    user_id=validated["user_id"],
+                    exclude_job_id=validated["job_id"]
+                )
+
+                if duplicate and score >= DUPLICATE_HIGH_THRESHOLD:
+                    # Skip - this is essentially a duplicate
+                    logger.info(
+                        f"Skipping duplicate still (score={score:.2f}): "
+                        f"'{validated['content'][:50]}...' matches existing still {duplicate['id']}"
+                    )
+                    result["skipped_duplicates"] += 1
+                    result["duplicate_details"].append({
+                        "new_content_preview": validated["content"][:100],
+                        "existing_still_id": duplicate["id"],
+                        "similarity_score": round(score, 3),
+                        "still_type": validated["still_type"]
+                    })
+                    continue
 
             # Handle best_formats: PostgreSQL uses TEXT[], SQLite uses JSON
             if settings.use_postgres:
@@ -276,12 +408,15 @@ async def save_stills_to_db(
                     validated["performance"],
                 )
             )
-            count += 1
+            result["saved"] += 1
 
         if not settings.use_postgres:
             await db.commit()
 
-    return count
+    if result["skipped_duplicates"] > 0:
+        logger.info(f"Duplicate detection: saved {result['saved']}, skipped {result['skipped_duplicates']} duplicates")
+
+    return result
 
 
 async def save_outputs_to_db(outputs: list[dict], job_id: str, campaign_name: Optional[str] = None) -> int:
