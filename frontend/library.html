@@ -638,6 +638,183 @@
         loadPersonas();
         loadLibrary();
         loadStats();
+
+        // SOT Modal State
+        let currentSOTJobId = null;
+        let currentSOTData = null;
+        let sotEditMode = false;
+
+        async function openSOTModal(jobId, sourceId, isApproved) {
+            currentSOTJobId = jobId;
+
+            try {
+                const response = await Auth.fetchWithAuth(`/api/jobs/${jobId}/source`);
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        showToast('Source of Truth not found');
+                        return;
+                    }
+                    throw new Error('Failed to load Source of Truth');
+                }
+
+                currentSOTData = await response.json();
+                renderSOTModal(currentSOTData, isApproved);
+                document.getElementById('sot-modal').classList.remove('hidden');
+            } catch (err) {
+                console.error('Error loading SOT:', err);
+                showToast('Error loading Source of Truth');
+            }
+        }
+
+        function renderSOTModal(source, isApproved) {
+            // Title
+            document.getElementById('sot-modal-title').textContent = 'Source of Truth';
+
+            // Badge
+            const badge = document.getElementById('sot-modal-badge');
+            if (isApproved) {
+                badge.textContent = 'Approved';
+                badge.className = 'text-xs px-2 py-0.5 rounded bg-still-green/20 text-still-green';
+            } else {
+                badge.textContent = 'Pending';
+                badge.className = 'text-xs px-2 py-0.5 rounded bg-still-amber/20 text-still-amber';
+            }
+
+            // Review date
+            document.getElementById('sot-modal-review-date').textContent =
+                source.review_date ? `Review: ${source.review_date}` : '';
+
+            // Core Narratives
+            const narrativesEl = document.getElementById('sot-modal-narratives');
+            if (source.core_narratives?.length) {
+                narrativesEl.innerHTML = source.core_narratives.map(n => `
+                    <div class="p-2 bg-still-bg rounded border border-still-border">
+                        <p class="text-still-muted">${escapeHtml(n.narrative)}</p>
+                        <p class="text-xs text-still-disabled mt-1">${escapeHtml(n.supporting_evidence || '')}</p>
+                    </div>
+                `).join('');
+            } else {
+                narrativesEl.innerHTML = '<p class="text-still-disabled">No narratives</p>';
+            }
+
+            // Statistics
+            const statsEl = document.getElementById('sot-modal-statistics');
+            if (source.statistics?.length) {
+                statsEl.innerHTML = source.statistics.map(s => `
+                    <tr class="border-b border-still-border">
+                        <td class="px-2 py-1 text-still-muted">${escapeHtml(s.stat)}</td>
+                        <td class="px-2 py-1 text-still-disabled">${escapeHtml(s.citation || '-')}</td>
+                        <td class="px-2 py-1">
+                            <span class="text-xs px-1.5 py-0.5 rounded ${getConfidenceClass(s.confidence)}">${s.confidence || 'unknown'}</span>
+                        </td>
+                    </tr>
+                `).join('');
+            } else {
+                statsEl.innerHTML = '<tr><td colspan="3" class="text-still-disabled py-2">No statistics</td></tr>';
+            }
+
+            // Quotes
+            const quotesEl = document.getElementById('sot-modal-quotes');
+            if (source.quotable_moments?.length) {
+                quotesEl.innerHTML = source.quotable_moments.map(q => `
+                    <blockquote class="border-l-2 border-still-copper pl-3 py-1">
+                        <p class="text-still-muted italic">"${escapeHtml(q.quote)}"</p>
+                        <footer class="text-xs text-still-disabled mt-1">— ${escapeHtml(q.speaker || 'Unknown')}</footer>
+                    </blockquote>
+                `).join('');
+            } else {
+                quotesEl.innerHTML = '<p class="text-still-disabled">No quotes</p>';
+            }
+
+            // Pain Point & Promise
+            document.getElementById('sot-modal-pain-point').textContent = source.primary_pain_point || 'Not specified';
+            document.getElementById('sot-modal-promise').textContent = source.the_promise || 'Not specified';
+
+            // Funnel
+            document.getElementById('sot-modal-funnel').textContent = source.funnel_stage || 'Not specified';
+
+            // Populate edit form values
+            document.getElementById('edit-pain-point').value = source.primary_pain_point || '';
+            document.getElementById('edit-promise').value = source.the_promise || '';
+            document.getElementById('edit-funnel').value = source.funnel_stage || 'awareness';
+
+            // Reset edit mode
+            sotEditMode = false;
+            document.getElementById('sot-modal-content').classList.remove('hidden');
+            document.getElementById('sot-edit-form').classList.add('hidden');
+            document.getElementById('sot-edit-form').setAttribute('aria-hidden', 'true');
+            document.getElementById('sot-save-btn').classList.add('hidden');
+            document.getElementById('sot-edit-toggle').textContent = 'Edit';
+        }
+
+        function getConfidenceClass(confidence) {
+            switch (confidence) {
+                case 'verified': return 'bg-still-green/20 text-still-green';
+                case 'calculated': return 'bg-still-copper/20 text-still-copper';
+                case 'implied': return 'bg-still-amber/20 text-still-amber';
+                default: return 'bg-still-border text-still-muted';
+            }
+        }
+
+        function closeSOTModal() {
+            document.getElementById('sot-modal').classList.add('hidden');
+            currentSOTJobId = null;
+            currentSOTData = null;
+            sotEditMode = false;
+        }
+
+        function toggleSOTEdit() {
+            sotEditMode = !sotEditMode;
+            document.getElementById('sot-modal-content').classList.toggle('hidden', sotEditMode);
+            document.getElementById('sot-edit-form').classList.toggle('hidden', !sotEditMode);
+            document.getElementById('sot-edit-form').setAttribute('aria-hidden', !sotEditMode);
+            document.getElementById('sot-save-btn').classList.toggle('hidden', !sotEditMode);
+            document.getElementById('sot-edit-toggle').textContent = sotEditMode ? 'Cancel' : 'Edit';
+        }
+
+        async function saveSOTChanges() {
+            if (!currentSOTJobId) return;
+
+            const updates = {
+                primary_pain_point: document.getElementById('edit-pain-point').value,
+                the_promise: document.getElementById('edit-promise').value,
+                funnel_stage: document.getElementById('edit-funnel').value
+            };
+
+            try {
+                const response = await Auth.fetchWithAuth(`/api/jobs/${currentSOTJobId}/source`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updates)
+                });
+
+                if (!response.ok) throw new Error('Failed to save changes');
+
+                showToast('Source of Truth updated!');
+
+                // Update local data and re-render
+                currentSOTData = { ...currentSOTData, ...updates };
+                renderSOTModal(currentSOTData, currentSOTData.is_approved);
+                toggleSOTEdit();
+            } catch (err) {
+                console.error('Error saving SOT:', err);
+                showToast('Error saving changes');
+            }
+        }
+
+        // Close modal on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !document.getElementById('sot-modal').classList.contains('hidden')) {
+                closeSOTModal();
+            }
+        });
+
+        // Close modal on backdrop click
+        document.getElementById('sot-modal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'sot-modal') {
+                closeSOTModal();
+            }
+        });
     </script>
 </body>
 </html>
