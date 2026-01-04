@@ -225,13 +225,24 @@ async def process_job(job_id: str):
         if is_document:
             # ======== DOCUMENT PATH: Extract content directly ========
             if not cleaned_transcript:
-                await update_job_status(
-                    job_id, JobStatus.TRANSCRIBING,
-                    "Extracting document content", 15
-                )
-
                 if not file_path.exists():
                     raise FileNotFoundError(f"Upload file not found: {file_path}")
+
+                # Plain text files (.txt, .md, .docx) don't need extraction - just reading
+                ext = file_path.suffix.lower()
+                is_plain_text = ext in [".txt", ".md", ".docx", ".doc"]
+
+                if is_plain_text:
+                    await update_job_status(
+                        job_id, JobStatus.TRANSCRIBING,
+                        "Reading text file...", 15
+                    )
+                else:
+                    # PDFs and images need actual extraction/analysis
+                    await update_job_status(
+                        job_id, JobStatus.TRANSCRIBING,
+                        "Extracting document content...", 15
+                    )
 
                 # Extract document content with image/graph analysis
                 # This goes directly to cleaned_transcript (no cleanup needed for documents)
