@@ -13,6 +13,9 @@ async def score_content(
     content: str,
     content_type: str,
     persona_title: str = "",
+    brand_voice_summary: str = "",
+    brand_tone_markers: str = "",
+    brand_phrases_to_avoid: str = "",
 ) -> Tuple[dict, float]:
     """
     Score content quality across 4 dimensions (0-100 each).
@@ -25,6 +28,19 @@ async def score_content(
 
     Returns (scores_dict, cost) tuple.
     """
+    # Build brand alignment criteria based on provided brand voice
+    if brand_voice_summary or brand_tone_markers:
+        brand_criteria = f"""2. BRAND ALIGNMENT (0-100)
+   - Does it match the brand voice: {brand_voice_summary or 'professional and authentic'}?
+   - Does it reflect the tone markers: {brand_tone_markers or 'authoritative, helpful'}?
+   - Does it AVOID these phrases/patterns: {brand_phrases_to_avoid or 'overly salesy language'}?
+   - Would this sound like the brand if read aloud?"""
+    else:
+        brand_criteria = """2. BRAND ALIGNMENT (0-100)
+   - Is the tone professional and authentic?
+   - Does it avoid overly salesy language?
+   - Would a thought leader share this?"""
+
     prompt = f"""Score this {content_type} content across 4 quality dimensions (0-100 each).
 
 CONTENT:
@@ -39,10 +55,7 @@ Evaluate these 4 dimensions:
    - Is there a compelling first line?
    - Would someone stop scrolling to read this?
 
-2. BRAND ALIGNMENT (0-100)
-   - Is the tone professional and authentic?
-   - Does it avoid overly salesy language?
-   - Would a thought leader share this?
+{brand_criteria}
 
 3. CLARITY (0-100)
    - Is it easy to understand?
@@ -99,6 +112,9 @@ OUTPUT FORMAT (valid JSON):
 async def batch_score_content(
     outputs: list[dict],
     persona_title: str = "",
+    brand_voice_summary: str = "",
+    brand_tone_markers: str = "",
+    brand_phrases_to_avoid: str = "",
 ) -> Tuple[list[dict], float]:
     """
     Score multiple content outputs.
@@ -118,7 +134,14 @@ async def batch_score_content(
             continue
 
         try:
-            scores, cost = await score_content(content, content_type, persona_title)
+            scores, cost = await score_content(
+                content,
+                content_type,
+                persona_title,
+                brand_voice_summary,
+                brand_tone_markers,
+                brand_phrases_to_avoid,
+            )
             total_cost += cost
 
             output["quality_scores"] = scores

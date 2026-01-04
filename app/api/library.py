@@ -618,6 +618,115 @@ async def create_library_entry(
     }
 
 
+class PatchStillRequest(BaseModel):
+    """Request model for partial still updates."""
+    status: Optional[str] = None
+    performance: Optional[str] = None
+    funnel_stage: Optional[str] = None
+    expiration_date: Optional[str] = None
+    expiration_type: Optional[str] = None
+    user_notes: Optional[str] = None
+
+
+@router.patch("/library/{entry_id}")
+async def patch_library_entry(
+    entry_id: int,
+    request: PatchStillRequest,
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Partially update a still in the Reserve.
+
+    Allows updating individual fields like status, performance, funnel_stage,
+    expiration settings, etc. without providing the full entry.
+    """
+    # Validate status if provided
+    if request.status:
+        valid_statuses = {"active", "evergreen", "needs_review", "retired"}
+        if request.status not in valid_statuses:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status. Must be one of: {', '.join(sorted(valid_statuses))}"
+            )
+
+    # Validate performance if provided
+    if request.performance:
+        valid_performance = {"low", "medium", "high"}
+        if request.performance not in valid_performance:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid performance. Must be one of: {', '.join(sorted(valid_performance))}"
+            )
+
+    # Validate funnel_stage if provided
+    if request.funnel_stage:
+        valid_stages = {"awareness", "consideration", "decision"}
+        if request.funnel_stage not in valid_stages:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid funnel_stage. Must be one of: {', '.join(sorted(valid_stages))}"
+            )
+
+    # Validate expiration_type if provided
+    if request.expiration_type:
+        valid_exp_types = {"evergreen", "date_bound", "event_bound"}
+        if request.expiration_type not in valid_exp_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid expiration_type. Must be one of: {', '.join(sorted(valid_exp_types))}"
+            )
+
+    async with get_db() as db:
+        # Verify ownership
+        row = await fetchone(
+            db,
+            "SELECT id FROM content_library WHERE id = ? AND user_id = ?",
+            (entry_id, user_id)
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail="Entry not found")
+
+        # Build dynamic update query
+        updates = []
+        params = []
+
+        if request.status is not None:
+            updates.append("status = ?")
+            params.append(request.status)
+
+        if request.performance is not None:
+            updates.append("performance = ?")
+            params.append(request.performance if request.performance else None)
+
+        if request.funnel_stage is not None:
+            updates.append("funnel_stage = ?")
+            params.append(request.funnel_stage)
+
+        if request.expiration_date is not None:
+            updates.append("expiration_date = ?")
+            params.append(request.expiration_date if request.expiration_date else None)
+
+        if request.expiration_type is not None:
+            updates.append("expiration_type = ?")
+            params.append(request.expiration_type)
+
+        if request.user_notes is not None:
+            updates.append("user_notes = ?")
+            params.append(request.user_notes)
+
+        if not updates:
+            raise HTTPException(status_code=400, detail="No fields to update")
+
+        params.append(entry_id)
+        query = f"UPDATE content_library SET {', '.join(updates)} WHERE id = ?"
+
+        await execute(db, query, tuple(params))
+        if not settings.use_postgres:
+            await db.commit()
+
+    return {"message": "Still updated successfully", "id": entry_id}
+
+
 @router.put("/library/{entry_id}")
 async def update_library_entry(
     entry_id: int,

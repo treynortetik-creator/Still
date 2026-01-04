@@ -40,9 +40,12 @@ EDITING CHECKLIST:
    - Length appropriate for their available time?
 
 PERSONA-SPECIFIC CONSIDERATIONS:
-- For executives: Lead with ROI, keep it concise
-- For clinical: Include evidence, maintain professionalism
-- For marketing: Focus on differentiation, allow more creativity
+Based on the persona's role ({persona_title}) and priorities ({persona_priorities}), apply appropriate adjustments:
+- For executive/leadership roles: Lead with ROI and business impact, keep it concise
+- For technical/specialist roles: Include evidence and data, maintain precision
+- For marketing/creative roles: Focus on differentiation, allow more creativity
+- For operational roles: Emphasize practical implementation and efficiency
+Adapt guidance based on the persona's actual industry and responsibilities.
 
 OUTPUT REQUIREMENTS:
 - Return the fully edited content

@@ -8,6 +8,8 @@ from app.services.ai_client import call_llm_text, calculate_openrouter_cost
 from app.services.prompt_manager import get_rendered_prompt
 from app.services.persona_manager import get_persona_for_job
 from app.services.distillation import select_stills_for_content_type, group_stills_by_type
+from app.services.brand_voice_analyzer import get_brand_voice_template_vars
+from app.services.source_of_truth import get_source_of_truth_template_vars
 from app.utils.json_parser import parse_llm_json
 from app.config import get_settings
 from app.database import get_db
@@ -258,6 +260,16 @@ async def draft_linkedin_posts(
         "persona_pain_points": ", ".join(persona["pain_points"]),
     }
 
+    # Inject brand voice variables if user_id provided
+    if user_id:
+        brand_vars = await get_brand_voice_template_vars(user_id, content_type="linkedin")
+        variables.update(brand_vars)
+
+    # Inject source of truth variables if job_id provided
+    if job_id:
+        sot_vars = await get_source_of_truth_template_vars(job_id)
+        variables.update(sot_vars)
+
     prompt, config = await get_rendered_prompt("linkedin_draft", variables)
 
     # Get user-specific context (memory rules, style DNA, brand voice)
@@ -356,6 +368,16 @@ async def draft_blog_post(
         "persona_title": persona["title"],
     }
 
+    # Inject brand voice variables if user_id provided
+    if user_id:
+        brand_vars = await get_brand_voice_template_vars(user_id, content_type="blog")
+        variables.update(brand_vars)
+
+    # Inject source of truth variables if job_id provided
+    if job_id:
+        sot_vars = await get_source_of_truth_template_vars(job_id)
+        variables.update(sot_vars)
+
     prompt, config = await get_rendered_prompt("blog_draft", variables)
 
     # Get user-specific context (memory rules, style DNA, brand voice)
@@ -428,6 +450,16 @@ async def draft_email(
         "persona_priorities": ", ".join(persona["priorities"]),
         "persona_pain_points": ", ".join(persona["pain_points"]),
     }
+
+    # Inject brand voice variables if user_id provided
+    if user_id:
+        brand_vars = await get_brand_voice_template_vars(user_id, content_type="email")
+        variables.update(brand_vars)
+
+    # Inject source of truth variables if job_id provided
+    if job_id:
+        sot_vars = await get_source_of_truth_template_vars(job_id)
+        variables.update(sot_vars)
 
     prompt, config = await get_rendered_prompt("email_draft", variables)
 

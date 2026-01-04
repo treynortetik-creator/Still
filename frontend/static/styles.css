@@ -935,6 +935,24 @@ select {
     box-shadow: 0 0 12px var(--still-copper-glow);
 }
 
+/* Navigation badge for notification counts */
+.nav-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 var(--space-1);
+    margin-left: var(--space-1);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1;
+    color: white;
+    background: var(--still-copper);
+    border-radius: var(--radius-full);
+    box-shadow: 0 0 8px var(--still-copper-glow);
+}
+
 /* Theme toggle */
 .theme-toggle {
     display: flex;

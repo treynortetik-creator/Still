@@ -179,8 +179,220 @@ async function extendReview(sourceId) {
 }
 
 async function showStillDetail(stillId) {
-    console.log('Show still:', stillId);
-    // Will be implemented in Task 8
+    try {
+        // Find the still in dashboardData
+        let still = null;
+        for (const cat of Object.values(dashboardData.stills_needing_attention || {})) {
+            still = cat.find(s => s.id === stillId);
+            if (still) break;
+        }
+        if (!still) {
+            still = (dashboardData.top_performers || []).find(s => s.id === stillId);
+        }
+
+        if (!still) {
+            Utils.showToast('Still not found', 'error');
+            return;
+        }
+
+        // Fetch outputs that use this still
+        let outputs = [];
+        try {
+            const outputsResp = await fetch(`/api/refresh/stills/${stillId}/outputs`, {
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            if (outputsResp.ok) {
+                const data = await outputsResp.json();
+                outputs = data.outputs || [];
+            }
+        } catch (e) {
+            console.debug('Failed to fetch outputs:', e);
+        }
+
+        // Render modal
+        const modalBody = document.getElementById('still-modal-body');
+        modalBody.innerHTML = `
+            <div class="flex justify-between items-start mb-6">
+                <h2 class="text-xl font-bold text-still-text">Still Detail</h2>
+                <button onclick="closeStillModal()" class="btn btn-icon">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Still Content -->
+            <div class="bg-still-bg p-4 rounded-lg mb-6">
+                <p class="text-still-text leading-relaxed">${Utils.escapeHtml(still.content)}</p>
+            </div>
+
+            <!-- Properties Grid -->
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label class="form-label">Type</label>
+                    <span class="badge badge-${getTypeBadge(still.still_type)}">${Utils.escapeHtml(still.still_type || 'Unknown')}</span>
+                </div>
+                <div>
+                    <label class="form-label">Funnel Stage</label>
+                    <span class="text-still-text">${Utils.escapeHtml(still.funnel_stage || 'Not set')}</span>
+                </div>
+                <div>
+                    <label class="form-label">Status</label>
+                    <select id="still-status" class="input-premium w-full" onchange="updateStillStatus('${stillId}', this.value)">
+                        <option value="active" ${still.status === 'active' ? 'selected' : ''}>Active</option>
+                        <option value="evergreen" ${still.status === 'evergreen' ? 'selected' : ''}>Evergreen</option>
+                        <option value="needs_review" ${still.status === 'needs_review' ? 'selected' : ''}>Needs Review</option>
+                        <option value="retired" ${still.status === 'retired' ? 'selected' : ''}>Retired</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label">Performance</label>
+                    <select id="still-performance" class="input-premium w-full" onchange="updateStillPerformance('${stillId}', this.value)">
+                        <option value="" ${!still.performance ? 'selected' : ''}>Not rated</option>
+                        <option value="low" ${still.performance === 'low' ? 'selected' : ''}>Low</option>
+                        <option value="medium" ${still.performance === 'medium' ? 'selected' : ''}>Medium</option>
+                        <option value="high" ${still.performance === 'high' ? 'selected' : ''}>High</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Expiration Info -->
+            ${still.expiration_date ? `
+            <div class="mb-6 p-3 rounded-lg ${isExpired(still.expiration_date) ? 'bg-error-subtle' : 'bg-still-card'}">
+                <p class="text-sm ${isExpired(still.expiration_date) ? 'text-error' : 'text-still-muted'}">
+                    <strong>Expiration:</strong> ${formatDate(still.expiration_date)}
+                    ${still.expiration_type ? `(${still.expiration_type})` : ''}
+                </p>
+            </div>
+            ` : ''}
+
+            <!-- Usage Stats -->
+            <div class="border-t border-still-border pt-4 mb-6">
+                <h3 class="text-sm font-semibold text-still-muted mb-3 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    USAGE STATS
+                </h3>
+                <p class="text-still-text">
+                    Used <strong>${still.usage_count || 0}</strong> times
+                    ${still.last_used_at ? ` · Last used: ${formatDate(still.last_used_at)}` : ''}
+                </p>
+            </div>
+
+            <!-- Outputs Using This Still -->
+            <div class="border-t border-still-border pt-4 mb-6">
+                <h3 class="text-sm font-semibold text-still-muted mb-3 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    OUTPUTS USING THIS STILL
+                </h3>
+                ${outputs.length > 0 ? `
+                    <div class="space-y-2">
+                        ${outputs.slice(0, 5).map(output => `
+                            <div class="p-2 bg-still-bg rounded flex justify-between items-center">
+                                <div>
+                                    <span class="badge badge-${getPlatformBadge(output.content_type)} text-xs">${Utils.escapeHtml(output.content_type)}</span>
+                                    <span class="text-sm text-still-text ml-2">${formatDate(output.created_at)}</span>
+                                </div>
+                                <span class="text-xs text-still-muted truncate max-w-xs">${Utils.escapeHtml((output.content || '').substring(0, 50))}...</span>
+                            </div>
+                        `).join('')}
+                        ${outputs.length > 5 ? `<p class="text-xs text-still-muted">+${outputs.length - 5} more</p>` : ''}
+                    </div>
+                ` : '<p class="text-sm text-still-disabled">No outputs yet</p>'}
+            </div>
+
+            <!-- Source Context -->
+            ${still.source_name ? `
+            <div class="border-t border-still-border pt-4">
+                <h3 class="text-sm font-semibold text-still-muted mb-3 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                    </svg>
+                    SOURCE CONTEXT
+                </h3>
+                <p class="text-sm text-still-text">From: <strong>${Utils.escapeHtml(still.source_name)}</strong></p>
+            </div>
+            ` : ''}
+        `;
+
+        document.getElementById('still-modal').classList.remove('hidden');
+    } catch (error) {
+        console.error('Error showing still detail:', error);
+        Utils.showToast('Failed to load still details', 'error');
+    }
+}
+
+async function updateStillStatus(stillId, newStatus) {
+    try {
+        const response = await fetch(`/api/library/${stillId}`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status: newStatus })
+        });
+
+        if (response.ok) {
+            Utils.showToast('Status updated', 'success');
+            await loadDashboard();
+        } else {
+            throw new Error('Update failed');
+        }
+    } catch (error) {
+        Utils.showToast('Failed to update status', 'error');
+    }
+}
+
+async function updateStillPerformance(stillId, newPerformance) {
+    try {
+        const response = await fetch(`/api/library/${stillId}`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ performance: newPerformance || null })
+        });
+
+        if (response.ok) {
+            Utils.showToast('Performance updated', 'success');
+            await loadDashboard();
+        } else {
+            throw new Error('Update failed');
+        }
+    } catch (error) {
+        Utils.showToast('Failed to update performance', 'error');
+    }
+}
+
+function getTypeBadge(type) {
+    const badges = {
+        'data': 'data',
+        'story': 'story',
+        'insight': 'insight',
+        'problem': 'problem',
+        'solution': 'solution',
+        'quote': 'quote'
+    };
+    return badges[type?.toLowerCase()] || 'muted';
+}
+
+function getPlatformBadge(platform) {
+    const badges = {
+        'linkedin': 'info',
+        'twitter': 'info',
+        'email': 'muted'
+    };
+    return badges[platform?.toLowerCase()] || 'muted';
+}
+
+function isExpired(dateStr) {
+    if (!dateStr) return false;
+    return new Date(dateStr) < new Date();
 }
 
 async function bulkRetire() {
@@ -268,5 +480,5 @@ function formatDate(dateStr) {
 }
 
 function getToken() {
-    return localStorage.getItem('token') || '';
+    return localStorage.getItem('auth_token') || '';
 }

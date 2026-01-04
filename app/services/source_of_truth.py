@@ -285,3 +285,43 @@ async def get_statistics_for_factcheck(source_id: int) -> list:
         return []
 
     return source.get("statistics", [])
+
+
+async def get_source_of_truth_template_vars(job_id: str) -> Dict:
+    """
+    Get Source of Truth as template variables for prompt injection.
+
+    Args:
+        job_id: Job ID to get source of truth for
+
+    Returns:
+        Dict with keys: core_narratives, primary_pain_point, the_promise
+    """
+    result = {
+        "core_narratives": "",
+        "primary_pain_point": "",
+        "the_promise": "",
+    }
+
+    if not job_id:
+        return result
+
+    source = await get_source_of_truth_by_job(job_id)
+    if not source:
+        return result
+
+    # Format core narratives as bullet list
+    narratives = source.get("core_narratives", [])
+    if narratives:
+        if isinstance(narratives, list):
+            result["core_narratives"] = "\n".join([f"- {n}" for n in narratives])
+        else:
+            result["core_narratives"] = str(narratives)
+
+    if source.get("primary_pain_point"):
+        result["primary_pain_point"] = source["primary_pain_point"]
+
+    if source.get("the_promise"):
+        result["the_promise"] = source["the_promise"]
+
+    return result

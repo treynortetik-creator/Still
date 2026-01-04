@@ -66,7 +66,7 @@ ORIGINAL POST:
 Create 5 hook variations, one for each type:
 
 1. QUESTION HOOK: Opens with a thought-provoking question that creates curiosity
-2. STAT HOOK: Opens with a surprising statistic or data point (can be implied/estimated if no exact stat in original)
+2. STAT HOOK: Opens with a surprising statistic FROM THE ORIGINAL POST ONLY. If no specific stat/data exists in the original, write "NO_STAT_AVAILABLE" for this hook instead of inventing one
 3. STORY HOOK: Opens with a brief story starter or personal angle
 4. BOLD CLAIM HOOK: Opens with a contrarian or provocative statement
 5. PROBLEM HOOK: Opens by directly addressing a specific pain point

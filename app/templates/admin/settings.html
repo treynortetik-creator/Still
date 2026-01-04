@@ -207,6 +207,77 @@
 
 </div>
 
+    <!-- Refresh Settings Section -->
+    <div class="admin-card border rounded-lg shadow lg:col-span-2">
+        <div class="px-6 py-4 border-b" style="border-color: var(--admin-border);">
+            <h2 class="text-lg font-semibold">Refresh Settings</h2>
+            <p class="text-sm" style="color: var(--admin-text-muted);">Configure content refresh and maintenance behavior</p>
+        </div>
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Still Matching Model -->
+                <div>
+                    <label class="block text-sm font-medium mb-1" style="color: var(--admin-text);">Still Matching Model</label>
+                    <div class="flex gap-2">
+                        <select id="model-still_matching" class="flex-1 border rounded px-3 py-2 admin-card" style="border-color: var(--admin-border);">
+                            <option value="">-- Select a model --</option>
+                        </select>
+                        <button onclick="loadOpenRouterModels('still_matching')"
+                            class="px-3 py-2 rounded whitespace-nowrap hover:opacity-80" style="background-color: var(--admin-border); color: var(--admin-text);">
+                            Load
+                        </button>
+                    </div>
+                    <p class="text-xs mt-1" style="color: var(--admin-text-muted);">Used for semantic matching during source refresh</p>
+                    <p id="status-still_matching" class="text-xs mt-1"></p>
+                </div>
+
+                <!-- Expiration Warning Days -->
+                <div>
+                    <label class="block text-sm font-medium mb-1" style="color: var(--admin-text);">Expiration Warning Days</label>
+                    <input type="number" id="expiration-warning-days" min="1" max="365" value="30"
+                        class="w-full border rounded px-3 py-2 admin-card" style="border-color: var(--admin-border);">
+                    <p class="text-xs mt-1" style="color: var(--admin-text-muted);">Flag stills this many days before expiration</p>
+                </div>
+
+                <!-- Fuzzy Match High Threshold -->
+                <div>
+                    <label class="block text-sm font-medium mb-1" style="color: var(--admin-text);">Fuzzy Match High Threshold</label>
+                    <input type="number" id="fuzzy-match-high" min="0" max="1" step="0.05" value="0.85"
+                        class="w-full border rounded px-3 py-2 admin-card" style="border-color: var(--admin-border);">
+                    <p class="text-xs mt-1" style="color: var(--admin-text-muted);">Score above this = high confidence match (0-1)</p>
+                </div>
+
+                <!-- Fuzzy Match Low Threshold -->
+                <div>
+                    <label class="block text-sm font-medium mb-1" style="color: var(--admin-text);">Fuzzy Match Low Threshold</label>
+                    <input type="number" id="fuzzy-match-low" min="0" max="1" step="0.05" value="0.50"
+                        class="w-full border rounded px-3 py-2 admin-card" style="border-color: var(--admin-border);">
+                    <p class="text-xs mt-1" style="color: var(--admin-text-muted);">Score below this = no match, above = use LLM (0-1)</p>
+                </div>
+
+                <!-- Auto-retire Expired -->
+                <div class="md:col-span-2">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="auto-retire-expired" checked
+                            class="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        <span class="text-sm font-medium" style="color: var(--admin-text);">Auto-retire expired stills</span>
+                    </label>
+                    <p class="text-xs mt-1 ml-6" style="color: var(--admin-text-muted);">
+                        Automatically set stills to "retired" status when past expiration date (during maintenance runs)
+                    </p>
+                </div>
+            </div>
+
+            <div class="pt-4 mt-4 border-t" style="border-color: var(--admin-border);">
+                <button onclick="saveRefreshSettings()"
+                    class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                    Save Refresh Settings
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Success Toast -->
 <div id="success-toast" class="hidden fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg">
     Settings saved successfully!
@@ -292,6 +363,15 @@ async function loadSettings() {
             if (data.models.factcheck) document.getElementById('model-factcheck').dataset.savedValue = data.models.factcheck;
             if (data.models.workshop_ai_edit) document.getElementById('model-workshop_ai_edit').dataset.savedValue = data.models.workshop_ai_edit;
             if (data.models.sommelier) document.getElementById('model-sommelier').dataset.savedValue = data.models.sommelier;
+            if (data.models.still_matching) document.getElementById('model-still_matching').dataset.savedValue = data.models.still_matching;
+        }
+
+        // Load refresh settings
+        if (data.refresh_settings) {
+            document.getElementById('expiration-warning-days').value = data.refresh_settings.expiration_warning_days || 30;
+            document.getElementById('fuzzy-match-high').value = data.refresh_settings.fuzzy_match_high_threshold || 0.85;
+            document.getElementById('fuzzy-match-low').value = data.refresh_settings.fuzzy_match_low_threshold || 0.50;
+            document.getElementById('auto-retire-expired').checked = data.refresh_settings.auto_retire_expired !== false;
         }
 
     } catch (err) {
@@ -338,7 +418,8 @@ async function saveModelConfig() {
         editing: document.getElementById('model-editing').value,
         factcheck: document.getElementById('model-factcheck').value,
         workshop_ai_edit: document.getElementById('model-workshop_ai_edit').value,
-        sommelier: document.getElementById('model-sommelier').value
+        sommelier: document.getElementById('model-sommelier').value,
+        still_matching: document.getElementById('model-still_matching').value
     };
     
     try {
@@ -358,6 +439,35 @@ async function saveModelConfig() {
     } catch (err) {
         console.error('Model config save exception:', err);
         showError('Failed to save model configuration: ' + err.message);
+    }
+}
+
+async function saveRefreshSettings() {
+    const settings = {
+        still_matching_model: document.getElementById('model-still_matching').value,
+        fuzzy_match_high_threshold: parseFloat(document.getElementById('fuzzy-match-high').value) || 0.85,
+        fuzzy_match_low_threshold: parseFloat(document.getElementById('fuzzy-match-low').value) || 0.50,
+        auto_retire_expired: document.getElementById('auto-retire-expired').checked,
+        expiration_warning_days: parseInt(document.getElementById('expiration-warning-days').value) || 30
+    };
+
+    try {
+        const response = await fetch('/api/admin/settings/refresh', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(settings)
+        });
+
+        if (response.ok) {
+            showSuccess();
+        } else {
+            const data = await response.json();
+            console.error('Refresh settings save error:', data);
+            showError(data.detail || 'Failed to save refresh settings');
+        }
+    } catch (err) {
+        console.error('Refresh settings save exception:', err);
+        showError('Failed to save refresh settings: ' + err.message);
     }
 }
 

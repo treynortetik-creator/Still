@@ -470,3 +470,98 @@ async def get_brand_voice_config_context(user_id: int, content_type: str = None)
         context_parts.append("")
 
         return "\n".join(context_parts)
+
+
+async def get_brand_voice_template_vars(user_id: int, content_type: str = None) -> Dict:
+    """
+    Get brand voice as template variables for prompt injection.
+
+    Combines both AI-analyzed profile and manual config into
+    a dict that can be merged into template variables.
+
+    Args:
+        user_id: User ID
+        content_type: "linkedin", "blog", or "email" for platform-specific values
+
+    Returns:
+        Dict with keys: brand_voice_summary, brand_tone_markers,
+                       brand_phrases_to_use, brand_phrases_to_avoid,
+                       brand_vocabulary_level, emoji_preference
+    """
+    result = {
+        "brand_voice_summary": "",
+        "brand_tone_markers": "",
+        "brand_phrases_to_use": "",
+        "brand_phrases_to_avoid": "",
+        "brand_vocabulary_level": "professional",
+        "emoji_preference": "Use emojis sparingly and professionally",
+    }
+
+    # Try to get AI-analyzed profile first
+    profile = await get_brand_voice_profile(user_id)
+    if profile:
+        if profile.get("overall_summary"):
+            result["brand_voice_summary"] = profile["overall_summary"]
+        if profile.get("tone_markers"):
+            result["brand_tone_markers"] = ", ".join(profile["tone_markers"])
+        if profile.get("phrases_to_use"):
+            result["brand_phrases_to_use"] = "; ".join(profile["phrases_to_use"])
+        if profile.get("phrases_to_avoid"):
+            result["brand_phrases_to_avoid"] = "; ".join(profile["phrases_to_avoid"])
+
+    # Override/supplement with manual config
+    async with get_db() as db:
+        row = await fetchone(
+            db,
+            """
+            SELECT vocabulary_level, tone_linkedin, tone_blog, tone_email,
+                   phrases_to_use, phrases_to_avoid, core_principles,
+                   emoji_preference
+            FROM brand_voice_config
+            WHERE user_id = ?
+            """,
+            (user_id,)
+        )
+
+        if row:
+            # Vocabulary level
+            if row["vocabulary_level"]:
+                result["brand_vocabulary_level"] = row["vocabulary_level"]
+
+            # Platform-specific tone as summary if no profile exists
+            tone_map = {
+                "linkedin": row["tone_linkedin"],
+                "blog": row["tone_blog"],
+                "email": row["tone_email"],
+            }
+            if content_type and tone_map.get(content_type):
+                if not result["brand_voice_summary"]:
+                    result["brand_voice_summary"] = tone_map[content_type]
+                # Add to tone markers
+                if result["brand_tone_markers"]:
+                    result["brand_tone_markers"] += f"; {tone_map[content_type]}"
+                else:
+                    result["brand_tone_markers"] = tone_map[content_type]
+
+            # Core principles as tone markers if no profile
+            if row["core_principles"] and not result["brand_tone_markers"]:
+                principles = json.loads(row["core_principles"])
+                if principles:
+                    result["brand_tone_markers"] = "; ".join(principles)
+
+            # Manual phrases override AI-detected ones
+            if row["phrases_to_use"]:
+                phrases = json.loads(row["phrases_to_use"])
+                if phrases:
+                    result["brand_phrases_to_use"] = "; ".join(phrases)
+
+            if row["phrases_to_avoid"]:
+                avoid = json.loads(row["phrases_to_avoid"])
+                if avoid:
+                    result["brand_phrases_to_avoid"] = "; ".join(avoid)
+
+            # Emoji preference
+            if row["emoji_preference"]:
+                result["emoji_preference"] = row["emoji_preference"]
+
+    return result

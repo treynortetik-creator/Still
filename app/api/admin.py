@@ -571,18 +571,43 @@ class SommelierConfigRequest(BaseModel):
 
 
 @router.get("/settings")
-async def get_settings(_: bool = Depends(verify_admin)):
-    """Get current settings including API key status and model config."""
+async def get_settings_endpoint(_: bool = Depends(verify_admin)):
+    """Get current settings including API key status, model config, and refresh settings."""
     import logging
     logger = logging.getLogger(__name__)
     try:
         settings = settings_manager.get_settings()
         api_keys = settings_manager.get_api_key_status()
 
+        # Load refresh settings from database
+        refresh_settings = {}
+        try:
+            async with get_db() as db:
+                refresh_keys = [
+                    "still_matching_model", "fuzzy_match_high_threshold",
+                    "fuzzy_match_low_threshold", "auto_retire_expired",
+                    "expiration_warning_days"
+                ]
+                for key in refresh_keys:
+                    row = await fetchone(db, "SELECT value FROM settings WHERE key = ?", (key,))
+                    if row:
+                        value = row["value"]
+                        if key in ("fuzzy_match_high_threshold", "fuzzy_match_low_threshold"):
+                            refresh_settings[key] = float(value)
+                        elif key == "expiration_warning_days":
+                            refresh_settings[key] = int(value)
+                        elif key == "auto_retire_expired":
+                            refresh_settings[key] = value.lower() == "true"
+                        else:
+                            refresh_settings[key] = value
+        except Exception as e:
+            logger.warning(f"Error loading refresh settings: {e}")
+
         return {
             "api_keys": api_keys,
             "use_openrouter": settings.get("use_openrouter", False),
-            "models": settings.get("models", {})
+            "models": settings.get("models", {}),
+            "refresh_settings": refresh_settings
         }
     except Exception as e:
         logger.error(f"Error loading settings: {e}", exc_info=True)
@@ -590,7 +615,8 @@ async def get_settings(_: bool = Depends(verify_admin)):
         return {
             "api_keys": {"openrouter": False, "gemini": False, "anthropic": False},
             "use_openrouter": True,
-            "models": {}
+            "models": {},
+            "refresh_settings": {}
         }
 
 
@@ -638,6 +664,50 @@ async def save_model_config(config: ModelConfig, _: bool = Depends(verify_admin)
         "workshop_ai_edit": config.workshop_ai_edit,
     })
     return {"status": "ok", "models": config.model_dump()}
+
+
+class RefreshSettingsRequest(BaseModel):
+    """Request model for refresh settings."""
+    still_matching_model: Optional[str] = None
+    fuzzy_match_high_threshold: Optional[float] = 0.85
+    fuzzy_match_low_threshold: Optional[float] = 0.50
+    auto_retire_expired: Optional[bool] = True
+    expiration_warning_days: Optional[int] = 30
+
+
+@router.post("/settings/refresh")
+async def save_refresh_settings(request: RefreshSettingsRequest, _: bool = Depends(verify_admin)):
+    """Save refresh/maintenance settings."""
+    async with get_db() as db:
+        settings_to_save = [
+            ("still_matching_model", request.still_matching_model or ""),
+            ("fuzzy_match_high_threshold", str(request.fuzzy_match_high_threshold)),
+            ("fuzzy_match_low_threshold", str(request.fuzzy_match_low_threshold)),
+            ("auto_retire_expired", "true" if request.auto_retire_expired else "false"),
+            ("expiration_warning_days", str(request.expiration_warning_days)),
+        ]
+
+        for key, value in settings_to_save:
+            if app_settings.use_postgres:
+                await db.execute(
+                    """
+                    INSERT INTO settings (key, value)
+                    VALUES ($1, $2)
+                    ON CONFLICT (key) DO UPDATE SET value = $2
+                    """,
+                    key, value
+                )
+            else:
+                await execute(
+                    db,
+                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                    (key, value)
+                )
+
+        if not app_settings.use_postgres:
+            await db.commit()
+
+    return {"status": "ok", "message": "Refresh settings saved"}
 
 
 @router.get("/error-logs")

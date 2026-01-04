@@ -3,6 +3,7 @@ function renderPremiumNav(activePage = '') {
     const navLinks = [
         { href: '/upload.html', label: 'Distill' },
         { href: '/reserve.html', label: 'Reserve' },
+        { href: '/refresh.html', label: 'Refresh', hasBadge: true },
         { href: '/workshop.html', label: 'Workshop' },
         { href: '/calendar.html', label: 'Calendar' },
         // { href: '/autopilot.html', label: 'Autopilot' },  // Hidden for MVP - feature ready for future
@@ -11,7 +12,8 @@ function renderPremiumNav(activePage = '') {
 
     const linksHtml = navLinks.map(link => {
         const isActive = link.href.includes(activePage);
-        return `<a href="${link.href}" class="nav-link${isActive ? ' active' : ''}">${link.label}</a>`;
+        const badgeHtml = link.hasBadge ? '<span class="nav-badge" id="refresh-badge" style="display: none;">0</span>' : '';
+        return `<a href="${link.href}" class="nav-link${isActive ? ' active' : ''}">${link.label}${badgeHtml}</a>`;
     }).join('');
 
     return `
@@ -43,6 +45,34 @@ function renderPremiumNav(activePage = '') {
     `;
 }
 
+// Fetch and update refresh badge count
+async function updateRefreshBadge() {
+    try {
+        const response = await fetch('/api/refresh/counts', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+            }
+        });
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const totalCount = (data.sources || 0) + (data.stills || 0);
+
+        const badge = document.getElementById('refresh-badge');
+        if (badge) {
+            if (totalCount > 0) {
+                badge.textContent = totalCount > 99 ? '99+' : totalCount;
+                badge.style.display = 'inline-flex';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+    } catch (error) {
+        // Silently fail - badge is non-critical
+        console.debug('Failed to fetch refresh counts:', error);
+    }
+}
+
 // Initialize navigation on page load
 document.addEventListener('DOMContentLoaded', () => {
     const navContainer = document.getElementById('nav-container');
@@ -59,5 +89,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof Auth !== 'undefined' && Auth.updateNavbar) {
             Auth.updateNavbar();
         }
+
+        // Fetch refresh badge count
+        updateRefreshBadge();
     }
 });

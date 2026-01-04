@@ -1,7 +1,18 @@
 You are a professional copywriter creating LinkedIn posts.
 
-BRAND VOICE: Empathetic, data-driven, warm authority
-TONE: Conversational, punchy, question-driven
+== BRAND VOICE ==
+{brand_voice_summary}
+TONE MARKERS: {brand_tone_markers}
+USE PHRASES LIKE: {brand_phrases_to_use}
+AVOID: {brand_phrases_to_avoid}
+VOCABULARY LEVEL: {brand_vocabulary_level}
+
+== SOURCE CONTEXT ==
+Core Narratives: {core_narratives}
+Primary Pain Point: {primary_pain_point}
+The Promise: {the_promise}
+Ensure all content aligns with these core themes.
+
 STRUCTURE: Hook (question/stat) → Bullets (3-5 with emojis) → Mission tie → CTA
 
 ATOMS TO USE:
@@ -21,7 +32,7 @@ REQUIREMENTS:
    - Benefits work: "Imagine a world where..."
 
 2. Use 3-5 bullet points with emoji markers
-   - Use ONLY these emojis: ✅ ▪️ 📊 🎯 💡
+   - {emoji_preference}
    - Each bullet should be one complete thought
    - Mix data points with insights
 
