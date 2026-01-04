@@ -5,6 +5,7 @@ from typing import Tuple
 from docx import Document
 
 from app.services.ai_client import call_llm_text, call_llm_with_file, calculate_openrouter_cost
+from app.services.prompt_manager import get_rendered_prompt
 
 
 def extract_text_from_docx(file_path: Path) -> str:
@@ -77,11 +78,10 @@ async def transcribe_file(
         except Exception as e:
             raise ValueError(f"Failed to extract text from Word document: {e}")
 
-    # Build prompt with optional magic words
-    vocabulary_section = ""
+    # Build magic_words_section for the prompt template
+    magic_words_section = ""
     if magic_words and magic_words.strip():
-        vocabulary_section = f"""
-IMPORTANT VOCABULARY TO RECOGNIZE ACCURATELY:
+        magic_words_section = f"""IMPORTANT VOCABULARY TO RECOGNIZE ACCURATELY:
 {magic_words}
 
 These are domain-specific terms, brand names, acronyms, or technical terms.
@@ -89,17 +89,10 @@ Make sure to transcribe them correctly as written above.
 
 """
 
-    prompt = f"""{vocabulary_section}Transcribe this content completely and accurately.
-
-Instructions:
-1. Transcribe all spoken words exactly as said
-2. Include speaker labels if there are multiple speakers (e.g., "Speaker 1:", "Speaker 2:")
-3. Note any significant non-verbal sounds in [brackets] (e.g., [applause], [laughter])
-4. For documents/PDFs, extract all readable text content
-5. Preserve paragraph breaks where natural
-6. If there are timestamps visible, include them
-
-Output the full transcript only, no additional commentary."""
+    # Get prompt from database
+    prompt, _config = await get_rendered_prompt("transcription", {
+        "magic_words_section": magic_words_section
+    })
 
     # Call LLM with file (no token limit)
     response_text, input_tokens, output_tokens, model = await call_llm_with_file(
