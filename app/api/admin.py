@@ -560,14 +560,14 @@ async def get_settings_endpoint(_: bool = Depends(verify_admin)):
             async with get_db() as db:
                 refresh_keys = [
                     "still_matching_model", "fuzzy_match_high_threshold",
-                    "fuzzy_match_low_threshold", "auto_retire_expired",
-                    "expiration_warning_days"
+                    "fuzzy_match_low_threshold", "duplicate_similarity_threshold",
+                    "auto_retire_expired", "expiration_warning_days"
                 ]
                 for key in refresh_keys:
                     row = await fetchone(db, "SELECT setting_value FROM global_settings WHERE setting_key = ?", (key,))
                     if row:
                         value = row["setting_value"]
-                        if key in ("fuzzy_match_high_threshold", "fuzzy_match_low_threshold"):
+                        if key in ("fuzzy_match_high_threshold", "fuzzy_match_low_threshold", "duplicate_similarity_threshold"):
                             refresh_settings[key] = float(value)
                         elif key == "expiration_warning_days":
                             refresh_settings[key] = int(value)
@@ -649,6 +649,7 @@ async def save_refresh_settings(request: RefreshSettingsRequest, _: bool = Depen
             ("still_matching_model", request.still_matching_model or ""),
             ("fuzzy_match_high_threshold", str(request.fuzzy_match_high_threshold)),
             ("fuzzy_match_low_threshold", str(request.fuzzy_match_low_threshold)),
+            ("duplicate_similarity_threshold", str(request.duplicate_similarity_threshold)),
             ("auto_retire_expired", "true" if request.auto_retire_expired else "false"),
             ("expiration_warning_days", str(request.expiration_warning_days)),
         ]

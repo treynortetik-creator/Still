@@ -40,6 +40,7 @@ class RefreshSettingsRequest(BaseModel):
     still_matching_model: Optional[str] = None
     fuzzy_match_high_threshold: Optional[float] = 0.85
     fuzzy_match_low_threshold: Optional[float] = 0.50
+    duplicate_similarity_threshold: Optional[float] = 0.90
     auto_retire_expired: Optional[bool] = True
     expiration_warning_days: Optional[int] = 30
 

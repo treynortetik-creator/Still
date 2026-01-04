@@ -270,6 +270,14 @@
                     <p class="text-xs mt-1" style="color: var(--admin-text-muted);">Score below this = no match, above = use LLM (0-1)</p>
                 </div>
 
+                <!-- Duplicate Similarity Threshold -->
+                <div>
+                    <label class="block text-sm font-medium mb-1" style="color: var(--admin-text);">Duplicate Similarity Threshold</label>
+                    <input type="number" id="duplicate-similarity" min="0.50" max="1" step="0.05" value="0.90"
+                        class="w-full border rounded px-3 py-2 admin-card" style="border-color: var(--admin-border);">
+                    <p class="text-xs mt-1" style="color: var(--admin-text-muted);">Minimum similarity to flag as duplicate in Find Duplicates (0.50-1.00)</p>
+                </div>
+
                 <!-- Auto-retire Expired -->
                 <div class="md:col-span-2">
                     <label class="flex items-center gap-2 cursor-pointer">
@@ -387,6 +395,7 @@ async function loadSettings() {
             document.getElementById('expiration-warning-days').value = data.refresh_settings.expiration_warning_days || 30;
             document.getElementById('fuzzy-match-high').value = data.refresh_settings.fuzzy_match_high_threshold || 0.85;
             document.getElementById('fuzzy-match-low').value = data.refresh_settings.fuzzy_match_low_threshold || 0.50;
+            document.getElementById('duplicate-similarity').value = data.refresh_settings.duplicate_similarity_threshold || 0.90;
             document.getElementById('auto-retire-expired').checked = data.refresh_settings.auto_retire_expired !== false;
         }
 
@@ -464,6 +473,7 @@ async function saveRefreshSettings() {
         still_matching_model: document.getElementById('model-still_matching').value,
         fuzzy_match_high_threshold: parseFloat(document.getElementById('fuzzy-match-high').value) || 0.85,
         fuzzy_match_low_threshold: parseFloat(document.getElementById('fuzzy-match-low').value) || 0.50,
+        duplicate_similarity_threshold: parseFloat(document.getElementById('duplicate-similarity').value) || 0.90,
         auto_retire_expired: document.getElementById('auto-retire-expired').checked,
         expiration_warning_days: parseInt(document.getElementById('expiration-warning-days').value) || 30
     };
