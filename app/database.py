@@ -199,7 +199,9 @@ async def _init_postgres_tables(conn: asyncpg.Connection):
             error_type TEXT NOT NULL,
             error_message TEXT,
             stack_trace TEXT,
-            context TEXT,
+            source TEXT DEFAULT 'backend',
+            endpoint TEXT,
+            additional_context JSONB,
             created_at TIMESTAMP DEFAULT NOW()
         )
     """)
@@ -782,7 +784,9 @@ async def _init_sqlite_db():
                 error_type TEXT NOT NULL,
                 error_message TEXT,
                 stack_trace TEXT,
-                context TEXT,
+                source TEXT DEFAULT 'backend',
+                endpoint TEXT,
+                additional_context TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
