@@ -198,6 +198,30 @@ async def get_current_user_id(authorization: Optional[str] = Header(None)) -> in
     return int(user_id)
 
 
+async def get_current_user_id_optional(authorization: Optional[str] = Header(None)) -> Optional[int]:
+    """
+    Dependency to get current user ID from token, or None if not authenticated.
+    Use for endpoints that work with or without auth.
+    """
+    if not authorization:
+        return None
+
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        return None
+
+    token = parts[1]
+    payload = decode_access_token(token)
+
+    if not payload:
+        return None
+
+    user_id = payload.get("sub")
+    if user_id is None:
+        return None
+    return int(user_id)
+
+
 # Admin authentication dependency
 from app.config import get_settings
 from fastapi import Request, Cookie

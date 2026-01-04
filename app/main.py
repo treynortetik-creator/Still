@@ -22,7 +22,7 @@ from app.database import init_db, close_postgres_pool
 logger = logging.getLogger(__name__)
 from app.api import upload, jobs, library, admin, auth, personas, export, feedback, edit
 from app.api import admin_views, swipes, memory, brand_voice, remix, custom_personas, batch
-from app.api import webhooks, calendar, autopilot, sommelier, workshop, refresh
+from app.api import webhooks, calendar, autopilot, sommelier, workshop, refresh, errors
 
 settings = get_settings()
 
@@ -221,6 +221,7 @@ app.include_router(autopilot.router, prefix="/api", tags=["autopilot"])
 app.include_router(sommelier.router, prefix="/api", tags=["sommelier"])
 app.include_router(workshop.router, prefix="/api", tags=["workshop"])
 app.include_router(refresh.router, prefix="/api", tags=["refresh"])
+app.include_router(errors.router, prefix="/api", tags=["errors"])
 
 # Frontend path
 frontend_path = Path(__file__).parent.parent / "frontend"
