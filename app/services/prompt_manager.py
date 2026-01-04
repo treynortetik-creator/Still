@@ -21,6 +21,11 @@ async def init_prompts_from_files():
 
     # Default prompts with their configurations
     default_prompts = {
+        "source_of_truth": {
+            "model": "gemini-2.5-flash",
+            "max_tokens": 8000,
+            "variables": ["cleaned_transcript", "today_date"],
+        },
         "distillation": {
             "model": "gemini-2.5-flash",
             "max_tokens": 8000,
