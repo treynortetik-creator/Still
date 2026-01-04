@@ -15,6 +15,7 @@ from app.models.refresh import (
     BulkExtendReviewRequest,
     MarkPerformerRequest,
     RefreshCounts,
+    MergeDuplicatesRequest,
 )
 from app.services.refresh_tasks import (
     get_stills_needing_attention,
@@ -22,6 +23,8 @@ from app.services.refresh_tasks import (
     get_top_performers,
     get_refresh_counts,
     run_refresh_maintenance,
+    find_duplicate_stills,
+    merge_duplicate_stills,
 )
 
 router = APIRouter()
@@ -235,3 +238,21 @@ async def mark_output_performer(
             await db.commit()
 
     return {"success": True, "stills_updated": len(request.still_ids)}
+
+
+@router.post("/refresh/find-duplicates")
+async def find_duplicates(user_id: int = Depends(get_current_user_id)):
+    """Scan for duplicate stills in user's library."""
+    return await find_duplicate_stills(user_id)
+
+
+@router.post("/refresh/merge-duplicates")
+async def merge_duplicates(
+    request: MergeDuplicatesRequest,
+    user_id: int = Depends(get_current_user_id)
+):
+    """Merge duplicate stills by retiring the loser."""
+    result = await merge_duplicate_stills(request.winner_id, request.loser_id, user_id)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result.get("error", "Merge failed"))
+    return result
