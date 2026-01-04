@@ -589,9 +589,9 @@ async def get_settings_endpoint(_: bool = Depends(verify_admin)):
                     "expiration_warning_days"
                 ]
                 for key in refresh_keys:
-                    row = await fetchone(db, "SELECT value FROM settings WHERE key = ?", (key,))
+                    row = await fetchone(db, "SELECT setting_value FROM global_settings WHERE setting_key = ?", (key,))
                     if row:
-                        value = row["value"]
+                        value = row["setting_value"]
                         if key in ("fuzzy_match_high_threshold", "fuzzy_match_low_threshold"):
                             refresh_settings[key] = float(value)
                         elif key == "expiration_warning_days":
@@ -691,16 +691,16 @@ async def save_refresh_settings(request: RefreshSettingsRequest, _: bool = Depen
             if app_settings.use_postgres:
                 await db.execute(
                     """
-                    INSERT INTO settings (key, value)
+                    INSERT INTO global_settings (setting_key, setting_value)
                     VALUES ($1, $2)
-                    ON CONFLICT (key) DO UPDATE SET value = $2
+                    ON CONFLICT (setting_key) DO UPDATE SET setting_value = $2
                     """,
                     key, value
                 )
             else:
                 await execute(
                     db,
-                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                    "INSERT OR REPLACE INTO global_settings (setting_key, setting_value) VALUES (?, ?)",
                     (key, value)
                 )
 
