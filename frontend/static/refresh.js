@@ -603,6 +603,10 @@ function closeDuplicateModal() {
 }
 
 async function mergeDuplicates(winnerId, loserId, pairIndex) {
+    // Disable all buttons in modal immediately to prevent double-clicks
+    const buttons = document.querySelectorAll('#duplicate-modal button');
+    buttons.forEach(btn => btn.disabled = true);
+
     try {
         const response = await fetch('/api/refresh/merge-duplicates', {
             method: 'POST',
@@ -631,7 +635,28 @@ async function mergeDuplicates(winnerId, loserId, pairIndex) {
         Utils.showToast('Merged - 1 still retired', 'success');
     } catch (error) {
         console.error('Merge error:', error);
-        Utils.showToast(error.message || 'Failed to merge duplicates', 'error');
+
+        // Log to database for production debugging
+        if (typeof ErrorLogger !== 'undefined') {
+            ErrorLogger.log('api_error', error.message, '/api/refresh/merge-duplicates', error.stack, {
+                winner_id: winnerId,
+                loser_id: loserId
+            });
+        }
+
+        // Show friendly message to user
+        const friendlyMessage = typeof ErrorLogger !== 'undefined'
+            ? ErrorLogger.friendlyMessage(error.message)
+            : error.message;
+        Utils.showToast(friendlyMessage, 'error');
+
+        // Close modal since the pair is probably already processed
+        closeDuplicateModal();
+
+        // Refresh the duplicates list to get fresh data
+        await findDuplicates();
+    } finally {
+        buttons.forEach(btn => btn.disabled = false);
     }
 }
 
