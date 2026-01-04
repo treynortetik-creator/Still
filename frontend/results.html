@@ -559,6 +559,10 @@
         let splitPollInterval = null;
 
         function startSplitViewPolling() {
+            // Clear any existing interval first
+            if (splitPollInterval) {
+                clearInterval(splitPollInterval);
+            }
             // Poll every 3 seconds
             splitPollInterval = setInterval(pollSplitStatus, 3000);
             // Also poll immediately
@@ -587,13 +591,17 @@
         }
 
         function updateSplitViewStatus(data) {
-            // Update progress bar
-            document.getElementById('split-current-step').textContent = data.current_step || 'Processing...';
-            document.getElementById('split-progress-percent').textContent = `${data.progress || 0}%`;
-            document.getElementById('split-progress-bar').style.width = `${data.progress || 0}%`;
+            // Update progress bar (with null checks)
+            const stepEl = document.getElementById('split-current-step');
+            const percentEl = document.getElementById('split-progress-percent');
+            const barEl = document.getElementById('split-progress-bar');
 
-            // Update ARIA for accessibility
-            document.getElementById('split-progress-bar').setAttribute('aria-valuenow', data.progress || 0);
+            if (stepEl) stepEl.textContent = data.current_step || 'Processing...';
+            if (percentEl) percentEl.textContent = `${data.progress || 0}%`;
+            if (barEl) {
+                barEl.style.width = `${data.progress || 0}%`;
+                barEl.setAttribute('aria-valuenow', data.progress || 0);
+            }
 
             // Update step indicators
             const stepOrder = ['distilling', 'drafting', 'editing', 'factchecking'];
