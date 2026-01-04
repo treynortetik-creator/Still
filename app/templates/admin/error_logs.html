@@ -44,13 +44,14 @@
                 <th class="px-4 py-3 text-left text-xs font-medium uppercase" style="color: var(--admin-text-muted);">Job ID</th>
                 <th class="px-4 py-3 text-left text-xs font-medium uppercase" style="color: var(--admin-text-muted);">File</th>
                 <th class="px-4 py-3 text-left text-xs font-medium uppercase" style="color: var(--admin-text-muted);">Error Type</th>
+                <th class="px-4 py-3 text-left text-xs font-medium uppercase" style="color: var(--admin-text-muted);">Source</th>
                 <th class="px-4 py-3 text-left text-xs font-medium uppercase" style="color: var(--admin-text-muted);">Message</th>
                 <th class="px-4 py-3 text-left text-xs font-medium uppercase" style="color: var(--admin-text-muted);">Actions</th>
             </tr>
         </thead>
         <tbody id="error-logs-table" style="border-color: var(--admin-border);">
             <tr>
-                <td colspan="6" class="px-4 py-4 text-center" style="color: var(--admin-text-muted);">Loading...</td>
+                <td colspan="7" class="px-4 py-4 text-center" style="color: var(--admin-text-muted);">Loading...</td>
             </tr>
         </tbody>
     </table>
@@ -102,7 +103,7 @@ async function loadErrorLogs() {
         const tbody = document.getElementById('error-logs-table');
 
         if (errorLogs.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-4 text-center" style="color: var(--admin-text-muted);">No error logs found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-4 text-center" style="color: var(--admin-text-muted);">No error logs found</td></tr>';
             return;
         }
 
@@ -120,6 +121,9 @@ async function loadErrorLogs() {
                 <td class="px-4 py-3">
                     <span class="px-2 py-1 text-xs rounded bg-red-100 text-red-700">${log.error_type || 'unknown'}</span>
                 </td>
+                <td class="px-4 py-3">
+                    <span class="px-2 py-1 text-xs rounded ${log.source === 'frontend' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}">${log.source || 'backend'}</span>
+                </td>
                 <td class="px-4 py-3 text-sm max-w-md truncate" title="${escapeHtml(log.error_message)}">
                     ${escapeHtml(log.error_message ? log.error_message.substring(0, 80) + (log.error_message.length > 80 ? '...' : '') : '-')}
                 </td>
@@ -133,7 +137,7 @@ async function loadErrorLogs() {
     } catch (err) {
         console.error('Failed to load error logs:', err);
         document.getElementById('error-logs-table').innerHTML =
-            '<tr><td colspan="6" class="px-4 py-4 text-center text-red-600">Failed to load error logs</td></tr>';
+            '<tr><td colspan="7" class="px-4 py-4 text-center text-red-600">Failed to load error logs</td></tr>';
     }
 }
 
