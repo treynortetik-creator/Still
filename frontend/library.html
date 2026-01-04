@@ -174,6 +174,110 @@
         </div>
     </div>
 
+    <!-- Source of Truth Modal -->
+    <div id="sot-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+        <div class="bg-still-card rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] flex flex-col border border-still-border">
+            <!-- Modal Header -->
+            <div class="p-4 border-b border-still-border flex justify-between items-center">
+                <div>
+                    <h2 id="sot-modal-title" class="text-xl font-bold text-still-text">Source of Truth</h2>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span id="sot-modal-badge" class="text-xs px-2 py-0.5 rounded"></span>
+                        <span id="sot-modal-review-date" class="text-xs text-still-disabled"></span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="sot-edit-toggle" type="button" onclick="toggleSOTEdit()" class="px-3 py-1 text-sm border border-still-border rounded hover:bg-still-border text-still-muted">
+                        Edit
+                    </button>
+                    <button type="button" onclick="closeSOTModal()" class="text-still-muted hover:text-still-text text-2xl" aria-label="Close modal">&times;</button>
+                </div>
+            </div>
+
+            <!-- Modal Body (scrollable) -->
+            <div class="p-6 overflow-y-auto flex-1">
+                <div id="sot-modal-content" class="space-y-6">
+                    <!-- Core Narratives -->
+                    <div>
+                        <h3 class="font-semibold text-still-text mb-2">Core Narratives</h3>
+                        <div id="sot-modal-narratives" class="space-y-2"></div>
+                    </div>
+
+                    <!-- Statistics -->
+                    <div>
+                        <h3 class="font-semibold text-still-text mb-2">Statistics</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b border-still-border">
+                                        <th class="text-left px-2 py-1 text-still-muted">Stat</th>
+                                        <th class="text-left px-2 py-1 text-still-muted">Citation</th>
+                                        <th class="text-left px-2 py-1 text-still-muted">Confidence</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sot-modal-statistics"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Quotable Moments -->
+                    <div>
+                        <h3 class="font-semibold text-still-text mb-2">Quotable Moments</h3>
+                        <div id="sot-modal-quotes" class="space-y-2"></div>
+                    </div>
+
+                    <!-- Pain Point & Promise -->
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <h3 class="font-semibold text-still-text mb-2">Primary Pain Point</h3>
+                            <p id="sot-modal-pain-point" class="text-still-muted"></p>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-still-text mb-2">The Promise</h3>
+                            <p id="sot-modal-promise" class="text-still-muted"></p>
+                        </div>
+                    </div>
+
+                    <!-- Funnel Stage -->
+                    <div>
+                        <h3 class="font-semibold text-still-text mb-2">Funnel Stage</h3>
+                        <span id="sot-modal-funnel" class="px-3 py-1 bg-still-border rounded-full text-sm text-still-muted capitalize"></span>
+                    </div>
+                </div>
+
+                <!-- Edit Form (hidden by default) -->
+                <div id="sot-edit-form" class="hidden space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-still-text mb-1">Primary Pain Point</label>
+                        <textarea id="edit-pain-point" rows="2" class="w-full input-premium"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-still-text mb-1">The Promise</label>
+                        <textarea id="edit-promise" rows="2" class="w-full input-premium"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-still-text mb-1">Funnel Stage</label>
+                        <select id="edit-funnel" class="input-premium select-premium">
+                            <option value="awareness">Awareness</option>
+                            <option value="consideration">Consideration</option>
+                            <option value="decision">Decision</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-4 border-t border-still-border flex justify-end gap-3">
+                <button type="button" onclick="closeSOTModal()" class="px-4 py-2 border border-still-border rounded-lg text-still-text hover:bg-still-border transition">
+                    Close
+                </button>
+                <button id="sot-save-btn" type="button" onclick="saveSOTChanges()" class="hidden px-4 py-2 btn btn-primary text-white rounded-lg transition">
+                    Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Copy Toast -->
     <div id="copy-toast" class="fixed bottom-4 right-4 bg-still-card text-still-text px-4 py-2 rounded-lg shadow-lg border border-still-border hidden">
         Copied to clipboard!
