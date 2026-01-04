@@ -82,10 +82,13 @@ async def get_library(
 
     async with get_db() as db:
         # Build query with LEFT JOIN to get source file name from jobs table
+        # Also join with sources table to get SOT info (source_id, is_approved)
         query = """
-            SELECT cl.*, j.original_filename as source_file
+            SELECT cl.*, j.original_filename as source_file,
+                   s.id as source_id, s.is_approved as source_approved
             FROM content_library cl
             LEFT JOIN jobs j ON cl.job_id = j.id
+            LEFT JOIN sources s ON j.id = s.job_id
             WHERE cl.user_id = ?
         """
         params = [user_id]
@@ -176,6 +179,9 @@ async def get_library(
                 "topics": json.loads(row["topics"]) if row["topics"] else [],
                 "source_file": row.get("source_file"),
                 "job_id": row.get("job_id"),
+                # SOT (Source of Truth) fields
+                "source_id": row.get("source_id"),
+                "source_approved": row.get("source_approved"),
                 # Lifecycle fields
                 "status": row.get("status") or "active",
                 "best_formats": best_formats,
