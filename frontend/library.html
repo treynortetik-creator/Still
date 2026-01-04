@@ -248,7 +248,8 @@
             const container = document.getElementById('library-container');
             container.innerHTML = '';
 
-            if (entries.length === 0) {
+            // Guard against undefined entries (can happen during auth redirect)
+            if (!entries || entries.length === 0) {
                 container.innerHTML = `
                     <div class="col-span-full text-center py-12">
                         <p class="text-still-muted">No entries found</p>
@@ -392,12 +393,16 @@
 
             try {
                 const response = await Auth.fetchWithAuth(`/api/library?${params}`);
+                if (!response.ok) {
+                    console.error('Library API error:', response.status);
+                    return;
+                }
                 const data = await response.json();
 
                 document.getElementById('library-stats').textContent =
-                    `${data.total} entries in library`;
+                    `${data.total || 0} entries in library`;
 
-                allEntries = data.entries;
+                allEntries = data.entries || [];
                 renderLibrary(allEntries);
 
                 // Render pagination
@@ -427,10 +432,14 @@
         async function loadStats() {
             try {
                 const response = await Auth.fetchWithAuth('/api/library/stats');
+                if (!response.ok) {
+                    console.error('Stats API error:', response.status);
+                    return;
+                }
                 const data = await response.json();
 
                 document.getElementById('library-stats').textContent =
-                    `${data.total_entries} total entries`;
+                    `${data.total_entries || 0} total entries`;
             } catch (err) {
                 console.error('Failed to load stats:', err);
             }
