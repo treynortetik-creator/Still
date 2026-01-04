@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" class="no-transitions">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/static/images/Icon only.png">
+    <title>Refresh - Still</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="/static/theme.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        still: {
+                            bg: 'var(--still-bg)',
+                            card: 'var(--still-card)',
+                            border: 'var(--still-border)',
+                            text: 'var(--still-text)',
+                            muted: 'var(--still-muted)',
+                            disabled: 'var(--still-disabled)',
+                            copper: 'var(--still-copper)',
+                            amber: 'var(--still-amber)',
+                            green: 'var(--still-green)',
+                            error: 'var(--still-error)',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/utils.js"></script>
+    <script src="/static/auth.js"></script>
+    <script src="/static/components.js"></script>
+    <script>
+        window.addEventListener('load', () => {
+            document.documentElement.classList.remove('no-transitions');
+        });
+    </script>
+</head>
+<body class="bg-still-bg min-h-screen">
+    <div id="nav-container"></div>
+
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-2xl font-bold text-still-text">Refresh Dashboard</h1>
+                <p class="text-still-muted mt-1">Monitor and maintain your content library</p>
+            </div>
+            <button id="run-maintenance-btn" class="btn btn-primary">
+                Run Maintenance Check
+            </button>
+        </div>
+
+        <!-- Dashboard Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Sources Needing Review -->
+            <div class="card p-0">
+                <div class="flex justify-between items-center p-4 border-b border-still-border">
+                    <h2 class="text-lg font-semibold text-still-text">Sources Needing Review</h2>
+                    <span id="sources-count" class="badge badge-amber">0</span>
+                </div>
+                <div id="sources-list" class="p-4 space-y-3">
+                    <p class="text-still-muted text-sm">Loading...</p>
+                </div>
+            </div>
+
+            <!-- Stills Needing Attention -->
+            <div class="card p-0">
+                <div class="flex justify-between items-center p-4 border-b border-still-border">
+                    <h2 class="text-lg font-semibold text-still-text">Stills Needing Attention</h2>
+                    <span id="stills-count" class="badge badge-error">0</span>
+                </div>
+                <div id="stills-list" class="p-4 space-y-3">
+                    <p class="text-still-muted text-sm">Loading...</p>
+                </div>
+            </div>
+
+            <!-- Top Performers -->
+            <div class="card p-0">
+                <div class="flex justify-between items-center p-4 border-b border-still-border">
+                    <h2 class="text-lg font-semibold text-still-text">Top Performers</h2>
+                    <span id="performers-count" class="badge badge-green">0</span>
+                </div>
+                <div id="performers-list" class="p-4 space-y-3">
+                    <p class="text-still-muted text-sm">Loading...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bulk Actions Bar -->
+        <div id="bulk-actions" class="fixed bottom-0 left-0 right-0 bg-still-card border-t border-still-border p-4 mt-8">
+            <div class="max-w-7xl mx-auto flex justify-between items-center">
+                <span id="selection-count" class="text-still-text font-medium">Bulk actions</span>
+                <div class="flex gap-3">
+                    <button id="bulk-retire-btn" class="btn btn-secondary">Retire All Expired</button>
+                    <button id="bulk-extend-btn" class="btn btn-secondary">Extend Review +6mo</button>
+                    <button id="export-csv-btn" class="btn btn-secondary">Export CSV</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Still Detail Modal -->
+    <div id="still-modal" class="hidden">
+        <div class="modal-backdrop" onclick="closeStillModal()"></div>
+        <div class="modal">
+            <div id="still-modal-body" class="p-6"></div>
+        </div>
+    </div>
+
+    <script src="/static/refresh.js"></script>
+</body>
+</html>
