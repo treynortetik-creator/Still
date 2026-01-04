@@ -321,6 +321,12 @@ async def serve_workshop():
     return FileResponse(frontend_path / "workshop.html")
 
 
+@app.get("/refresh.html")
+async def serve_refresh():
+    """Serve the Refresh dashboard page."""
+    return FileResponse(frontend_path / "refresh.html")
+
+
 @app.get("/")
 async def root():
     """Serve homepage."""
