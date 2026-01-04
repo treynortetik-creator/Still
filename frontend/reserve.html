@@ -225,15 +225,6 @@
                 </div>
 
                 <div id="sommelier-results-grid" class="grid md:grid-cols-2 gap-4"></div>
-
-                <div class="mt-6 flex justify-end">
-                    <button id="blend-selected-btn" disabled class="btn btn-primary">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                        </svg>
-                        Blend Selected (<span id="sommelier-selected-count">0</span>)
-                    </button>
-                </div>
             </div>
         </section>
 
@@ -256,11 +247,11 @@
                     </svg>
                     Delete (<span id="delete-count">0</span>)
                 </button>
-                <button id="generate-btn" disabled class="btn btn-primary-glow">
+                <button id="blend-selected-btn" disabled class="btn btn-primary-glow">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                     </svg>
-                    Generate from Selected (<span id="selected-count">0</span>)
+                    Blend Selected (<span id="blend-selected-count">0</span>)
                 </button>
             </div>
         </header>
@@ -862,7 +853,6 @@
         let sommelierResults = [];  // Store Sommelier search results
         let selectedIds = new Set();
         let sommelierSelectedIds = new Set();
-        let generateFromSommelier = false;  // Track which selection source to use for generation
         let currentPage = 0;
         const pageSize = 24;
         let filterDebounceTimer = null;
@@ -912,13 +902,16 @@
             return activeChip ? activeChip.dataset.type : '';
         }
 
-        function updateSelectedCount() {
-            document.getElementById('selected-count').textContent = selectedIds.size;
+        function updateUnifiedSelectedCount() {
+            const totalSelected = selectedIds.size + sommelierSelectedIds.size;
+            document.getElementById('blend-selected-count').textContent = totalSelected;
+            document.getElementById('blend-selected-btn').disabled = totalSelected === 0;
+
+            // Also update delete button for Reserve selections only
             document.getElementById('delete-count').textContent = selectedIds.size;
-            document.getElementById('generate-btn').disabled = selectedIds.size === 0;
             document.getElementById('delete-selected-btn').disabled = selectedIds.size === 0;
 
-            // Update Select All checkbox state
+            // Update Select All checkbox state (for Reserve only)
             const selectAllCheckbox = document.getElementById('select-all-checkbox');
             if (allEntries.length > 0 && allEntries.every(e => selectedIds.has(e.id))) {
                 selectAllCheckbox.checked = true;
@@ -930,11 +923,18 @@
                 selectAllCheckbox.checked = false;
                 selectAllCheckbox.indeterminate = false;
             }
+
+            // Debug logging
+            console.log('Selection updated - Reserve:', selectedIds.size, 'Sommelier:', sommelierSelectedIds.size, 'Total:', totalSelected);
+        }
+
+        // Backwards compatibility aliases
+        function updateSelectedCount() {
+            updateUnifiedSelectedCount();
         }
 
         function updateSommelierSelectedCount() {
-            document.getElementById('sommelier-selected-count').textContent = sommelierSelectedIds.size;
-            document.getElementById('blend-selected-btn').disabled = sommelierSelectedIds.size === 0;
+            updateUnifiedSelectedCount();
         }
 
         function toggleSelect(id) {
@@ -1464,18 +1464,21 @@
             }
         }
 
-        function openGenerateModal(fromSommelier = false) {
-            generateFromSommelier = fromSommelier;
-            const idsToUse = fromSommelier ? sommelierSelectedIds : selectedIds;
-            const entriesToSearch = fromSommelier ? sommelierResults : allEntries;
+        function openGenerateModal() {
+            // Combine both selection sets for unified blending
+            const allSelectedIds = new Set([...selectedIds, ...sommelierSelectedIds]);
+
+            // Find entries from both sources
+            const reserveEntries = allEntries.filter(e => selectedIds.has(e.id));
+            const sommelierEntries = sommelierResults.filter(e => sommelierSelectedIds.has(e.id));
+            const allSelectedEntries = [...reserveEntries, ...sommelierEntries];
 
             const previewList = document.getElementById('stills-preview-list');
             previewList.innerHTML = '';
 
-            const selectedEntries = entriesToSearch.filter(e => idsToUse.has(e.id));
-            document.getElementById('modal-still-count').textContent = idsToUse.size;
+            document.getElementById('modal-still-count').textContent = allSelectedIds.size;
 
-            selectedEntries.forEach(entry => {
+            allSelectedEntries.forEach(entry => {
                 const div = document.createElement('div');
                 div.className = 'py-1';
                 div.innerHTML = `<span class="text-still-muted">&bull;</span> ${escapeHtml(entry.content.substring(0, 80))}${entry.content.length > 80 ? '...' : ''}`;
@@ -1484,6 +1487,9 @@
 
             document.getElementById('generate-modal').classList.remove('hidden');
             document.body.style.overflow = 'hidden';
+
+            // Debug logging
+            console.log('Opening modal with IDs:', Array.from(allSelectedIds));
         }
 
         function closeGenerateModal() {
@@ -1556,11 +1562,7 @@
             updateSommelierSelectedCount();
         });
 
-        document.getElementById('blend-selected-btn').addEventListener('click', () => {
-            openGenerateModal(true);  // Use Sommelier selections
-        });
-
-        document.getElementById('generate-btn').addEventListener('click', openGenerateModal);
+        document.getElementById('blend-selected-btn').addEventListener('click', openGenerateModal);
 
         document.getElementById('cancel-generate').addEventListener('click', closeGenerateModal);
 
@@ -1584,12 +1586,13 @@
             }
 
             try {
-                const idsToUse = generateFromSommelier ? sommelierSelectedIds : selectedIds;
+                // Combine both selection sets for unified blending
+                const allSelectedIds = new Set([...selectedIds, ...sommelierSelectedIds]);
                 const response = await Auth.fetchWithAuth('/api/generate-from-library', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        still_ids: Array.from(idsToUse),
+                        still_ids: Array.from(allSelectedIds),
                         target_persona: persona,
                         asset_types: assetTypes,
                         asset_quantities: assetQuantities
