@@ -1,6 +1,6 @@
 """Refresh maintenance tasks service."""
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from typing import Dict, List, Optional
 
 from app.config import get_settings
@@ -9,6 +9,15 @@ from app.db_utils import execute, fetchall, fetchone
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+def get_date_param(dt: datetime) -> date:
+    """Convert datetime to date object for database queries.
+    PostgreSQL (asyncpg) requires actual date objects, not strings.
+    """
+    if isinstance(dt, datetime):
+        return dt.date()
+    return dt
 
 
 async def get_setting(key: str, default: str = None) -> str:
@@ -35,8 +44,8 @@ async def get_stills_needing_attention(user_id: int) -> Dict[str, List[dict]]:
         "low_performance": [],
     }
 
-    today = datetime.now().date().isoformat()
-    thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
+    today = datetime.now().date()
+    thirty_days_ago = datetime.now() - timedelta(days=30)
 
     async with get_db() as db:
         # Expired stills
@@ -91,7 +100,7 @@ async def get_sources_needing_review(user_id: int, days_threshold: int = 14) -> 
     """
     Get sources where review_date has passed or is within threshold days.
     """
-    threshold_date = (datetime.now() + timedelta(days=days_threshold)).date().isoformat()
+    threshold_date = (datetime.now() + timedelta(days=days_threshold)).date()
 
     async with get_db() as db:
         rows = await fetchall(db, """
@@ -145,8 +154,8 @@ async def run_refresh_maintenance(user_id: int = None) -> Dict[str, int]:
     warning_days = int(await get_setting('expiration_warning_days', '30'))
     auto_retire = (await get_setting('auto_retire_expired', 'true')).lower() == 'true'
 
-    warning_date = (datetime.now() + timedelta(days=warning_days)).date().isoformat()
-    today = datetime.now().date().isoformat()
+    warning_date = (datetime.now() + timedelta(days=warning_days)).date()
+    today = datetime.now().date()
 
     async with get_db() as db:
         # Build user filter
@@ -222,8 +231,8 @@ async def run_refresh_maintenance(user_id: int = None) -> Dict[str, int]:
 
 async def get_refresh_counts(user_id: int) -> Dict[str, int]:
     """Get counts for notification badge."""
-    today = datetime.now().date().isoformat()
-    threshold_date = (datetime.now() + timedelta(days=14)).date().isoformat()
+    today = datetime.now().date()
+    threshold_date = (datetime.now() + timedelta(days=14)).date()
 
     async with get_db() as db:
         # Sources needing review
