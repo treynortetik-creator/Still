@@ -7,6 +7,7 @@ from app.config import get_settings
 from app.database import get_db
 from app.db_utils import execute, fetchall, fetchone
 from app.services.settings_manager import get_global_setting
+from app.services.library_manager import calculate_similarity
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -246,3 +247,119 @@ async def get_refresh_counts(user_id: int) -> Dict[str, int]:
             "sources": source_row["count"] if source_row else 0,
             "stills": still_row["count"] if still_row else 0,
         }
+
+
+async def find_duplicate_stills(user_id: int) -> dict:
+    """
+    Find duplicate stills in user's library.
+
+    Returns dict with:
+    - duplicates: list of {still_a, still_b, similarity} dicts
+    - threshold_used: float
+    - stills_scanned: int
+    """
+    threshold = float(await get_global_setting('duplicate_similarity_threshold', '0.90'))
+
+    result = {
+        "duplicates": [],
+        "threshold_used": threshold,
+        "stills_scanned": 0
+    }
+
+    async with get_db() as db:
+        # Get all active stills for user
+        rows = await fetchall(db, """
+            SELECT id, content, still_type, usage_count, performance, status,
+                   created_at, source_file, job_id
+            FROM stills
+            WHERE user_id = ? AND status = 'active'
+            ORDER BY still_type, created_at
+        """, (user_id,))
+
+        stills = [dict(r) for r in rows]
+        result["stills_scanned"] = len(stills)
+
+        if len(stills) < 2:
+            return result
+
+        # Group by still_type for efficient comparison
+        by_type = {}
+        for still in stills:
+            st = still["still_type"]
+            if st not in by_type:
+                by_type[st] = []
+            by_type[st].append(still)
+
+        # Compare within each type group
+        seen_pairs = set()
+        for still_type, group in by_type.items():
+            for i, still_a in enumerate(group):
+                for still_b in group[i+1:]:
+                    # Create consistent pair key to avoid duplicates
+                    pair_key = tuple(sorted([still_a["id"], still_b["id"]]))
+                    if pair_key in seen_pairs:
+                        continue
+                    seen_pairs.add(pair_key)
+
+                    # Calculate similarity
+                    score = calculate_similarity(
+                        still_a.get("content", ""),
+                        still_b.get("content", "")
+                    )
+
+                    if score >= threshold:
+                        result["duplicates"].append({
+                            "still_a": still_a,
+                            "still_b": still_b,
+                            "similarity": round(score, 3)
+                        })
+
+        # Sort by similarity descending
+        result["duplicates"].sort(key=lambda x: x["similarity"], reverse=True)
+
+    return result
+
+
+async def merge_duplicate_stills(winner_id: str, loser_id: str, user_id: int) -> dict:
+    """
+    Retire the loser still, keeping the winner active.
+
+    Returns dict with:
+    - success: bool
+    - retired_still_id: str
+    - error: str (if failed)
+    """
+    from app.config import get_settings
+    settings = get_settings()
+
+    async with get_db() as db:
+        # Verify both stills belong to user and are active
+        winner = await fetchone(db,
+            "SELECT id, status FROM stills WHERE id = ? AND user_id = ?",
+            (winner_id, user_id)
+        )
+        loser = await fetchone(db,
+            "SELECT id, status FROM stills WHERE id = ? AND user_id = ?",
+            (loser_id, user_id)
+        )
+
+        if not winner:
+            return {"success": False, "error": "Winner still not found"}
+        if not loser:
+            return {"success": False, "error": "Loser still not found"}
+        if loser["status"] == "retired":
+            return {"success": False, "error": "Still already retired"}
+
+        # Retire the loser
+        await execute(db,
+            "UPDATE stills SET status = 'retired' WHERE id = ?",
+            (loser_id,)
+        )
+
+        if not settings.use_postgres:
+            await db.commit()
+
+    return {
+        "success": True,
+        "retired_still_id": loser_id
+    }
