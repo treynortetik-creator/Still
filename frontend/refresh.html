@@ -58,9 +58,14 @@
                 <h1 class="text-2xl font-bold text-still-text">Refresh Dashboard</h1>
                 <p class="text-still-muted mt-1">Monitor and maintain your content library</p>
             </div>
-            <button id="run-maintenance-btn" class="btn btn-primary">
-                Run Maintenance Check
-            </button>
+            <div class="flex gap-3">
+                <button id="find-duplicates-btn" class="btn btn-secondary">
+                    Find Duplicates
+                </button>
+                <button id="run-maintenance-btn" class="btn btn-primary">
+                    Run Maintenance Check
+                </button>
+            </div>
         </div>
 
         <!-- Dashboard Grid -->
@@ -117,6 +122,20 @@
         <div class="modal-backdrop" onclick="closeStillModal()"></div>
         <div class="modal" style="width: 90%; max-width: 600px;">
             <div id="still-modal-body" class="p-6"></div>
+        </div>
+    </div>
+
+    <!-- Duplicate Comparison Modal -->
+    <div id="duplicate-modal" class="hidden">
+        <div class="modal-backdrop" onclick="closeDuplicateModal()"></div>
+        <div class="modal" style="width: 95%; max-width: 900px;">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-still-text">Merge Duplicates</h2>
+                    <button onclick="closeDuplicateModal()" class="text-still-muted hover:text-still-text">&times;</button>
+                </div>
+                <div id="duplicate-modal-body"></div>
+            </div>
         </div>
     </div>
 
