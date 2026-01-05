@@ -681,10 +681,16 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
     """
     total_cost = 0.0
 
+    # Diagnostic logging
+    logger.info(f"[RESERVE] Starting process_job_from_library for job {job_id}")
+    logger.info(f"[RESERVE] Received {len(still_content)} stills")
+
     try:
         # Get job data
+        logger.info(f"[RESERVE] Fetching job data for {job_id}")
         job_data = await get_job_data(job_id)
         if not job_data:
+            logger.error(f"[RESERVE] Job {job_id} not found in database!")
             return
 
         target_persona = job_data["target_persona"]
@@ -692,6 +698,8 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
         asset_types = json.loads(job_data["asset_types"]) if job_data["asset_types"] else ["linkedin"]
         asset_quantities = json.loads(job_data["asset_quantities"]) if job_data["asset_quantities"] else {}
         campaign_name = job_data.get("campaign_name")
+
+        logger.info(f"[RESERVE] Job config: persona={target_persona}, assets={asset_types}, quantities={asset_quantities}")
 
         # Convert library entries to still format
         stills = []
@@ -703,7 +711,12 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
                 "persona_relevance": entry.get("persona_relevance", {}),
             })
 
+        logger.info(f"[RESERVE] Converted {len(stills)} stills for processing")
+        if stills:
+            logger.info(f"[RESERVE] First still preview: {stills[0].get('content', '')[:100]}...")
+
         # ======== STEP 2: DRAFTING ========
+        logger.info(f"[RESERVE] Starting DRAFTING step")
         await update_job_status(
             job_id, JobStatus.DRAFTING,
             "Drafting content from Reserve", 50, 0
@@ -713,9 +726,11 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
 
         if "linkedin" in asset_types:
             count = asset_quantities.get("linkedin", 2)
+            logger.info(f"[RESERVE] Drafting {count} LinkedIn posts...")
             linkedin_drafts, li_cost = await draft_linkedin_posts(
                 stills, target_persona, count, job_id, user_id
             )
+            logger.info(f"[RESERVE] LinkedIn drafts complete: {len(linkedin_drafts)} drafts, cost={li_cost}")
             total_cost += li_cost
 
             for i, draft in enumerate(linkedin_drafts):
@@ -785,8 +800,24 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
                 await db.commit()
 
     except Exception as e:
-        error_detail = f"{type(e).__name__}: {str(e)}"
-        logger.error(f"Reserve job {job_id} failed: {error_detail}")
+        # Log detailed error for debugging
+        error_type = type(e).__name__
+        error_message = str(e)
+        stack_trace = traceback.format_exc()
+        error_detail = f"{error_type}: {error_message}\n{stack_trace}"
+        logger.error(f"[RESERVE] Job {job_id} failed: {error_detail}")
+
+        # Log to database for admin debugging
+        try:
+            await log_error_to_db(
+                job_id,
+                user_id if 'user_id' in dir() else 0,
+                f"RESERVE_{error_type}",
+                error_message,
+                stack_trace
+            )
+        except Exception as log_err:
+            logger.error(f"[RESERVE] Failed to log error to DB: {log_err}")
 
         # Get user-friendly error message
         user_error = format_pipeline_error(e, "generation", job_id)
