@@ -1,7 +1,7 @@
 """Brand Voice API endpoints for voice analysis and management."""
 import json
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, List
 
 from app.config import get_settings
@@ -39,6 +39,14 @@ class BrandVoiceConfig(BaseModel):
     phrases_to_use: Optional[List[str]] = None
     phrases_to_avoid: Optional[List[str]] = None
     vocabulary_level: Optional[str] = "professional"
+
+    @field_validator("company_info")
+    @classmethod
+    def validate_company_info_length(cls, v: Optional[str]) -> Optional[str]:
+        """Validate company_info is within character limit."""
+        if v is not None and len(v) > 50000:
+            raise ValueError("Company info must be less than 50,000 characters")
+        return v
 
 
 @router.get("/brand-voice/profile")

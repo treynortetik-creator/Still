@@ -211,14 +211,18 @@
                 <p class="text-still-muted text-sm mb-4">
                     Information about your company that AI can reference when creating content.
                 </p>
-                <textarea id="bv-company-info" rows="8"
+                <textarea id="bv-company-info" rows="8" maxlength="50000"
                     class="w-full bg-still-bg border border-still-border rounded-lg p-3 text-still-text focus:ring-2 focus:ring-still-copper"
                     placeholder="Include information about:
 • Products and services you offer
 • Key differentiators from competitors
 • Commonly cited facts and statistics
 • FAQs and standard responses
-• Company history and milestones"></textarea>
+• Company history and milestones"
+                    oninput="updateCompanyInfoCounter()"></textarea>
+                <p class="text-sm text-still-muted mt-1">
+                    <span id="company-info-counter">0</span> / 50,000 characters
+                </p>
             </div>
 
             <!-- Master Voice Section -->
@@ -1186,6 +1190,14 @@
         }
 
         // ============ Brand Voice Config ============
+        function updateCompanyInfoCounter() {
+            const textarea = document.getElementById('bv-company-info');
+            const counter = document.getElementById('company-info-counter');
+            if (textarea && counter) {
+                counter.textContent = textarea.value.length.toLocaleString();
+            }
+        }
+
         async function loadBrandVoiceConfig() {
             try {
                 const response = await Auth.fetchWithAuth('/api/brand-voice/config');
@@ -1202,6 +1214,9 @@
                     document.getElementById('bv-tone-linkedin').value = data.tone_linkedin || '';
                     document.getElementById('bv-tone-blog').value = data.tone_blog || '';
                     document.getElementById('bv-tone-email').value = data.tone_email || '';
+
+                    // Update character counter
+                    updateCompanyInfoCounter();
                 }
             } catch (err) {
                 console.log('No brand voice config yet');

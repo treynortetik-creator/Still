@@ -682,13 +682,13 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
     total_cost = 0.0
     user_id = 0  # Initialize for error handling if exception occurs before user_id is set
 
-    # Diagnostic logging
-    logger.info(f"[RESERVE] Starting process_job_from_library for job {job_id}")
-    logger.info(f"[RESERVE] Received {len(still_content)} stills")
+    # Diagnostic logging (DEBUG level to reduce log noise in production)
+    logger.debug(f"[RESERVE] Starting process_job_from_library for job {job_id}")
+    logger.debug(f"[RESERVE] Received {len(still_content)} stills")
 
     try:
         # Get job data
-        logger.info(f"[RESERVE] Fetching job data for {job_id}")
+        logger.debug(f"[RESERVE] Fetching job data for {job_id}")
         job_data = await get_job_data(job_id)
         if not job_data:
             logger.error(f"[RESERVE] Job {job_id} not found in database!")
@@ -700,7 +700,7 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
         asset_quantities = json.loads(job_data["asset_quantities"]) if job_data["asset_quantities"] else {}
         campaign_name = job_data.get("campaign_name")
 
-        logger.info(f"[RESERVE] Job config: persona={target_persona}, assets={asset_types}, quantities={asset_quantities}")
+        logger.debug(f"[RESERVE] Job config: persona={target_persona}, assets={asset_types}, quantities={asset_quantities}")
 
         # Convert library entries to still format
         stills = []
@@ -712,12 +712,12 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
                 "persona_relevance": entry.get("persona_relevance", {}),
             })
 
-        logger.info(f"[RESERVE] Converted {len(stills)} stills for processing")
+        logger.debug(f"[RESERVE] Converted {len(stills)} stills for processing")
         if stills:
-            logger.info(f"[RESERVE] First still preview: {stills[0].get('content', '')[:100]}...")
+            logger.debug(f"[RESERVE] First still preview: {stills[0].get('content', '')[:100]}...")
 
         # ======== STEP 2: DRAFTING ========
-        logger.info(f"[RESERVE] Starting DRAFTING step")
+        logger.debug(f"[RESERVE] Starting DRAFTING step")
         await update_job_status(
             job_id, JobStatus.DRAFTING,
             "Drafting content from Reserve", 50, 0
@@ -727,11 +727,11 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
 
         if "linkedin" in asset_types:
             count = asset_quantities.get("linkedin", 2)
-            logger.info(f"[RESERVE] Drafting {count} LinkedIn posts...")
+            logger.debug(f"[RESERVE] Drafting {count} LinkedIn posts...")
             linkedin_drafts, li_cost = await draft_linkedin_posts(
                 stills, target_persona, count, job_id, user_id
             )
-            logger.info(f"[RESERVE] LinkedIn drafts complete: {len(linkedin_drafts)} drafts, cost={li_cost}")
+            logger.debug(f"[RESERVE] LinkedIn drafts complete: {len(linkedin_drafts)} drafts, cost={li_cost}")
             total_cost += li_cost
 
             for i, draft in enumerate(linkedin_drafts):

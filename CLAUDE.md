@@ -168,6 +168,30 @@ When working on migration:
 
 ---
 
+## Coding Standards
+
+### Boolean Handling in SQL Queries
+When querying boolean columns across SQLite and PostgreSQL:
+
+**DO:** Use parameterized queries with Python booleans
+```python
+# Correct - works on both SQLite and PostgreSQL
+rows = await fetchall(db, "SELECT * FROM table WHERE is_active = ?", (True,))
+```
+
+**DON'T:** Use hardcoded SQL boolean keywords
+```python
+# WRONG - TRUE keyword not recognized in SQLite
+rows = await fetchall(db, "SELECT * FROM table WHERE is_active = TRUE")
+
+# WRONG - Integer literals work but are less readable
+rows = await fetchall(db, "SELECT * FROM table WHERE is_active = 1")
+```
+
+The `db_utils.py` helpers automatically convert `?` placeholders to `$1, $2...` for PostgreSQL, and Python's `True`/`False` are properly handled by both database drivers.
+
+---
+
 ## Other Project Notes
 - Deployed on Railway with nixpacks
 - Frontend: vanilla JS + Tailwind in `/frontend`
