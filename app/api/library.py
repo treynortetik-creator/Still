@@ -28,6 +28,15 @@ class CreateStillRequest(BaseModel):
     user_notes: Optional[str] = None
 
 
+class GenerateFromLibraryRequest(BaseModel):
+    """Request model for generating content from Reserve stills."""
+    still_ids: Optional[list[int]] = None
+    atom_ids: Optional[list[int]] = None  # Backwards compatibility
+    target_persona: Optional[str] = None
+    asset_types: list[str] = ["linkedin"]
+    asset_quantities: dict[str, int] = {"linkedin": 2}
+
+
 @router.get("/library")
 async def get_library(
     entry_type: Optional[str] = Query(None, description="Filter by entry type"),
@@ -361,12 +370,8 @@ async def get_library_sources(user_id: int = Depends(get_current_user_id)):
 
 @router.post("/generate-from-library", response_model=JobResponse)
 async def generate_from_library(
+    request: GenerateFromLibraryRequest,
     background_tasks: BackgroundTasks,
-    still_ids: list[int] = None,
-    atom_ids: list[int] = None,  # Keep for backwards compatibility
-    target_persona: str = None,
-    asset_types: list[str] = ["linkedin"],
-    asset_quantities: dict[str, int] = {"linkedin": 2},
     user_id: int = Depends(get_current_user_id),
 ):
     """
@@ -375,7 +380,10 @@ async def generate_from_library(
     Select stills from the Reserve and generate content without uploading new source material.
     """
     # Support both still_ids and atom_ids for backwards compatibility
-    ids_to_use = still_ids or atom_ids
+    ids_to_use = request.still_ids or request.atom_ids
+    target_persona = request.target_persona
+    asset_types = request.asset_types
+    asset_quantities = request.asset_quantities
     if not ids_to_use:
         raise HTTPException(status_code=400, detail="Must provide at least one still ID")
 
