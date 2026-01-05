@@ -185,7 +185,7 @@ async def update_source(
 
         if update.is_active is not None:
             updates.append("is_active = ?")
-            params.append(1 if update.is_active else 0)
+            params.append(update.is_active)
             # Reset error count when re-enabling
             if update.is_active:
                 updates.append("error_count = 0")
@@ -340,7 +340,7 @@ async def get_autopilot_stats(
         # Active sources
         row = await fetchone(
             db,
-            "SELECT COUNT(*) as count FROM autopilot_sources WHERE user_id = ? AND is_active = 1",
+            "SELECT COUNT(*) as count FROM autopilot_sources WHERE user_id = ? AND is_active = TRUE",
             (user_id,),
         )
         active_sources = row["count"] if row else 0

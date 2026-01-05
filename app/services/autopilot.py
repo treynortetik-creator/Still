@@ -117,7 +117,7 @@ async def check_source(source_id: int) -> dict:
         # Get source config
         source = await fetchone(
             db,
-            "SELECT * FROM autopilot_sources WHERE id = ? AND is_active = 1",
+            "SELECT * FROM autopilot_sources WHERE id = ? AND is_active = TRUE",
             (source_id,)
         )
 
@@ -294,7 +294,7 @@ async def process_pending_items(limit: int = 5) -> int:
             FROM autopilot_items ai
             JOIN autopilot_sources s ON ai.source_id = s.id
             WHERE ai.processing_status = 'pending'
-            AND s.is_active = 1
+            AND s.is_active = TRUE
             ORDER BY ai.created_at ASC
             LIMIT ?
             """,
@@ -340,7 +340,7 @@ async def check_due_sources() -> int:
             db,
             """
             SELECT id, source_name FROM autopilot_sources
-            WHERE is_active = 1
+            WHERE is_active = TRUE
             AND (next_check IS NULL OR next_check <= CURRENT_TIMESTAMP)
             LIMIT 5
             """,

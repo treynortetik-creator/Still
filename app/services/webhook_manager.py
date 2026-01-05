@@ -51,7 +51,7 @@ async def trigger_webhook_event(event_type: str, user_id: int, data: dict):
             """
             SELECT id, url, secret_key, trigger_events
             FROM webhooks
-            WHERE user_id = ? AND is_active = 1
+            WHERE user_id = ? AND is_active = TRUE
             """,
             (user_id,)
         )

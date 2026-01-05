@@ -54,7 +54,7 @@ async def list_rules(
         params = [user_id]
 
         if active_only:
-            query += " AND is_active = 1"
+            query += " AND is_active = TRUE"
 
         query += " ORDER BY priority DESC, created_at DESC"
 
@@ -151,7 +151,7 @@ async def update_rule(
             params.append(data.rule_type)
         if data.is_active is not None:
             updates.append("is_active = ?")
-            params.append(1 if data.is_active else 0)
+            params.append(data.is_active)
         if data.priority is not None:
             updates.append("priority = ?")
             params.append(data.priority)
@@ -213,7 +213,7 @@ async def toggle_rule(
         if not row:
             raise HTTPException(status_code=404, detail="Rule not found")
 
-        new_status = 0 if row["is_active"] else 1
+        new_status = not row["is_active"]
         await execute(
             db,
             "UPDATE memory_rules SET is_active = ? WHERE id = ?",
@@ -257,7 +257,7 @@ async def get_memory_rules_context(user_id: int) -> str:
             """
             SELECT rule_type, rule_text
             FROM memory_rules
-            WHERE user_id = ? AND is_active = 1
+            WHERE user_id = ? AND is_active = TRUE
             ORDER BY priority DESC
             """,
             (user_id,)

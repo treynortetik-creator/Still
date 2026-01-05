@@ -232,7 +232,7 @@ async def update_webhook(
 
         if data.is_active is not None:
             updates.append("is_active = ?")
-            values.append(1 if data.is_active else 0)
+            values.append(data.is_active)
 
         if updates:
             values.append(webhook_id)
