@@ -494,6 +494,7 @@ async def get_brand_voice_template_vars(user_id: int, content_type: str = None) 
         "brand_phrases_to_use": "",
         "brand_phrases_to_avoid": "",
         "brand_vocabulary_level": "professional",
+        "brand_company_info": "",
         "emoji_preference": "Use emojis sparingly and professionally",
     }
 
@@ -516,7 +517,7 @@ async def get_brand_voice_template_vars(user_id: int, content_type: str = None) 
             """
             SELECT vocabulary_level, tone_linkedin, tone_blog, tone_email,
                    phrases_to_use, phrases_to_avoid, core_principles,
-                   emoji_preference
+                   company_info, emoji_preference
             FROM brand_voice_config
             WHERE user_id = ?
             """,
@@ -563,5 +564,9 @@ async def get_brand_voice_template_vars(user_id: int, content_type: str = None) 
             # Emoji preference
             if row["emoji_preference"]:
                 result["emoji_preference"] = row["emoji_preference"]
+
+            # Company knowledge base
+            if row["company_info"]:
+                result["brand_company_info"] = row["company_info"]
 
     return result

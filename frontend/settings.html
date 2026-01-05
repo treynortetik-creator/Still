@@ -63,7 +63,7 @@
                     Memory Rules
                 </button>
                 <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-still-muted hover:text-still-text" data-tab="brand-voice">
-                    Brand Voice
+                    Brand Information
                 </button>
                 <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-still-muted hover:text-still-text" data-tab="personas">
                     Personas
@@ -205,6 +205,22 @@
 
         <!-- Brand Voice Tab -->
         <div id="brand-voice-tab" class="hidden space-y-6">
+            <!-- Company Knowledge Base Section -->
+            <div class="bg-still-card rounded-lg shadow-sm p-6 border border-still-border">
+                <h2 class="text-xl font-semibold mb-2 text-still-text">Company Knowledge Base</h2>
+                <p class="text-still-muted text-sm mb-4">
+                    Information about your company that AI can reference when creating content.
+                </p>
+                <textarea id="bv-company-info" rows="8"
+                    class="w-full bg-still-bg border border-still-border rounded-lg p-3 text-still-text focus:ring-2 focus:ring-still-copper"
+                    placeholder="Include information about:
+• Products and services you offer
+• Key differentiators from competitors
+• Commonly cited facts and statistics
+• FAQs and standard responses
+• Company history and milestones"></textarea>
+            </div>
+
             <!-- Master Voice Section -->
             <div class="bg-still-card rounded-lg shadow-sm p-6 border border-still-border">
                 <h2 class="text-xl font-semibold mb-2 text-still-text">Master Brand Voice</h2>
@@ -1178,6 +1194,7 @@
 
                     document.getElementById('bv-company-name').value = data.company_name || '';
                     document.getElementById('bv-industry').value = data.industry || '';
+                    document.getElementById('bv-company-info').value = data.company_info || '';
                     document.getElementById('bv-vocabulary').value = data.vocabulary_level || 'professional';
                     document.getElementById('bv-core-principles').value = (data.core_principles || []).join('\n');
                     document.getElementById('bv-phrases-use').value = (data.phrases_to_use || []).join('\n');
@@ -1210,6 +1227,7 @@
             const configData = {
                 company_name: document.getElementById('bv-company-name').value.trim() || null,
                 industry: document.getElementById('bv-industry').value.trim() || null,
+                company_info: document.getElementById('bv-company-info').value.trim() || null,
                 vocabulary_level: document.getElementById('bv-vocabulary').value,
                 core_principles: corePrinciples.length > 0 ? corePrinciples : null,
                 phrases_to_use: phrasesToUse.length > 0 ? phrasesToUse : null,

@@ -246,6 +246,7 @@ PROMPT_VARIABLES = {
         "label": "Brand Voice",
         "variables": [
             {"key": "brand_company_name", "description": "Company name"},
+            {"key": "brand_company_info", "description": "Company knowledge base - products, services, FAQs, differentiators, facts"},
             {"key": "brand_mission", "description": "Mission statement"},
             {"key": "brand_differentiators", "description": "What makes you unique"},
             {"key": "brand_tone", "description": "Platform-specific tone"},
@@ -921,7 +922,7 @@ async def update_model_config(
                     config.cost_per_1k_input,
                     config.cost_per_1k_output,
                     config.max_tokens,
-                    1 if config.is_active else 0,
+                    config.is_active,
                     service_name,
                 )
             )
@@ -942,7 +943,7 @@ async def update_model_config(
                     config.cost_per_1k_input,
                     config.cost_per_1k_output,
                     config.max_tokens,
-                    1 if config.is_active else 0,
+                    config.is_active,
                 )
             )
 

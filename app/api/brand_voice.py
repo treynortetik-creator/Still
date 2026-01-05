@@ -30,6 +30,7 @@ class BrandVoiceConfig(BaseModel):
     """Extended brand voice configuration."""
     company_name: Optional[str] = None
     industry: Optional[str] = None
+    company_info: Optional[str] = None  # Company knowledge base - products, services, FAQs, differentiators
     tone_linkedin: Optional[str] = None
     tone_blog: Optional[str] = None
     tone_email: Optional[str] = None
@@ -126,7 +127,7 @@ async def get_brand_voice_config(
         row = await fetchone(
             db,
             """
-            SELECT company_name, industry, tone_linkedin, tone_blog,
+            SELECT company_name, industry, company_info, tone_linkedin, tone_blog,
                    tone_email, tone_twitter, core_principles,
                    phrases_to_use, phrases_to_avoid, vocabulary_level,
                    created_at, updated_at
@@ -141,6 +142,7 @@ async def get_brand_voice_config(
             return {
                 "company_name": "",
                 "industry": "",
+                "company_info": "",
                 "tone_linkedin": "Professional and insightful",
                 "tone_blog": "Educational and engaging",
                 "tone_email": "Friendly and direct",
@@ -155,6 +157,7 @@ async def get_brand_voice_config(
         return {
             "company_name": row["company_name"] or "",
             "industry": row["industry"] or "",
+            "company_info": row["company_info"] or "",
             "tone_linkedin": row["tone_linkedin"] or "",
             "tone_blog": row["tone_blog"] or "",
             "tone_email": row["tone_email"] or "",
@@ -192,14 +195,15 @@ async def update_brand_voice_config(
                 await db.execute(
                     """
                     UPDATE brand_voice_config
-                    SET company_name = $1, industry = $2, tone_linkedin = $3,
-                        tone_blog = $4, tone_email = $5, tone_twitter = $6,
-                        core_principles = $7, phrases_to_use = $8, phrases_to_avoid = $9,
-                        vocabulary_level = $10, updated_at = NOW()
-                    WHERE user_id = $11
+                    SET company_name = $1, industry = $2, company_info = $3,
+                        tone_linkedin = $4, tone_blog = $5, tone_email = $6,
+                        tone_twitter = $7, core_principles = $8, phrases_to_use = $9,
+                        phrases_to_avoid = $10, vocabulary_level = $11, updated_at = NOW()
+                    WHERE user_id = $12
                     """,
                     config.company_name,
                     config.industry,
+                    config.company_info,
                     config.tone_linkedin,
                     config.tone_blog,
                     config.tone_email,
@@ -215,15 +219,16 @@ async def update_brand_voice_config(
                     db,
                     """
                     UPDATE brand_voice_config
-                    SET company_name = ?, industry = ?, tone_linkedin = ?,
-                        tone_blog = ?, tone_email = ?, tone_twitter = ?,
-                        core_principles = ?, phrases_to_use = ?, phrases_to_avoid = ?,
-                        vocabulary_level = ?, updated_at = CURRENT_TIMESTAMP
+                    SET company_name = ?, industry = ?, company_info = ?,
+                        tone_linkedin = ?, tone_blog = ?, tone_email = ?,
+                        tone_twitter = ?, core_principles = ?, phrases_to_use = ?,
+                        phrases_to_avoid = ?, vocabulary_level = ?, updated_at = CURRENT_TIMESTAMP
                     WHERE user_id = ?
                     """,
                     (
                         config.company_name,
                         config.industry,
+                        config.company_info,
                         config.tone_linkedin,
                         config.tone_blog,
                         config.tone_email,
@@ -241,15 +246,16 @@ async def update_brand_voice_config(
                 db,
                 """
                 INSERT INTO brand_voice_config
-                (user_id, company_name, industry, tone_linkedin, tone_blog,
+                (user_id, company_name, industry, company_info, tone_linkedin, tone_blog,
                  tone_email, tone_twitter, core_principles, phrases_to_use,
                  phrases_to_avoid, vocabulary_level)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     user_id,
                     config.company_name,
                     config.industry,
+                    config.company_info,
                     config.tone_linkedin,
                     config.tone_blog,
                     config.tone_email,
