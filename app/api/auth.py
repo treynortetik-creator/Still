@@ -4,9 +4,6 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Header, Request
 from typing import Optional
 
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-
 from app.database import get_db
 from app.models.auth import UserRegister, UserLogin, TokenResponse, UserResponse
 from app.db_utils import execute, fetchone, execute_insert_returning_id
@@ -20,9 +17,9 @@ from app.services.auth import (
     validate_email,
     validate_password,
 )
+from app.rate_limiter import limiter
 
 router = APIRouter()
-limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/register", response_model=TokenResponse)

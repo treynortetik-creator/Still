@@ -11,13 +11,12 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pathlib import Path
 
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from datetime import datetime
 
 from app.config import get_settings
 from app.database import init_db, close_postgres_pool
+from app.rate_limiter import limiter
 
 logger = logging.getLogger(__name__)
 from app.api import upload, jobs, library, admin, auth, personas, export, feedback, edit
@@ -25,18 +24,6 @@ from app.api import admin_views, swipes, memory, brand_voice, remix, custom_pers
 from app.api import webhooks, calendar, autopilot, sommelier, workshop, refresh, errors
 
 settings = get_settings()
-
-# Configure rate limiter
-def get_user_id_or_ip(request: Request) -> str:
-    """Get user ID from auth header or fall back to IP address."""
-    auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer "):
-        # Use token hash as identifier (not the full token for security)
-        token = auth_header[7:]
-        return f"user:{hash(token) % 1000000}"
-    return get_remote_address(request)
-
-limiter = Limiter(key_func=get_user_id_or_ip)
 
 
 def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:

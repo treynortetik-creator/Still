@@ -4,15 +4,12 @@ from fastapi import APIRouter, HTTPException, Query, Depends, Request
 from pydantic import BaseModel
 from typing import Optional
 
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-
 from app.api.auth import get_current_user_id
 from app.services.sommelier import search_stills, get_example_queries
 from app.utils.retry import log_error
+from app.rate_limiter import limiter
 
 router = APIRouter()
-limiter = Limiter(key_func=get_remote_address)
 
 
 class SommelierSearchRequest(BaseModel):

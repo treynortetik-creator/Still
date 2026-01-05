@@ -4,16 +4,11 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from typing import Optional
 
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-
 from app.api.auth import get_current_user_id_optional
 from app.services.error_logger import log_error
+from app.rate_limiter import limiter
 
 router = APIRouter()
-
-# Rate limiter for error logging endpoint
-limiter = Limiter(key_func=get_remote_address)
 
 
 class ErrorLogRequest(BaseModel):

@@ -10,9 +10,6 @@ from typing import Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Depends, Request
 from fastapi.responses import StreamingResponse
 
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-
 from app.config import get_settings
 from app.database import get_db
 from app.db_utils import execute, fetchone, fetchall
@@ -21,10 +18,10 @@ from app.models.batch import BatchResponse, BatchStatusResponse, BatchJobStatus,
 from app.api.auth import get_current_user_id
 from app.utils.security import sanitize_filename
 from app.utils.file_utils import get_file_type
+from app.rate_limiter import limiter
 
 router = APIRouter()
 settings = get_settings()
-limiter = Limiter(key_func=get_remote_address)
 
 # Max files per batch
 MAX_BATCH_FILES = 5

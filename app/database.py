@@ -1299,6 +1299,19 @@ async def _init_sqlite_db():
         if 'job_id' not in columns:
             await db.execute("ALTER TABLE content_library ADD COLUMN job_id TEXT REFERENCES jobs(id)")
 
+        # Migrate error_logs table - add columns for enhanced error tracking
+        cursor = await db.execute("PRAGMA table_info(error_logs)")
+        columns = [row[1] for row in await cursor.fetchall()]
+
+        if 'source' not in columns:
+            await db.execute("ALTER TABLE error_logs ADD COLUMN source TEXT DEFAULT 'backend'")
+
+        if 'endpoint' not in columns:
+            await db.execute("ALTER TABLE error_logs ADD COLUMN endpoint TEXT")
+
+        if 'additional_context' not in columns:
+            await db.execute("ALTER TABLE error_logs ADD COLUMN additional_context TEXT")
+
         await db.commit()
 
         # Create default user if not exists

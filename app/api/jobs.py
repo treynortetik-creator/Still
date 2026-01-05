@@ -3,21 +3,16 @@ import json
 from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import Optional
 
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-
 from app.config import get_settings
 from app.database import get_db
 from app.db_utils import fetchone, fetchall, fetchval, sql
 from app.models.job import JobStatus, JobStatusResponse
 from app.api.auth import get_current_user_id
+from app.rate_limiter import limiter
 
 settings = get_settings()
 
 router = APIRouter()
-
-# Rate limiter
-limiter = Limiter(key_func=get_remote_address)
 
 
 def estimate_time_remaining(status: str, progress: int) -> Optional[str]:

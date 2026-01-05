@@ -8,9 +8,6 @@ from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Depends, Request
 from typing import Optional
 
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-
 from app.config import get_settings
 from app.database import get_db
 from app.db_utils import execute, fetchval
@@ -25,12 +22,10 @@ from app.utils.validation import (
     validate_asset_quantities,
     validate_processing_mode,
 )
+from app.rate_limiter import limiter
 
 router = APIRouter()
 settings = get_settings()
-
-# Rate limiter (uses app state limiter)
-limiter = Limiter(key_func=get_remote_address)
 
 
 def generate_campaign_from_filename(filename: str) -> str:
