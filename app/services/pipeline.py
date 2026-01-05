@@ -680,6 +680,7 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
     Skips transcription and distillation steps.
     """
     total_cost = 0.0
+    user_id = 0  # Initialize for error handling if exception occurs before user_id is set
 
     # Diagnostic logging
     logger.info(f"[RESERVE] Starting process_job_from_library for job {job_id}")
@@ -811,7 +812,7 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
         try:
             await log_error_to_db(
                 job_id,
-                user_id if 'user_id' in dir() else 0,
+                user_id,
                 f"RESERVE_{error_type}",
                 error_message,
                 stack_trace

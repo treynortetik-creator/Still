@@ -116,8 +116,8 @@ async def refresh_settings_cache():
             # Load model configurations
             rows = await fetchall(
                 db,
-                "SELECT service_name, model_id FROM ai_model_config WHERE is_active = TRUE",
-                ()
+                "SELECT service_name, model_id FROM ai_model_config WHERE is_active = ?",
+                (True,)
             )
 
             models = {}
