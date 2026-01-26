@@ -286,6 +286,7 @@
 
             } catch (error) {
                 console.error('Failed to load personas:', error);
+                showToast('Failed to load personas', 'error');
                 // Fallback to hardcoded options
                 select.innerHTML = `
                     <option value="">Select a persona...</option>
@@ -309,6 +310,7 @@
                 }
             } catch (error) {
                 console.error('Failed to load stats:', error);
+                showToast('Failed to load stats', 'error');
             }
         }
 
@@ -322,6 +324,7 @@
                 }
             } catch (error) {
                 console.error('Failed to load sources:', error);
+                showToast('Failed to load sources', 'error');
             }
         }
 
@@ -521,7 +524,7 @@
                 }
             } catch (error) {
                 console.error('Failed to save source:', error);
-                alert('Failed to save source');
+                showToast('Failed to save source', 'error');
             }
         }
 
@@ -539,6 +542,7 @@
                 }
             } catch (error) {
                 console.error('Failed to toggle source:', error);
+                showToast('Failed to toggle source', 'error');
             }
         }
 
@@ -558,6 +562,7 @@
                 }
             } catch (error) {
                 console.error('Failed to delete source:', error);
+                showToast('Failed to delete source', 'error');
             }
         }
 
@@ -578,7 +583,7 @@
                 await loadStats();
             } catch (error) {
                 console.error('Failed to check source:', error);
-                alert('Failed to check source');
+                showToast('Failed to check source', 'error');
             } finally {
                 btn.innerHTML = originalHtml;
                 btn.disabled = false;
@@ -601,6 +606,7 @@
                 }
             } catch (error) {
                 console.error('Failed to load items:', error);
+                showToast('Failed to load items', 'error');
                 document.getElementById('items-container').innerHTML = '<div class="text-center py-8 text-still-error">Failed to load items</div>';
             }
         }
@@ -679,7 +685,7 @@
                 }
             } catch (error) {
                 console.error('Failed to process item:', error);
-                alert('Failed to process item');
+                showToast('Failed to process item', 'error');
             }
         }
 
@@ -696,6 +702,7 @@
                 }
             } catch (error) {
                 console.error('Failed to skip item:', error);
+                showToast('Failed to skip item', 'error');
             }
         }
 
