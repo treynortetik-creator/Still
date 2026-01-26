@@ -45,6 +45,22 @@
             document.documentElement.classList.remove('no-transitions');
         });
     </script>
+    <style>
+        /* Calendar skeleton */
+        .skeleton-day {
+            height: 100px;
+            background: linear-gradient(90deg, var(--surface-elevated) 0%, var(--surface-highlight) 50%, var(--surface-elevated) 100%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite linear;
+        }
+        .skeleton-sidebar-item {
+            height: 60px;
+            background: linear-gradient(90deg, var(--surface-elevated) 0%, var(--surface-highlight) 50%, var(--surface-elevated) 100%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite linear;
+            border-radius: var(--radius-md);
+        }
+    </style>
 </head>
 <body class="bg-still-bg min-h-screen font-sans">
     <!-- Navigation -->
@@ -88,7 +104,14 @@
                     </div>
                     <!-- Calendar Days -->
                     <div id="calendar-grid" class="grid grid-cols-7">
-                        <!-- Populated by JS -->
+                        <!-- Skeleton days shown during load -->
+                        <div class="skeleton-day border-r border-b border-still-border"></div>
+                        <div class="skeleton-day border-r border-b border-still-border"></div>
+                        <div class="skeleton-day border-r border-b border-still-border"></div>
+                        <div class="skeleton-day border-r border-b border-still-border"></div>
+                        <div class="skeleton-day border-r border-b border-still-border"></div>
+                        <div class="skeleton-day border-r border-b border-still-border"></div>
+                        <div class="skeleton-day border-b border-still-border"></div>
                     </div>
                 </div>
             </div>
@@ -98,7 +121,10 @@
                 <div class="bg-still-card rounded-lg shadow-sm p-4">
                     <h2 class="font-semibold text-still-text mb-4">Unscheduled Content</h2>
                     <div id="unscheduled-list" class="space-y-3 max-h-[600px] overflow-y-auto">
-                        <!-- Populated by JS -->
+                        <!-- Skeleton items shown during load -->
+                        <div class="skeleton-sidebar-item"></div>
+                        <div class="skeleton-sidebar-item"></div>
+                        <div class="skeleton-sidebar-item"></div>
                     </div>
                 </div>
             </div>
