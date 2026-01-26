@@ -41,8 +41,11 @@
         .email-tab.active { border-bottom-color: var(--still-copper); color: var(--still-copper); }
     </style>
     <link rel="stylesheet" href="/static/styles.css">
-    <script src="/static/utils.js"></script>
-    <script src="/static/auth.js"></script>
+    <!-- JS Modules (ES6) - provide window globals for backwards compatibility -->
+    <script type="module" src="/static/js/utils.js"></script>
+    <script type="module" src="/static/js/auth.js"></script>
+    <script type="module" src="/static/js/api-client.js"></script>
+    <!-- Legacy scripts for components and error logging -->
     <script src="/static/components.js"></script>
     <script src="/static/error-logger.js"></script>
     <script>
