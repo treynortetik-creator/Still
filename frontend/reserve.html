@@ -856,6 +856,8 @@
         let currentPage = 0;
         const pageSize = 24;
         let filterDebounceTimer = null;
+        let nextCursor = null;  // For cursor-based pagination
+        let hasMore = false;
 
         const urlParams = new URLSearchParams(window.location.search);
         const jobIdFilter = urlParams.get('job_id');
@@ -894,6 +896,7 @@
                 chip.classList.toggle('active', chip.dataset.type === type);
             });
             currentPage = 0;
+            nextCursor = null;
             loadLibrary();
         }
 
@@ -1368,10 +1371,11 @@
             document.getElementById('filter-funnel').value = '';
             document.getElementById('sort-by').value = 'newest';
             currentPage = 0;
+            nextCursor = null;
             loadLibrary();
         }
 
-        async function loadLibrary() {
+        async function loadLibrary(useCursor = false) {
             const type = getActiveTypeFilter();
             const persona = document.getElementById('filter-persona').value;
             const minRelevance = document.getElementById('filter-relevance').value;
@@ -1397,7 +1401,13 @@
             if (source) params.set('job_id', source);
             else if (jobIdFilter) params.set('job_id', jobIdFilter);
             params.set('limit', pageSize);
-            params.set('offset', currentPage * pageSize);
+
+            // Use cursor for "Load More" style pagination, offset for page jumps
+            if (useCursor && nextCursor) {
+                params.set('cursor', nextCursor);
+            } else {
+                params.set('offset', currentPage * pageSize);
+            }
 
             try {
                 const response = await Auth.fetchWithAuth(`/api/library?${params}`);
@@ -1405,6 +1415,10 @@
 
                 document.getElementById('library-stats').textContent =
                     `${data.total} stills in your Reserve`;
+
+                // Store cursor info for next page
+                nextCursor = data.next_cursor;
+                hasMore = data.has_more;
 
                 allEntries = data.entries;
                 renderLibrary(allEntries);
@@ -1416,16 +1430,16 @@
                 pagination.innerHTML = '';
 
                 if (totalPages > 1) {
-                    // Previous
+                    // Previous - reset cursor when going back
                     if (currentPage > 0) {
                         const prevBtn = document.createElement('button');
                         prevBtn.className = 'btn btn-ghost btn-sm';
-                        prevBtn.innerHTML = '&larr; Prev';
-                        prevBtn.onclick = () => { currentPage--; loadLibrary(); };
+                        prevBtn.textContent = '\u2190 Prev';
+                        prevBtn.onclick = () => { currentPage--; nextCursor = null; loadLibrary(); };
                         pagination.appendChild(prevBtn);
                     }
 
-                    // Page numbers
+                    // Page numbers - reset cursor when jumping to specific page
                     for (let i = 0; i < totalPages; i++) {
                         if (totalPages > 7 && i > 1 && i < totalPages - 2 && Math.abs(i - currentPage) > 1) {
                             if (i === 2 || i === totalPages - 3) {
@@ -1442,16 +1456,16 @@
                         btn.className = i === currentPage
                             ? 'btn btn-primary btn-sm'
                             : 'btn btn-ghost btn-sm';
-                        btn.onclick = () => { currentPage = i; loadLibrary(); };
+                        btn.onclick = ((pageNum) => () => { currentPage = pageNum; nextCursor = null; loadLibrary(); })(i);
                         pagination.appendChild(btn);
                     }
 
-                    // Next
+                    // Next - use cursor for better performance on sequential navigation
                     if (currentPage < totalPages - 1) {
                         const nextBtn = document.createElement('button');
                         nextBtn.className = 'btn btn-ghost btn-sm';
-                        nextBtn.innerHTML = 'Next &rarr;';
-                        nextBtn.onclick = () => { currentPage++; loadLibrary(); };
+                        nextBtn.textContent = 'Next \u2192';
+                        nextBtn.onclick = () => { currentPage++; loadLibrary(true); };
                         pagination.appendChild(nextBtn);
                     }
                 }

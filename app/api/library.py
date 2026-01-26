@@ -51,6 +51,7 @@ async def get_library(
     sort_by: str = Query("newest", description="Sort order: newest, oldest, most_used, never_used, expiring_soon"),
     limit: int = Query(50, description="Number of results", ge=1, le=100),
     offset: int = Query(0, description="Offset for pagination", ge=0),
+    cursor: Optional[str] = Query(None, description="Cursor for pagination (id:value format)"),
     user_id: int = Depends(get_current_user_id),
 ):
     """
@@ -131,33 +132,77 @@ async def get_library(
             query += " AND cl.funnel_stage = ?"
             params.append(funnel_stage)
 
+        # Server-side persona relevance filtering using JSON extraction
+        # This moves the persona filtering from client-side to server-side
+        if persona and min_relevance > 0:
+            if settings.use_postgres:
+                # PostgreSQL JSONB extraction: persona_relevance->>'persona_key'
+                query += f" AND (cl.persona_relevance::jsonb->>?) IS NOT NULL"
+                query += f" AND CAST(cl.persona_relevance::jsonb->>? AS INTEGER) >= ?"
+                params.extend([persona, persona, min_relevance])
+            else:
+                # SQLite JSON extraction: json_extract(persona_relevance, '$.persona_key')
+                query += f" AND json_extract(cl.persona_relevance, '$.' || ?) IS NOT NULL"
+                query += f" AND CAST(json_extract(cl.persona_relevance, '$.' || ?) AS INTEGER) >= ?"
+                params.extend([persona, persona, min_relevance])
+
         # Handle sort_by with special filters for some options
         if sort_by == "never_used":
             query += " AND (cl.times_used = 0 OR cl.times_used IS NULL)"
             order_clause = "ORDER BY cl.date_added DESC"
+            cursor_column = "date_added"
+            cursor_direction = "DESC"
         elif sort_by == "expiring_soon":
             query += " AND cl.expiration_date IS NOT NULL"
             order_clause = "ORDER BY cl.expiration_date ASC"
+            cursor_column = "expiration_date"
+            cursor_direction = "ASC"
         elif sort_by == "oldest":
             order_clause = "ORDER BY cl.date_added ASC"
+            cursor_column = "date_added"
+            cursor_direction = "ASC"
         elif sort_by == "most_used":
             order_clause = "ORDER BY COALESCE(cl.times_used, 0) DESC, cl.date_added DESC"
+            cursor_column = "times_used"
+            cursor_direction = "DESC"
         else:  # newest (default)
             order_clause = "ORDER BY cl.date_added DESC"
+            cursor_column = "date_added"
+            cursor_direction = "DESC"
 
-        query += f" {order_clause} LIMIT ? OFFSET ?"
-        params.extend([limit, offset])
+        # Apply cursor-based pagination if cursor provided
+        if cursor:
+            try:
+                cursor_id, cursor_value = cursor.split(":", 1)
+                cursor_id = int(cursor_id)
+                # For cursor pagination, we need to filter rows after the cursor position
+                if cursor_direction == "DESC":
+                    query += f" AND (cl.{cursor_column} < ? OR (cl.{cursor_column} = ? AND cl.id < ?))"
+                else:
+                    query += f" AND (cl.{cursor_column} > ? OR (cl.{cursor_column} = ? AND cl.id > ?))"
+                params.extend([cursor_value, cursor_value, cursor_id])
+            except (ValueError, IndexError):
+                pass  # Invalid cursor, ignore
+
+        query += f" {order_clause}, cl.id {cursor_direction} LIMIT ?"
+        params.append(limit + 1)  # Fetch one extra to detect if there's a next page
+
+        # Only use offset if no cursor (for backwards compatibility)
+        if not cursor and offset > 0:
+            query += " OFFSET ?"
+            params.append(offset)
 
         rows = await fetchall(db, query, tuple(params))
 
+        # Check if there are more results (we fetched limit + 1)
+        has_more = len(rows) > limit
+        if has_more:
+            rows = rows[:limit]  # Trim to requested limit
+
         entries = []
+        next_cursor = None
         for row in rows:
             persona_relevance = json.loads(row["persona_relevance"]) if row["persona_relevance"] else {}
-
-            # Filter by persona relevance if specified
-            if persona and persona in persona_relevance:
-                if persona_relevance[persona] < min_relevance:
-                    continue
 
             # Handle best_formats - it's a TEXT[] in PostgreSQL, may need conversion
             best_formats = row.get("best_formats")
@@ -171,7 +216,7 @@ async def get_library(
                     best_formats = []
             # PostgreSQL returns list directly, so no conversion needed
 
-            entries.append({
+            entry = {
                 "id": row["id"],
                 "entry_type": row["entry_type"],
                 "content": row["content"],
@@ -198,7 +243,14 @@ async def get_library(
                 "expiration_type": row.get("expiration_type"),
                 "expiration_date": str(row["expiration_date"]) if row.get("expiration_date") else None,
                 "performance": row.get("performance") or "untested",
-            })
+            }
+            entries.append(entry)
+
+        # Build next cursor from last entry if there are more results
+        if has_more and entries:
+            last_entry = entries[-1]
+            cursor_value = last_entry.get(cursor_column) or last_entry["date_added"]
+            next_cursor = f"{last_entry['id']}:{cursor_value}"
 
         # Get total count (must match the same filters)
         count_query = "SELECT COUNT(*) FROM content_library WHERE user_id = ?"
@@ -233,6 +285,17 @@ async def get_library(
             count_query += " AND funnel_stage = ?"
             count_params.append(funnel_stage)
 
+        # Include persona relevance filter in count
+        if persona and min_relevance > 0:
+            if settings.use_postgres:
+                count_query += " AND (persona_relevance::jsonb->>?) IS NOT NULL"
+                count_query += " AND CAST(persona_relevance::jsonb->>? AS INTEGER) >= ?"
+                count_params.extend([persona, persona, min_relevance])
+            else:
+                count_query += " AND json_extract(persona_relevance, '$.' || ?) IS NOT NULL"
+                count_query += " AND CAST(json_extract(persona_relevance, '$.' || ?) AS INTEGER) >= ?"
+                count_params.extend([persona, persona, min_relevance])
+
         # Include sort_by filters that affect result set
         if sort_by == "never_used":
             count_query += " AND (times_used = 0 OR times_used IS NULL)"
@@ -246,6 +309,8 @@ async def get_library(
             "total": total,
             "limit": limit,
             "offset": offset,
+            "next_cursor": next_cursor,
+            "has_more": has_more,
         }
 
 
