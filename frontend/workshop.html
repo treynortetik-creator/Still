@@ -373,6 +373,7 @@
                 }
             } catch (err) {
                 console.error('Error loading outputs:', err);
+                showToast('Failed to load content', 'error');
                 document.getElementById('loading').classList.add('hidden');
                 document.getElementById('empty-state').classList.remove('hidden');
             }
@@ -839,6 +840,7 @@
                 }
             } catch (err) {
                 console.error('Failed to load personas:', err);
+                showToast('Failed to load personas', 'error');
             }
         }
 
