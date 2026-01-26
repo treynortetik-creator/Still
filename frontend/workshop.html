@@ -39,6 +39,15 @@
         body { font-family: 'Inter', sans-serif; }
         .editor-textarea { min-height: 400px; resize: vertical; }
         .email-tab.active { border-bottom-color: var(--still-copper); color: var(--still-copper); }
+
+        /* Loading skeleton */
+        .skeleton-card {
+            height: 160px;
+            background: linear-gradient(90deg, var(--surface-elevated) 0%, var(--surface-highlight) 50%, var(--surface-elevated) 100%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite linear;
+            border-radius: var(--radius-lg);
+        }
     </style>
     <link rel="stylesheet" href="/static/styles.css">
     <!-- JS Modules (ES6) - provide window globals for backwards compatibility -->
@@ -88,10 +97,14 @@
                 </button>
             </div>
 
-            <!-- Loading State -->
-            <div id="loading" class="text-center py-12">
-                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-still-copper mx-auto"></div>
-                <p class="mt-4 text-still-muted">Loading your content...</p>
+            <!-- Loading Skeletons -->
+            <div id="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card"></div>
             </div>
 
             <!-- Empty State -->
