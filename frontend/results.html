@@ -99,6 +99,14 @@
         .status-step-pending { background: var(--still-border); color: var(--still-muted); }
         .status-step-active { background: var(--still-copper); color: white; }
         .status-step-complete { background: var(--still-green); color: white; }
+        /* Skeleton loader for stills */
+        .skeleton-still {
+            height: 80px;
+            background: linear-gradient(90deg, var(--surface-elevated) 0%, var(--surface-highlight) 50%, var(--surface-elevated) 100%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite linear;
+            border-radius: var(--radius-md);
+        }
     </style>
     <script>
         window.addEventListener('load', () => {
@@ -342,6 +350,13 @@
                 <button class="still-filter px-3 py-1 rounded-full bg-still-error/30 text-still-error text-sm" data-type="problem" aria-pressed="false">Problems</button>
                 <button class="still-filter px-3 py-1 rounded-full bg-still-amber/30 text-still-amber text-sm" data-type="solution" aria-pressed="false">Solutions</button>
                 <button class="still-filter px-3 py-1 rounded-full bg-still-copper/30 text-still-copper text-sm" data-type="quote" aria-pressed="false">Quotes</button>
+            </div>
+            <!-- Skeleton placeholder for stills during loading -->
+            <div id="stills-skeleton" class="grid md:grid-cols-2 gap-4">
+                <div class="skeleton-still"></div>
+                <div class="skeleton-still"></div>
+                <div class="skeleton-still"></div>
+                <div class="skeleton-still"></div>
             </div>
             <div id="stills-container" class="grid md:grid-cols-2 gap-4"></div>
         </div>
@@ -1352,6 +1367,59 @@
 
             if (atoms.length === 0) {
                 container.innerHTML = '<p class="text-still-muted col-span-2 text-center py-8">No atoms found</p>';
+            }
+        }
+
+        function renderStills(stills) {
+            // Hide skeleton when stills are rendered
+            document.getElementById('stills-skeleton')?.classList.add('hidden');
+
+            const container = document.getElementById('stills-container');
+            container.innerHTML = '';
+
+            stills.forEach(still => {
+                const color = getTypeColor(still.type);
+                const card = document.createElement('div');
+                card.className = `bg-still-card p-4 rounded-lg shadow-sm border-l-4 border-${color}`;
+
+                const relevance = still.persona_relevance ? Object.values(still.persona_relevance)[0] : null;
+                const isQuote = still.type === 'quote';
+                const attribution = still.quote_attribution;
+
+                // Format content differently for quotes
+                let contentHtml;
+                if (isQuote) {
+                    contentHtml = `<p class="text-still-muted text-sm italic">"${escapeHtml(still.content)}"</p>`;
+                    if (attribution) {
+                        contentHtml += `<p class="text-sm text-still-disabled mt-1 font-medium">— ${escapeHtml(attribution)}</p>`;
+                    }
+                } else {
+                    contentHtml = `<p class="text-still-muted text-sm">${escapeHtml(still.content)}</p>`;
+                }
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-semibold text-${color} uppercase">${still.type}</span>
+                        ${relevance ? `<span class="text-xs text-still-disabled">Relevance: ${relevance}/5</span>` : ''}
+                    </div>
+                    ${contentHtml}
+                    ${still.source_location ? `<p class="text-xs text-still-disabled mt-2">Source: ${escapeHtml(still.source_location)}</p>` : ''}
+                    <div class="mt-3 flex gap-2">
+                        ${still.tags && still.tags.length ? still.tags.map(tag =>
+                            `<span class="text-xs px-2 py-0.5 bg-still-border text-still-muted rounded">${escapeHtml(tag)}</span>`
+                        ).join('') : ''}
+                    </div>
+                    <button onclick="copyToClipboard(\`${still.content.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)"
+                        class="mt-3 text-xs text-still-copper hover:underline">
+                        Copy
+                    </button>
+                `;
+
+                container.appendChild(card);
+            });
+
+            if (stills.length === 0) {
+                container.innerHTML = '<p class="text-still-muted col-span-2 text-center py-8">No stills found</p>';
             }
         }
 
