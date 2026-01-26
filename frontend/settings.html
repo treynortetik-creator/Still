@@ -40,6 +40,7 @@
     <script type="module" src="/static/js/utils.js"></script>
     <script type="module" src="/static/js/auth.js"></script>
     <script type="module" src="/static/js/api-client.js"></script>
+    <script type="module" src="/static/js/request-cache.js"></script>
     <!-- Legacy scripts for components and error logging -->
     <script src="/static/components.js"></script>
     <script src="/static/error-logger.js"></script>
@@ -685,12 +686,7 @@
 
         async function loadPersonas() {
             try {
-                const response = await Auth.fetchWithAuth('/api/personas/all');
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.detail || 'Failed to load personas');
-                }
+                const data = await cachedFetch('/api/personas/all', { ttl: 30000 });
 
                 const defaultPersonas = data.default_personas || [];
                 const customPersonas = data.custom_personas || [];
@@ -963,8 +959,7 @@
         // ============ Memory Rules ============
         async function loadMemoryRules() {
             try {
-                const response = await Auth.fetchWithAuth('/api/memory/rules');
-                const data = await response.json();
+                const data = await cachedFetch('/api/memory/rules', { ttl: 30000 });
                 memoryRules = data.rules || [];
                 renderMemoryRules();
             } catch (err) {
@@ -1043,6 +1038,7 @@
         async function toggleRule(id) {
             try {
                 await Auth.fetchWithAuth(`/api/memory/rules/${id}/toggle`, { method: 'POST' });
+                invalidateCache('/api/memory/rules');
                 loadMemoryRules();
             } catch (err) {
                 showToast('Error toggling rule');
@@ -1053,6 +1049,7 @@
             if (!confirm('Delete this rule?')) return;
             try {
                 await Auth.fetchWithAuth(`/api/memory/rules/${id}`, { method: 'DELETE' });
+                invalidateCache('/api/memory/rules');
                 loadMemoryRules();
                 showToast('Rule deleted');
             } catch (err) {
@@ -1078,6 +1075,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
+                invalidateCache('/api/memory/rules');
                 hideRuleModal();
                 loadMemoryRules();
                 showToast(isEdit ? 'Rule updated' : 'Rule added');
@@ -1089,9 +1087,8 @@
         // ============ Brand Voice ============
         async function loadVoiceProfile() {
             try {
-                const response = await Auth.fetchWithAuth('/api/brand-voice/profile');
-                if (response.ok) {
-                    const data = await response.json();
+                const data = await cachedFetch('/api/brand-voice/profile', { ttl: 60000 });
+                if (data) {
                     voiceProfile = data.profile;
                     voiceSamples = data.samples || [];
                     renderVoiceSamples();
@@ -1155,6 +1152,7 @@
 
                 if (response.ok) {
                     document.getElementById('voice-sample').value = '';
+                    invalidateCache('/api/brand-voice', { pattern: true });
                     loadVoiceProfile();
                     showToast('Sample added');
                 }
@@ -1166,6 +1164,7 @@
         async function removeSample(id) {
             try {
                 await Auth.fetchWithAuth(`/api/brand-voice/samples/${id}`, { method: 'DELETE' });
+                invalidateCache('/api/brand-voice', { pattern: true });
                 loadVoiceProfile();
             } catch (err) {
                 showToast('Error removing sample');
@@ -1182,6 +1181,7 @@
                 if (response.ok) {
                     const data = await response.json();
                     voiceProfile = data.profile;
+                    invalidateCache('/api/brand-voice', { pattern: true });
                     renderVoiceProfile();
                     showToast('Voice analysis complete!');
                 }
@@ -1204,9 +1204,8 @@
 
         async function loadBrandVoiceConfig() {
             try {
-                const response = await Auth.fetchWithAuth('/api/brand-voice/config');
-                if (response.ok) {
-                    const data = await response.json();
+                const data = await cachedFetch('/api/brand-voice/config', { ttl: 60000 });
+                if (data) {
 
                     document.getElementById('bv-company-name').value = data.company_name || '';
                     document.getElementById('bv-industry').value = data.industry || '';
@@ -1264,6 +1263,7 @@
                 });
 
                 if (response.ok) {
+                    invalidateCache('/api/brand-voice', { pattern: true });
                     showToast('Brand voice settings saved!');
                 } else {
                     const err = await response.json();
@@ -1281,8 +1281,7 @@
 
         async function loadWebhooks() {
             try {
-                const response = await Auth.fetchWithAuth('/api/webhooks');
-                const data = await response.json();
+                const data = await cachedFetch('/api/webhooks', { ttl: 30000 });
                 webhooks = data.webhooks || [];
                 renderWebhooks();
             } catch (err) {
@@ -1380,6 +1379,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ is_active: !currentActive })
                 });
+                invalidateCache('/api/webhooks');
                 loadWebhooks();
             } catch (err) {
                 showToast('Error toggling webhook');
@@ -1390,6 +1390,7 @@
             if (!confirm('Delete this webhook?')) return;
             try {
                 await Auth.fetchWithAuth(`/api/webhooks/${id}`, { method: 'DELETE' });
+                invalidateCache('/api/webhooks');
                 loadWebhooks();
                 showToast('Webhook deleted');
             } catch (err) {
@@ -1468,6 +1469,7 @@
                     throw new Error(errData.detail || 'Failed to save webhook');
                 }
 
+                invalidateCache('/api/webhooks');
                 hideWebhookModal();
                 loadWebhooks();
                 showToast(isEdit ? 'Webhook updated' : 'Webhook added');
@@ -1525,6 +1527,7 @@
             try {
                 const response = await Auth.fetchWithAuth(`/api/custom-personas/${id}`, { method: 'DELETE' });
                 if (!response.ok) throw new Error('Failed to delete persona');
+                invalidateCache('/api/personas', { pattern: true });
                 loadPersonas();
                 showToast('Persona deleted');
             } catch (err) {
@@ -1585,6 +1588,7 @@
                     throw new Error(error.detail || 'Failed to save persona');
                 }
 
+                invalidateCache('/api/personas', { pattern: true });
                 showToast(editingPersonaId ? 'Persona updated' : 'Persona created');
                 hidePersonaModal();
                 loadPersonas();
