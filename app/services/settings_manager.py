@@ -21,6 +21,7 @@ _settings_cache: Dict[str, Any] = {
     "last_refresh": 0,
 }
 _cache_lock = threading.Lock()
+_SETTINGS_CACHE_TTL: int = 300  # 5 minutes in seconds
 
 # Default model configurations
 DEFAULT_MODELS = {
@@ -46,13 +47,33 @@ def get_api_key_status() -> Dict[str, bool]:
     }
 
 
+def _is_cache_stale() -> bool:
+    """Check if the settings cache needs refresh."""
+    import time
+    with _cache_lock:
+        last_refresh = _settings_cache.get("last_refresh", 0)
+    return time.time() - last_refresh > _SETTINGS_CACHE_TTL
+
+
 def get_model_for_step(step: str) -> str:
     """
     Get the configured model for a specific pipeline step.
 
     This is a synchronous function that uses cached values.
     The cache is refreshed by async operations or on app startup.
+    If cache is stale, triggers background refresh.
     """
+    # Trigger background refresh if cache is stale
+    if _is_cache_stale():
+        try:
+            import asyncio
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # Schedule refresh as a task if we're in an async context
+                asyncio.create_task(refresh_settings_cache())
+        except RuntimeError:
+            pass  # No event loop, will refresh on next async call
+
     with _cache_lock:
         models = _settings_cache.get("models", {})
 
@@ -70,13 +91,33 @@ def get_model_for_step(step: str) -> str:
 
 
 def is_openrouter_enabled() -> bool:
-    """Check if OpenRouter is enabled (synchronous, uses cache)."""
+    """Check if OpenRouter is enabled (synchronous, uses cache with TTL)."""
+    # Trigger background refresh if cache is stale
+    if _is_cache_stale():
+        try:
+            import asyncio
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.create_task(refresh_settings_cache())
+        except RuntimeError:
+            pass
+
     with _cache_lock:
         return _settings_cache.get("use_openrouter", True)
 
 
 def get_settings() -> Dict[str, Any]:
-    """Get all settings (synchronous, uses cache)."""
+    """Get all settings (synchronous, uses cache with TTL)."""
+    # Trigger background refresh if cache is stale
+    if _is_cache_stale():
+        try:
+            import asyncio
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.create_task(refresh_settings_cache())
+        except RuntimeError:
+            pass
+
     with _cache_lock:
         return {
             "use_openrouter": _settings_cache.get("use_openrouter", True),

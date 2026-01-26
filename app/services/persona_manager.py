@@ -1,5 +1,6 @@
 """Persona management service."""
 import json
+import time
 import aiofiles
 from pathlib import Path
 from typing import Optional
@@ -9,22 +10,27 @@ from app.db_utils import fetchone, fetchall
 
 settings = get_settings()
 
-# Cache for personas
+# Cache for personas with TTL
 _personas_cache: Optional[dict] = None
+_personas_cache_time: float = 0
+_PERSONAS_CACHE_TTL: int = 300  # 5 minutes in seconds
 
 
 async def load_personas() -> dict:
-    """Load default personas from the JSON file."""
-    global _personas_cache
+    """Load default personas from the JSON file with TTL caching."""
+    global _personas_cache, _personas_cache_time
 
+    # Check if cache is valid (exists and not expired)
     if _personas_cache is not None:
-        return _personas_cache
+        if time.time() - _personas_cache_time < _PERSONAS_CACHE_TTL:
+            return _personas_cache
 
     personas_file = settings.data_dir / "personas.json"
 
     if not personas_file.exists():
         # Return default personas if file doesn't exist
         _personas_cache = get_default_personas()
+        _personas_cache_time = time.time()
         # Save to file for future edits
         await save_personas(_personas_cache)
         return _personas_cache
@@ -32,13 +38,14 @@ async def load_personas() -> dict:
     async with aiofiles.open(personas_file, "r") as f:
         content = await f.read()
         _personas_cache = json.loads(content)
+        _personas_cache_time = time.time()
 
     return _personas_cache
 
 
 async def save_personas(personas_data: dict):
-    """Save personas to the JSON file."""
-    global _personas_cache
+    """Save personas to the JSON file and update cache."""
+    global _personas_cache, _personas_cache_time
 
     personas_file = settings.data_dir / "personas.json"
     personas_file.parent.mkdir(parents=True, exist_ok=True)
@@ -47,6 +54,7 @@ async def save_personas(personas_data: dict):
         await f.write(json.dumps(personas_data, indent=2))
 
     _personas_cache = personas_data
+    _personas_cache_time = time.time()
 
 
 async def get_persona(persona_id: str, user_id: int = None) -> Optional[dict]:
@@ -259,5 +267,6 @@ def get_default_personas() -> dict:
 
 def invalidate_cache():
     """Invalidate the personas cache to force reload."""
-    global _personas_cache
+    global _personas_cache, _personas_cache_time
     _personas_cache = None
+    _personas_cache_time = 0
