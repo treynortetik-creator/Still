@@ -1,74 +1,34 @@
 """Pipeline orchestrator - coordinates the 4-step content generation process."""
-import asyncio
 import json
 import logging
 import os
 import traceback
 from pathlib import Path
-from datetime import datetime
-
-logger = logging.getLogger(__name__)
 
 from app.config import get_settings
 from app.database import get_db
 from app.db_utils import execute, fetchone
 from app.models.job import JobStatus
 from app.services.transcription import transcribe_file, cleanup_transcript, extract_document_content
-from app.services.distillation import distill_content, distill_content_pass2
-from app.services.summarization import generate_source_summary
-from app.services.drafting import draft_linkedin_posts, draft_blog_post, draft_email, draft_email_sequence
-from app.services.hook_generator import batch_generate_hooks
-from app.services.editing import batch_edit_content
-from app.services.factcheck import batch_factcheck_content
 from app.services.source_of_truth import (
     generate_source_of_truth,
     save_source_of_truth,
     approve_source_of_truth,
 )
-from app.services.library_manager import (
-    add_stills_to_library,
-    save_stills_to_db,
-    save_outputs_to_db,
+from app.services.editing import batch_edit_content
+from app.services.factcheck import batch_factcheck_content
+from app.services.drafting import draft_linkedin_posts, draft_blog_post
+from app.services.library_manager import save_outputs_to_db
+from app.services.pipeline_steps import (
+    PipelineContext,
+    run_pipeline_steps,
+    update_job_status,
+    enrich_outputs_with_topics,
 )
-from app.services.scoring import batch_score_content
-from app.utils.error_messages import format_pipeline_error, detect_error_type, get_error_message
+from app.utils.error_messages import format_pipeline_error
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
-
-
-def enrich_outputs_with_topics(outputs: list[dict], stills: list[dict]) -> list[dict]:
-    """
-    Enrich outputs with topics gathered from the stills they use.
-
-    Each output has a 'stills_used' field that lists still IDs.
-    We gather all unique topics from those stills and add them to the output.
-    """
-    # Create a mapping of still ID to topics
-    still_topics_map = {}
-    for still in stills:
-        still_id = still.get("id")
-        topics = still.get("topics", [])
-        if still_id and topics:
-            still_topics_map[still_id] = topics
-
-    # Enrich each output
-    enriched_outputs = []
-    for output in outputs:
-        # Get stills used by this output
-        stills_used = output.get("stills_used", output.get("atoms_used", []))
-
-        # Gather all unique topics from the stills
-        output_topics = set()
-        for still_id in stills_used:
-            if still_id in still_topics_map:
-                output_topics.update(still_topics_map[still_id])
-
-        # Add topics to output
-        output_copy = output.copy()
-        output_copy["topics"] = sorted(list(output_topics))
-        enriched_outputs.append(output_copy)
-
-    return enriched_outputs
 
 
 async def log_error_to_db(job_id: str, user_id: int, error_type: str, error_message: str, stack_trace: str):
@@ -109,54 +69,6 @@ def validate_api_keys(file_type: str) -> tuple[bool, str]:
     return True, ""
 
 
-async def update_job_status(
-    job_id: str,
-    status: JobStatus,
-    current_step: str,
-    progress: int,
-    cost_to_add: float = 0.0,
-    error_message: str = None,
-):
-    """Update job status in database and track user costs."""
-    async with get_db() as db:
-        if error_message:
-            await execute(
-                db,
-                """
-                UPDATE jobs SET
-                    status = ?, current_step = ?, progress = ?,
-                    cost_incurred = cost_incurred + ?, error_message = ?
-                WHERE id = ?
-                """,
-                (status.value, current_step, progress, cost_to_add, error_message, job_id)
-            )
-        else:
-            await execute(
-                db,
-                """
-                UPDATE jobs SET
-                    status = ?, current_step = ?, progress = ?,
-                    cost_incurred = cost_incurred + ?
-                WHERE id = ?
-                """,
-                (status.value, current_step, progress, cost_to_add, job_id)
-            )
-
-        # Update user's total cost if cost was added
-        if cost_to_add > 0:
-            await execute(
-                db,
-                """
-                UPDATE users SET total_cost_incurred = total_cost_incurred + ?
-                WHERE id = (SELECT user_id FROM jobs WHERE id = ?)
-                """,
-                (cost_to_add, job_id)
-            )
-
-        if not settings.use_postgres:
-            await db.commit()
-
-
 async def get_job_data(job_id: str) -> dict:
     """Get job data from database."""
     async with get_db() as db:
@@ -164,6 +76,58 @@ async def get_job_data(job_id: str) -> dict:
         if row:
             return dict(row)
         return None
+
+
+def _determine_step_context(current_step: str) -> str:
+    """Determine the step context from current_step for error messages."""
+    if not current_step:
+        return "unknown"
+    current = current_step.lower()
+    if "transcrib" in current or "extract" in current:
+        return "transcription"
+    elif "distill" in current or "still" in current:
+        return "distillation"
+    elif "draft" in current:
+        return "drafting"
+    elif "edit" in current:
+        return "editing"
+    elif "fact" in current:
+        return "factchecking"
+    return "unknown"
+
+
+async def _handle_pipeline_error(
+    e: Exception, job_id: str, user_id: int, total_cost: float
+):
+    """Common error handling for pipeline failures."""
+    error_type = type(e).__name__
+    error_message = str(e)
+    stack_trace = traceback.format_exc()
+    error_detail = f"{error_type}: {error_message}\n{stack_trace}"
+    logger.error(f"Job {job_id} failed: {error_detail}")
+
+    # Determine which step failed for context
+    job_data_check = await get_job_data(job_id)
+    step_context = "unknown"
+    if job_data_check:
+        step_context = _determine_step_context(job_data_check.get("current_step", ""))
+
+    # Log error to database
+    await log_error_to_db(
+        job_id,
+        user_id if user_id else 0,
+        f"{step_context.upper()}_{error_type}",
+        error_message,
+        stack_trace
+    )
+
+    # Get user-friendly error message
+    user_error = format_pipeline_error(e, step_context, job_id)
+
+    await update_job_status(
+        job_id, JobStatus.FAILED,
+        "Failed", 0, total_cost, user_error
+    )
 
 
 async def process_job(job_id: str):
@@ -179,7 +143,7 @@ async def process_job(job_id: str):
     5. Save results
     """
     total_cost = 0.0
-    user_id = None  # Initialize for error logging
+    user_id = None
 
     try:
         # Get job data
@@ -217,8 +181,6 @@ async def process_job(job_id: str):
         file_path = settings.upload_dir / str(user_id) / job_id / original_filename
 
         # Determine processing path based on file type
-        # Documents (PDF, DOCX, TXT, MD) go directly to extraction → atomization
-        # Audio/Video go through transcription → cleanup → atomization
         is_document = file_type == "document"
         is_audio_video = file_type in ["audio", "video"]
 
@@ -228,7 +190,6 @@ async def process_job(job_id: str):
                 if not file_path.exists():
                     raise FileNotFoundError(f"Upload file not found: {file_path}")
 
-                # Plain text files (.txt, .md, .docx) don't need extraction - just reading
                 ext = file_path.suffix.lower()
                 is_plain_text = ext in [".txt", ".md", ".docx", ".doc"]
 
@@ -238,25 +199,19 @@ async def process_job(job_id: str):
                         "Reading text file...", 15
                     )
                 else:
-                    # PDFs and images need actual extraction/analysis
                     await update_job_status(
                         job_id, JobStatus.TRANSCRIBING,
                         "Extracting document content...", 15
                     )
 
-                # Extract document content with image/graph analysis
-                # This goes directly to cleaned_transcript (no cleanup needed for documents)
                 extracted_content, extract_cost = await extract_document_content(
                     file_path, job_id, user_id
                 )
                 total_cost += extract_cost
 
-                # For documents, the extracted content IS the cleaned transcript
-                # No cleanup step needed since it's not spoken content
                 cleaned_transcript = extracted_content
                 transcript = extracted_content
 
-                # Save both transcript and cleaned_transcript
                 async with get_db() as db:
                     await execute(
                         db,
@@ -268,7 +223,6 @@ async def process_job(job_id: str):
 
         elif is_audio_video:
             # ======== AUDIO/VIDEO PATH: Transcribe → Cleanup ========
-            # Step 0a: Transcription
             if not transcript:
                 await update_job_status(
                     job_id, JobStatus.TRANSCRIBING,
@@ -283,7 +237,6 @@ async def process_job(job_id: str):
                 )
                 total_cost += trans_cost
 
-                # Save transcript to database
                 async with get_db() as db:
                     await execute(
                         db,
@@ -293,21 +246,18 @@ async def process_job(job_id: str):
                     if not settings.use_postgres:
                         await db.commit()
 
-            # Step 0b: Cleanup (for spoken content with filler words, etc.)
             if not cleaned_transcript:
                 await update_job_status(
                     job_id, JobStatus.CLEANING,
                     "Step 0b: Cleaning transcript", 20, total_cost
                 )
-                total_cost = 0  # Reset after update
+                total_cost = 0
 
-                # Use transcript or the text that was uploaded
                 source_text = transcript or job_data.get("transcript", "")
 
                 cleaned_transcript, clean_cost = await cleanup_transcript(source_text)
                 total_cost += clean_cost
 
-                # Save cleaned transcript
                 async with get_db() as db:
                     await execute(
                         db,
@@ -319,7 +269,6 @@ async def process_job(job_id: str):
 
         else:
             # ======== TEXT UPLOAD PATH (file_type == "text") ========
-            # Text was already saved to transcript, just need cleanup
             if not cleaned_transcript:
                 await update_job_status(
                     job_id, JobStatus.CLEANING,
@@ -329,7 +278,6 @@ async def process_job(job_id: str):
 
                 source_text = transcript or job_data.get("transcript", "")
 
-                # For pasted text, do a light cleanup
                 cleaned_transcript, clean_cost = await cleanup_transcript(source_text)
                 total_cost += clean_cost
 
@@ -355,322 +303,40 @@ async def process_job(job_id: str):
         total_cost += sot_cost
         logger.info(f"Job {job_id}: Generated Source of Truth with {len(source_data.get('statistics', []))} statistics")
 
-        # Save Source of Truth to database
         source_id = await save_source_of_truth(job_id, user_id, source_data)
 
-        # Check if auto-approve is enabled
         auto_approve = job_data.get("auto_approve_source", False)
 
         if auto_approve:
-            # Mark as approved and continue immediately
             await approve_source_of_truth(source_id)
             logger.info(f"Job {job_id}: Auto-approved Source of Truth")
         else:
-            # Pause for user review
             await update_job_status(
                 job_id, JobStatus.AWAITING_APPROVAL,
                 "Awaiting Source of Truth approval", 24, total_cost
             )
             logger.info(f"Job {job_id}: Paused for Source of Truth approval")
-            return  # Exit pipeline - user must approve via API to continue
-
-        # ======== STEP 1: DISTILLATION (Pass 1) + SUMMARIZATION (parallel) ========
-        await update_job_status(
-            job_id, JobStatus.DISTILLING,
-            "Step 1a: Distilling content stills (Pass 1)", 25, total_cost
-        )
-        total_cost = 0
-
-        # Start summarization in parallel with distillation
-        # Summarization is non-blocking - if it fails, we just won't have a summary
-        summary_task = asyncio.create_task(
-            generate_source_summary(cleaned_transcript, job_id, user_id)
-        )
-
-        stills, still_cost = await distill_content(
-            cleaned_transcript, target_persona, job_id, user_id
-        )
-        total_cost += still_cost
-        logger.info(f"Job {job_id}: Pass 1 extracted {len(stills)} stills")
-
-        # ======== STEP 1b: DISTILLATION (Pass 2 - Deep Extraction) ========
-        await update_job_status(
-            job_id, JobStatus.DISTILLING,
-            "Step 1b: Deep extraction (Pass 2)", 35, total_cost
-        )
-        total_cost = 0
-
-        pass2_stills, pass2_cost = await distill_content_pass2(
-            cleaned_transcript, stills, target_persona, job_id, user_id
-        )
-        total_cost += pass2_cost
-        logger.info(f"Job {job_id}: Pass 2 extracted {len(pass2_stills)} additional stills")
-
-        # Merge stills from both passes
-        stills.extend(pass2_stills)
-        logger.info(f"Job {job_id}: Total stills after both passes: {len(stills)}")
-
-        # Await summarization result (should be done by now, ran in parallel)
-        try:
-            source_summary, summary_cost = await summary_task
-            total_cost += summary_cost
-            if source_summary:
-                # Save summary to jobs table
-                async with get_db() as db:
-                    await execute(
-                        db,
-                        "UPDATE jobs SET source_summary = ? WHERE id = ?",
-                        (source_summary, job_id)
-                    )
-                    if not settings.use_postgres:
-                        await db.commit()
-                logger.info(f"Job {job_id}: Source summary saved ({len(source_summary)} chars)")
-        except Exception as summary_err:
-            logger.warning(f"Job {job_id}: Summary step failed (non-fatal): {summary_err}")
-
-        # Save stills to database and the Reserve (with duplicate detection)
-        save_result = await save_stills_to_db(stills, campaign_name=campaign_name, source_id=source_id)
-        if save_result["skipped_duplicates"] > 0:
-            logger.info(f"Job {job_id}: {save_result['skipped_duplicates']} duplicate stills skipped, {save_result['saved']} new stills saved")
-        await add_stills_to_library(stills, user_id, original_filename, campaign_name=campaign_name, job_id=job_id)
-
-        # Check if this is a Quick Distill job - if so, complete now
-        processing_mode = job_data.get("processing_mode", "autopilot")
-        if processing_mode == "quick_distill":
-            # Quick Distill: skip drafting/editing, just save stills to Reserve
-            await update_job_status(
-                job_id, JobStatus.COMPLETE,
-                "Stills saved to Reserve", 100, total_cost
-            )
-            async with get_db() as db:
-                if settings.use_postgres:
-                    await db.execute("UPDATE jobs SET completed_at = NOW() WHERE id = $1", job_id)
-                else:
-                    await execute(db, "UPDATE jobs SET completed_at = CURRENT_TIMESTAMP WHERE id = ?", (job_id,))
-                    await db.commit()
             return
 
-        # ======== STEP 2: DRAFTING ========
-        await update_job_status(
-            job_id, JobStatus.DRAFTING,
-            "Step 2: Drafting content", 50, total_cost
-        )
-        total_cost = 0
-
-        all_drafts = []
-
-        # Generate LinkedIn posts if requested
-        if "linkedin" in asset_types:
-            count = asset_quantities.get("linkedin", 3)
-            linkedin_drafts, li_cost = await draft_linkedin_posts(
-                stills, target_persona, count, job_id, user_id
-            )
-            total_cost += li_cost
-
-            for i, draft in enumerate(linkedin_drafts):
-                all_drafts.append({
-                    "content_type": "linkedin",
-                    "variation_number": i + 1,
-                    "content": draft.get("content", ""),
-                    "stills_used": draft.get("stills_used", draft.get("atoms_used", [])),
-                })
-
-        # Generate blog post if requested
-        if "blog" in asset_types:
-            blog_draft, blog_cost = await draft_blog_post(
-                stills, target_persona, job_id, user_id
-            )
-            total_cost += blog_cost
-
-            all_drafts.append({
-                "content_type": "blog",
-                "variation_number": 1,
-                "content": blog_draft.get("content", ""),
-                "title": blog_draft.get("title", ""),
-                "stills_used": blog_draft.get("stills_used", blog_draft.get("atoms_used", [])),
-            })
-
-        # Generate email if requested
-        if "email" in asset_types:
-            email_draft, email_cost = await draft_email(
-                stills, target_persona, job_id, user_id
-            )
-            total_cost += email_cost
-
-            all_drafts.append({
-                "content_type": "email",
-                "variation_number": 1,
-                "content": email_draft.get("body", ""),
-                "subject": email_draft.get("subject", ""),
-                "stills_used": email_draft.get("stills_used", email_draft.get("atoms_used", [])),
-            })
-
-        # Generate email sequence if requested
-        if "email_sequence" in asset_types:
-            email_sequence, seq_cost = await draft_email_sequence(
-                stills, target_persona, job_id, user_id
-            )
-            total_cost += seq_cost
-
-            for i, email in enumerate(email_sequence):
-                all_drafts.append({
-                    "content_type": "email_sequence",
-                    "variation_number": i + 1,
-                    "content": email.get("body", ""),
-                    "subject": email.get("subject", ""),
-                    "preview_text": email.get("preview_text", ""),
-                    "email_day": email.get("day"),
-                    "email_purpose": email.get("purpose", ""),
-                    "sequence_name": email.get("sequence_name", ""),
-                    "cta": email.get("cta", ""),
-                    "stills_used": email.get("stills_used", email.get("atoms_used", [])),
-                })
-
-        # ======== STEP 3: EDITING ========
-        await update_job_status(
-            job_id, JobStatus.EDITING,
-            "Step 3: Editing for audience", 70, total_cost
-        )
-        total_cost = 0
-
-        edited_drafts, edit_cost = await batch_edit_content(
-            all_drafts, target_persona, job_id, user_id
-        )
-        total_cost += edit_cost
-
-        # ======== STEP 4: FACT-CHECKING ========
-        await update_job_status(
-            job_id, JobStatus.FACTCHECKING,
-            "Step 4: Fact-checking content", 85, total_cost
-        )
-        total_cost = 0
-
-        factchecked_drafts, fc_cost = await batch_factcheck_content(
-            edited_drafts, cleaned_transcript, job_id, user_id, source_id=source_id
-        )
-        total_cost += fc_cost
-
-        # ======== STEP 5: QUALITY SCORING ========
-        await update_job_status(
-            job_id, JobStatus.FACTCHECKING,
-            "Step 5: Scoring content quality", 92, total_cost
-        )
-        total_cost = 0
-
-        # Get persona title for context
-        from app.services.persona_manager import get_persona
-        persona = await get_persona(target_persona, user_id=user_id)
-        persona_title = persona.get("title", "") if persona else ""
-
-        scored_drafts, score_cost = await batch_score_content(
-            factchecked_drafts, persona_title
-        )
-        total_cost += score_cost
-
-        # ======== STEP 6: HOOK VARIATIONS (for LinkedIn posts) ========
-        if "linkedin" in asset_types:
-            await update_job_status(
-                job_id, JobStatus.FACTCHECKING,
-                "Step 6: Generating hook variations", 96, total_cost
-            )
-            total_cost = 0
-
-            scored_drafts, hook_cost = await batch_generate_hooks(
-                scored_drafts, target_persona, job_id, user_id
-            )
-            total_cost += hook_cost
-
-        # ======== STEP 7: IMAGE PROMPT GENERATION (Optional) ========
-        if job_data.get("generate_image_prompts"):
-            await update_job_status(
-                job_id, JobStatus.FACTCHECKING,
-                "Step 7: Generating image prompts", 98, total_cost
-            )
-            total_cost = 0
-
-            from app.services.image_prompts import batch_generate_image_prompts
-            scored_drafts, img_cost = await batch_generate_image_prompts(
-                scored_drafts, job_id, user_id
-            )
-            total_cost += img_cost
-        else:
-            logger.info(f"Job {job_id}: Skipping image prompt generation (disabled)")
-
-        # ======== SAVE RESULTS ========
-        # Enrich outputs with topics from their stills
-        enriched_outputs = enrich_outputs_with_topics(scored_drafts, stills)
-        await save_outputs_to_db(enriched_outputs, job_id, campaign_name=campaign_name)
-
-        # Mark job complete
-        await update_job_status(
-            job_id, JobStatus.COMPLETE,
-            "Complete", 100, total_cost
+        # ======== RUN SHARED PIPELINE STEPS ========
+        ctx = PipelineContext(
+            job_id=job_id,
+            user_id=user_id,
+            target_persona=target_persona,
+            asset_types=asset_types,
+            asset_quantities=asset_quantities,
+            original_filename=original_filename,
+            campaign_name=campaign_name,
+            cleaned_transcript=cleaned_transcript,
+            source_id=source_id,
+            generate_image_prompts=job_data.get("generate_image_prompts", False),
+            total_cost=total_cost,
         )
 
-        # Update completed_at timestamp
-        async with get_db() as db:
-            if settings.use_postgres:
-                await db.execute("UPDATE jobs SET completed_at = NOW() WHERE id = $1", job_id)
-            else:
-                await execute(db, "UPDATE jobs SET completed_at = CURRENT_TIMESTAMP WHERE id = ?", (job_id,))
-                await db.commit()
-
-        # Trigger webhooks for job completion and content generation
-        try:
-            from app.services.webhook_manager import (
-                trigger_webhook_event,
-                get_job_webhook_payload,
-                get_content_webhook_payload
-            )
-            job_payload = await get_job_webhook_payload(job_id)
-            await trigger_webhook_event("job_completed", user_id, job_payload)
-
-            content_payload = await get_content_webhook_payload(job_id)
-            await trigger_webhook_event("content_generated", user_id, content_payload)
-        except Exception as webhook_error:
-            # Don't fail the job if webhook fails
-            logger.warning(f"Webhook trigger failed for job {job_id}: {webhook_error}")
+        await run_pipeline_steps(ctx)
 
     except Exception as e:
-        # Log detailed error for debugging
-        error_type = type(e).__name__
-        error_message = str(e)
-        stack_trace = traceback.format_exc()
-        error_detail = f"{error_type}: {error_message}\n{stack_trace}"
-        logger.error(f"Job {job_id} failed: {error_detail}")
-
-        # Determine which step failed for context
-        step_context = "unknown"
-        job_data_check = await get_job_data(job_id)
-        if job_data_check:
-            current = job_data_check.get("current_step", "")
-            if "transcrib" in current.lower() or "extract" in current.lower():
-                step_context = "transcription"
-            elif "distill" in current.lower() or "still" in current.lower():
-                step_context = "distillation"
-            elif "draft" in current.lower():
-                step_context = "drafting"
-            elif "edit" in current.lower():
-                step_context = "editing"
-            elif "fact" in current.lower():
-                step_context = "factchecking"
-
-        # Log error to database for admin debugging
-        await log_error_to_db(
-            job_id,
-            user_id if user_id else 0,
-            f"{step_context.upper()}_{error_type}",
-            error_message,
-            stack_trace
-        )
-
-        # Get user-friendly error message
-        user_error = format_pipeline_error(e, step_context, job_id)
-
-        await update_job_status(
-            job_id, JobStatus.FAILED,
-            "Failed", 0, total_cost, user_error
-        )
+        await _handle_pipeline_error(e, job_id, user_id if user_id else 0, total_cost)
 
 
 async def process_job_from_library(job_id: str, still_content: list[dict]):
@@ -680,14 +346,12 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
     Skips transcription and distillation steps.
     """
     total_cost = 0.0
-    user_id = 0  # Initialize for error handling if exception occurs before user_id is set
+    user_id = 0
 
-    # Diagnostic logging (DEBUG level to reduce log noise in production)
     logger.debug(f"[RESERVE] Starting process_job_from_library for job {job_id}")
     logger.debug(f"[RESERVE] Received {len(still_content)} stills")
 
     try:
-        # Get job data
         logger.debug(f"[RESERVE] Fetching job data for {job_id}")
         job_data = await get_job_data(job_id)
         if not job_data:
@@ -769,13 +433,11 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
         total_cost += edit_cost
 
         # ======== STEP 4: FACT-CHECKING ========
-        # For Reserve generation, we do a lighter fact-check
         await update_job_status(
             job_id, JobStatus.FACTCHECKING,
             "Final review", 85, total_cost
         )
 
-        # Use still content as "transcript" for fact-checking
         still_text = "\n\n".join([s["content"] for s in stills])
         factchecked_drafts, fc_cost = await batch_factcheck_content(
             edited_drafts, still_text, job_id, user_id
@@ -783,7 +445,6 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
         total_cost += fc_cost
 
         # Save results
-        # Enrich outputs with topics from their stills
         enriched_outputs = enrich_outputs_with_topics(factchecked_drafts, stills)
         await save_outputs_to_db(enriched_outputs, job_id, campaign_name=campaign_name)
 
@@ -801,14 +462,12 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
                 await db.commit()
 
     except Exception as e:
-        # Log detailed error for debugging
         error_type = type(e).__name__
         error_message = str(e)
         stack_trace = traceback.format_exc()
         error_detail = f"{error_type}: {error_message}\n{stack_trace}"
         logger.error(f"[RESERVE] Job {job_id} failed: {error_detail}")
 
-        # Log to database for admin debugging
         try:
             await log_error_to_db(
                 job_id,
@@ -820,7 +479,6 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
         except Exception as log_err:
             logger.error(f"[RESERVE] Failed to log error to DB: {log_err}")
 
-        # Get user-friendly error message
         user_error = format_pipeline_error(e, "generation", job_id)
 
         await update_job_status(
@@ -840,7 +498,6 @@ async def resume_pipeline_from_distillation(job_id: str):
     user_id = None
 
     try:
-        # Get job data
         job_data = await get_job_data(job_id)
         if not job_data:
             logger.error(f"Job {job_id} not found for resume")
@@ -867,283 +524,35 @@ async def resume_pipeline_from_distillation(job_id: str):
             )
             source_id = source_row["id"] if source_row else None
 
-        # ======== STEP 1: DISTILLATION (Pass 1) + SUMMARIZATION (parallel) ========
-        await update_job_status(
-            job_id, JobStatus.DISTILLING,
-            "Step 1a: Distilling content stills (Pass 1)", 25, total_cost
-        )
-        total_cost = 0
-
-        # Start summarization in parallel with distillation
-        summary_task = asyncio.create_task(
-            generate_source_summary(cleaned_transcript, job_id, user_id)
-        )
-
-        stills, still_cost = await distill_content(
-            cleaned_transcript, target_persona, job_id, user_id
-        )
-        total_cost += still_cost
-        logger.info(f"Job {job_id}: Pass 1 extracted {len(stills)} stills")
-
-        # ======== STEP 1b: DISTILLATION (Pass 2 - Deep Extraction) ========
-        await update_job_status(
-            job_id, JobStatus.DISTILLING,
-            "Step 1b: Deep extraction (Pass 2)", 35, total_cost
-        )
-        total_cost = 0
-
-        pass2_stills, pass2_cost = await distill_content_pass2(
-            cleaned_transcript, stills, target_persona, job_id, user_id
-        )
-        total_cost += pass2_cost
-        logger.info(f"Job {job_id}: Pass 2 extracted {len(pass2_stills)} additional stills")
-
-        # Merge stills from both passes
-        stills.extend(pass2_stills)
-        logger.info(f"Job {job_id}: Total stills after both passes: {len(stills)}")
-
-        # Await summarization result
-        try:
-            source_summary, summary_cost = await summary_task
-            total_cost += summary_cost
-            if source_summary:
-                async with get_db() as db:
-                    await execute(
-                        db,
-                        "UPDATE jobs SET source_summary = ? WHERE id = ?",
-                        (source_summary, job_id)
-                    )
-                    if not settings.use_postgres:
-                        await db.commit()
-                logger.info(f"Job {job_id}: Source summary saved ({len(source_summary)} chars)")
-        except Exception as summary_err:
-            logger.warning(f"Job {job_id}: Summary step failed (non-fatal): {summary_err}")
-
-        # Save stills to database and the Reserve (with source_id and duplicate detection)
-        save_result = await save_stills_to_db(stills, campaign_name=campaign_name, source_id=source_id)
-        if save_result["skipped_duplicates"] > 0:
-            logger.info(f"Job {job_id}: {save_result['skipped_duplicates']} duplicate stills skipped, {save_result['saved']} new stills saved")
-        await add_stills_to_library(stills, user_id, original_filename, campaign_name=campaign_name, job_id=job_id)
-
-        # Check if this is a Quick Distill job - if so, complete now
-        processing_mode = job_data.get("processing_mode", "autopilot")
-        if processing_mode == "quick_distill":
-            await update_job_status(
-                job_id, JobStatus.COMPLETE,
-                "Stills saved to Reserve", 100, total_cost
-            )
-            async with get_db() as db:
-                if settings.use_postgres:
-                    await db.execute("UPDATE jobs SET completed_at = NOW() WHERE id = $1", job_id)
-                else:
-                    await execute(db, "UPDATE jobs SET completed_at = CURRENT_TIMESTAMP WHERE id = ?", (job_id,))
-                    await db.commit()
-            return
-
-        # ======== STEP 2: DRAFTING ========
-        await update_job_status(
-            job_id, JobStatus.DRAFTING,
-            "Step 2: Drafting content", 50, total_cost
-        )
-        total_cost = 0
-
-        all_drafts = []
-
-        # Generate LinkedIn posts if requested
-        if "linkedin" in asset_types:
-            count = asset_quantities.get("linkedin", 3)
-            linkedin_drafts, li_cost = await draft_linkedin_posts(
-                stills, target_persona, count, job_id, user_id
-            )
-            total_cost += li_cost
-
-            for i, draft in enumerate(linkedin_drafts):
-                all_drafts.append({
-                    "content_type": "linkedin",
-                    "variation_number": i + 1,
-                    "content": draft.get("content", ""),
-                    "stills_used": draft.get("stills_used", draft.get("atoms_used", [])),
-                })
-
-        # Generate blog post if requested
-        if "blog" in asset_types:
-            blog_draft, blog_cost = await draft_blog_post(
-                stills, target_persona, job_id, user_id
-            )
-            total_cost += blog_cost
-
-            all_drafts.append({
-                "content_type": "blog",
-                "variation_number": 1,
-                "content": blog_draft.get("content", ""),
-                "title": blog_draft.get("title", ""),
-                "stills_used": blog_draft.get("stills_used", blog_draft.get("atoms_used", [])),
-            })
-
-        # Generate email if requested
-        if "email" in asset_types:
-            email_draft, email_cost = await draft_email(
-                stills, target_persona, job_id, user_id
-            )
-            total_cost += email_cost
-
-            all_drafts.append({
-                "content_type": "email",
-                "variation_number": 1,
-                "content": email_draft.get("body", ""),
-                "subject": email_draft.get("subject", ""),
-                "stills_used": email_draft.get("stills_used", email_draft.get("atoms_used", [])),
-            })
-
-        # Generate email sequence if requested
-        if "email_sequence" in asset_types:
-            email_sequence, seq_cost = await draft_email_sequence(
-                stills, target_persona, job_id, user_id
-            )
-            total_cost += seq_cost
-
-            for i, email in enumerate(email_sequence):
-                all_drafts.append({
-                    "content_type": "email_sequence",
-                    "variation_number": i + 1,
-                    "content": email.get("body", ""),
-                    "subject": email.get("subject", ""),
-                    "preview_text": email.get("preview_text", ""),
-                    "email_day": email.get("day"),
-                    "email_purpose": email.get("purpose", ""),
-                    "sequence_name": email.get("sequence_name", ""),
-                    "cta": email.get("cta", ""),
-                    "stills_used": email.get("stills_used", email.get("atoms_used", [])),
-                })
-
-        # ======== STEP 3: EDITING ========
-        await update_job_status(
-            job_id, JobStatus.EDITING,
-            "Step 3: Editing for audience", 70, total_cost
-        )
-        total_cost = 0
-
-        edited_drafts, edit_cost = await batch_edit_content(
-            all_drafts, target_persona, job_id, user_id
-        )
-        total_cost += edit_cost
-
-        # ======== STEP 4: FACT-CHECKING ========
-        await update_job_status(
-            job_id, JobStatus.FACTCHECKING,
-            "Step 4: Fact-checking content", 85, total_cost
-        )
-        total_cost = 0
-
-        factchecked_drafts, fc_cost = await batch_factcheck_content(
-            edited_drafts, cleaned_transcript, job_id, user_id, source_id=source_id
-        )
-        total_cost += fc_cost
-
-        # ======== STEP 5: QUALITY SCORING ========
-        await update_job_status(
-            job_id, JobStatus.FACTCHECKING,
-            "Step 5: Scoring content quality", 92, total_cost
-        )
-        total_cost = 0
-
-        # Get persona title for context
-        from app.services.persona_manager import get_persona
-        persona = await get_persona(target_persona, user_id=user_id)
-        persona_title = persona.get("title", "") if persona else ""
-
-        scored_drafts, score_cost = await batch_score_content(
-            factchecked_drafts, persona_title
-        )
-        total_cost += score_cost
-
-        # ======== STEP 6: HOOK VARIATIONS (for LinkedIn posts) ========
-        if "linkedin" in asset_types:
-            await update_job_status(
-                job_id, JobStatus.FACTCHECKING,
-                "Step 6: Generating hook variations", 96, total_cost
-            )
-            total_cost = 0
-
-            scored_drafts, hook_cost = await batch_generate_hooks(
-                scored_drafts, target_persona, job_id, user_id
-            )
-            total_cost += hook_cost
-
-        # ======== STEP 7: IMAGE PROMPT GENERATION (Optional) ========
-        if generate_image_prompts:
-            await update_job_status(
-                job_id, JobStatus.FACTCHECKING,
-                "Step 7: Generating image prompts", 98, total_cost
-            )
-            total_cost = 0
-
-            from app.services.image_prompts import batch_generate_image_prompts
-            scored_drafts, img_cost = await batch_generate_image_prompts(
-                scored_drafts, job_id, user_id
-            )
-            total_cost += img_cost
-        else:
-            logger.info(f"Job {job_id}: Skipping image prompt generation (disabled)")
-
-        # ======== SAVE RESULTS ========
-        # Enrich outputs with topics from their stills
-        enriched_outputs = enrich_outputs_with_topics(scored_drafts, stills)
-        await save_outputs_to_db(enriched_outputs, job_id, campaign_name=campaign_name)
-
-        # Mark job complete
-        await update_job_status(
-            job_id, JobStatus.COMPLETE,
-            "Complete", 100, total_cost
+        # ======== RUN SHARED PIPELINE STEPS ========
+        ctx = PipelineContext(
+            job_id=job_id,
+            user_id=user_id,
+            target_persona=target_persona,
+            asset_types=asset_types,
+            asset_quantities=asset_quantities,
+            original_filename=original_filename,
+            campaign_name=campaign_name,
+            cleaned_transcript=cleaned_transcript,
+            source_id=source_id,
+            generate_image_prompts=generate_image_prompts,
+            total_cost=total_cost,
         )
 
-        # Update completed_at timestamp
-        async with get_db() as db:
-            if settings.use_postgres:
-                await db.execute("UPDATE jobs SET completed_at = NOW() WHERE id = $1", job_id)
-            else:
-                await execute(db, "UPDATE jobs SET completed_at = CURRENT_TIMESTAMP WHERE id = ?", (job_id,))
-                await db.commit()
-
-        # Trigger webhooks for job completion and content generation
-        try:
-            from app.services.webhook_manager import (
-                trigger_webhook_event,
-                get_job_webhook_payload,
-                get_content_webhook_payload
-            )
-            job_payload = await get_job_webhook_payload(job_id)
-            await trigger_webhook_event("job_completed", user_id, job_payload)
-
-            content_payload = await get_content_webhook_payload(job_id)
-            await trigger_webhook_event("content_generated", user_id, content_payload)
-        except Exception as webhook_error:
-            # Don't fail the job if webhook fails
-            logger.warning(f"Webhook trigger failed for job {job_id}: {webhook_error}")
+        await run_pipeline_steps(ctx)
 
     except Exception as e:
-        # Log detailed error for debugging
         error_type = type(e).__name__
         error_message = str(e)
         stack_trace = traceback.format_exc()
         error_detail = f"{error_type}: {error_message}\n{stack_trace}"
         logger.error(f"Job {job_id} failed during resume: {error_detail}")
 
-        # Determine which step failed for context
-        step_context = "unknown"
         job_data_check = await get_job_data(job_id)
+        step_context = "unknown"
         if job_data_check:
-            current = job_data_check.get("current_step", "")
-            if "distill" in current.lower() or "still" in current.lower():
-                step_context = "distillation"
-            elif "draft" in current.lower():
-                step_context = "drafting"
-            elif "edit" in current.lower():
-                step_context = "editing"
-            elif "fact" in current.lower():
-                step_context = "factchecking"
+            step_context = _determine_step_context(job_data_check.get("current_step", ""))
 
-        # Log error to database for admin debugging
         await log_error_to_db(
             job_id,
             user_id if user_id else 0,
@@ -1152,7 +561,6 @@ async def resume_pipeline_from_distillation(job_id: str):
             stack_trace
         )
 
-        # Get user-friendly error message
         user_error = format_pipeline_error(e, step_context, job_id)
 
         await update_job_status(
