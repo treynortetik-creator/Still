@@ -124,14 +124,14 @@ ERROR_MESSAGES = {
         "retry": False,
     },
     ErrorCode.NO_ATOMS_EXTRACTED: {
-        "title": "No Content Atoms Found",
-        "message": "We couldn't extract meaningful content atoms from your input.",
-        "action": "Ensure your content contains specific insights, data, stories, or actionable information. Generic content may not yield useful atoms.",
+        "title": "No Content Stills Found",
+        "message": "We couldn't extract meaningful content stills from your input.",
+        "action": "Ensure your content contains specific insights, data, stories, or actionable information. Generic content may not yield useful stills.",
         "retry": False,
     },
     ErrorCode.GENERATION_FAILED: {
         "title": "Content Generation Failed",
-        "message": "We couldn't generate content from the extracted atoms.",
+        "message": "We couldn't generate content from the extracted stills.",
         "action": "This usually happens when the source content lacks clear themes. Try adding more specific, topical content.",
         "retry": True,
     },
@@ -215,9 +215,9 @@ def detect_error_type(exception: Exception, context: str = "") -> ErrorCode:
             return ErrorCode.LANGUAGE_NOT_DETECTED
         return ErrorCode.TRANSCRIPTION_FAILED
 
-    # Atomization context
-    if context == "atomization":
-        if "no atoms" in error_str or "empty" in error_str:
+    # Distillation context (formerly atomization)
+    if context == "distillation" or context == "atomization":
+        if "no stills" in error_str or "no atoms" in error_str or "empty" in error_str:
             return ErrorCode.NO_ATOMS_EXTRACTED
         if "short" in error_str:
             return ErrorCode.CONTENT_TOO_SHORT

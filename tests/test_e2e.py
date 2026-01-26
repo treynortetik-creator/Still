@@ -23,7 +23,7 @@ class TestConfig:
     access_token: str = None
     user_id: int = None
     job_id: str = None
-    library_atom_ids: list = []
+    library_still_ids: list = []
 
     # Test user credentials
     test_email = f"test_user_{datetime.now().strftime('%Y%m%d%H%M%S')}@example.com"
@@ -182,7 +182,7 @@ class TestUserJourney:
         assert elapsed < max_wait_seconds, "Job processing timed out"
 
         # Verify we saw expected steps
-        expected_keywords = ["transcrib", "atom", "draft", "edit"]
+        expected_keywords = ["transcrib", "distill", "draft", "edit"]
         for keyword in expected_keywords:
             found = any(keyword in step for step in seen_steps)
             print(f"Step containing '{keyword}': {'Found' if found else 'Not found'}")
@@ -216,17 +216,17 @@ class TestUserJourney:
                 print(f"  {content_type}: Quality score {overall}/100")
                 assert 0 <= overall <= 100, f"Invalid quality score: {overall}"
 
-        # Verify atoms
-        atoms = data.get("atoms", [])
-        assert len(atoms) > 0, "No atoms extracted"
-        print(f"Extracted {len(atoms)} atoms")
+        # Verify stills (support both keys for backwards compatibility)
+        stills = data.get("stills", data.get("atoms", []))
+        assert len(stills) > 0, "No stills extracted"
+        print(f"Extracted {len(stills)} stills")
 
-        # Store atom IDs for library test
-        TestConfig.library_atom_ids = [a.get("id") for a in atoms[:3] if a.get("id")]
+        # Store still IDs for library test
+        TestConfig.library_still_ids = [s.get("id") for s in stills[:3] if s.get("id")]
 
     @pytest.mark.asyncio
     async def test_06_content_library_populated(self, client: httpx.AsyncClient):
-        """Test: Atoms added to user's library"""
+        """Test: Stills added to user's library"""
         headers = {"Authorization": f"Bearer {TestConfig.access_token}"}
 
         response = await client.get(
@@ -242,14 +242,14 @@ class TestUserJourney:
         assert len(entries) > 0, "Library is empty after upload"
         print(f"Library contains {len(entries)} entries")
 
-        # Check atom types
-        atom_types = set()
+        # Check still types
+        still_types = set()
         for entry in entries:
-            atoms = entry.get("atoms", [])
-            for atom in atoms:
-                atom_types.add(atom.get("type", "unknown"))
+            stills = entry.get("stills", entry.get("atoms", []))
+            for still in stills:
+                still_types.add(still.get("type", "unknown"))
 
-        print(f"Atom types found: {atom_types}")
+        print(f"Still types found: {still_types}")
 
     @pytest.mark.asyncio
     async def test_07_brand_voice_preview(self, client: httpx.AsyncClient):

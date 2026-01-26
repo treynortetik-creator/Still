@@ -12,7 +12,7 @@ class OutputCreate(BaseModel):
     step1_draft: Optional[str] = None
     step2_edited: Optional[str] = None
     step3_final: Optional[str] = None
-    atoms_used: list[str] = []
+    stills_used: list[str] = []
     citations: list[dict] = []
     warnings: list[str] = []
 
@@ -29,5 +29,5 @@ class OutputResponse(BaseModel):
     job_id: str
     status: str
     outputs: list[Output]
-    atoms: list[dict]
+    stills: list[dict]
     cost_incurred: float

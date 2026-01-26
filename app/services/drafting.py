@@ -51,10 +51,10 @@ async def record_still_usage(still_ids: List[str], output_id: int) -> None:
                     WHERE id = ANY($2)
                 """, now, still_ids)
 
-                # Update atoms_used on output
+                # Update stills_used on output
                 await db.execute("""
                     UPDATE outputs
-                    SET atoms_used = $1
+                    SET stills_used = $1
                     WHERE id = $2
                 """, json.dumps(still_ids), output_id)
             else:
@@ -69,7 +69,7 @@ async def record_still_usage(still_ids: List[str], output_id: int) -> None:
 
                 await db.execute("""
                     UPDATE outputs
-                    SET atoms_used = ?
+                    SET stills_used = ?
                     WHERE id = ?
                 """, (json.dumps(still_ids), output_id))
 
@@ -245,7 +245,7 @@ async def draft_linkedin_posts(
 
     # Format stills for prompt (include attribution for quotes)
     def format_still(s):
-        still_type = s.get('still_type', s.get('atom_type', 'insight')).upper()
+        still_type = s.get('still_type', 'insight').upper()
         content = s['content']
         if still_type == 'QUOTE' and s.get('quote_attribution'):
             return f"- [{still_type}] \"{content}\" — {s['quote_attribution']}"
@@ -254,7 +254,7 @@ async def draft_linkedin_posts(
     stills_text = "\n".join([format_still(s) for s in selected_stills])
 
     variables = {
-        "selected_atoms_for_linkedin": stills_text,  # Keep prompt variable name for compatibility
+        "selected_stills_for_linkedin": stills_text,
         "persona_title": persona["title"],
         "persona_priorities": ", ".join(persona["priorities"]),
         "persona_pain_points": ", ".join(persona["pain_points"]),
@@ -293,7 +293,7 @@ OUTPUT FORMAT (valid JSON):
       "variation": 1,
       "hook_type": "question|stat|problem|benefit",
       "content": "Full post text here...",
-      "atoms_used": ["atom content snippets used"],
+      "stills_used": ["still content snippets used"],
       "cta": "Call to action text"
     }}
   ]
@@ -359,12 +359,12 @@ async def draft_blog_post(
         return "\n".join(formatted)
 
     variables = {
-        "problem_atoms": format_stills(grouped["problem"]),
-        "insight_atoms": format_stills(grouped["insight"]),
-        "solution_atoms": format_stills(grouped["solution"]),
-        "data_atoms": format_stills(grouped["data"]),
-        "story_atoms": format_stills(grouped["story"]),
-        "quote_atoms": format_quotes(grouped["quote"]),
+        "problem_stills": format_stills(grouped["problem"]),
+        "insight_stills": format_stills(grouped["insight"]),
+        "solution_stills": format_stills(grouped["solution"]),
+        "data_stills": format_stills(grouped["data"]),
+        "story_stills": format_stills(grouped["story"]),
+        "quote_stills": format_quotes(grouped["quote"]),
         "persona_title": persona["title"],
     }
 
@@ -395,7 +395,7 @@ OUTPUT FORMAT (valid JSON):
 {
   "title": "Blog post title",
   "content": "Full blog post content with markdown formatting (## for H2 headings)",
-  "atoms_used": ["atom content snippets used"],
+  "stills_used": ["still content snippets used"],
   "word_count": 0,
   "sections": ["Section 1 title", "Section 2 title", "Section 3 title"]
 }"""
@@ -440,12 +440,12 @@ async def draft_email(
     selected_stills = select_stills_for_content_type(stills, "email", persona_id, count=4)
 
     stills_text = "\n".join([
-        f"- [{s.get('still_type', s.get('atom_type', 'insight')).upper()}] {s['content']}"
+        f"- [{s.get('still_type', 'insight').upper()}] {s['content']}"
         for s in selected_stills
     ])
 
     variables = {
-        "selected_atoms": stills_text,  # Keep prompt variable name for compatibility
+        "selected_stills": stills_text,
         "persona_title": persona["title"],
         "persona_priorities": ", ".join(persona["priorities"]),
         "persona_pain_points": ", ".join(persona["pain_points"]),
@@ -480,7 +480,7 @@ OUTPUT FORMAT (valid JSON):
   "preview_text": "Email preview text (first line)",
   "body": "Full email body",
   "cta": "Call to action",
-  "atoms_used": ["atom content snippets used"]
+  "stills_used": ["still content snippets used"]
 }"""
 
     # Call LLM via unified client
@@ -581,22 +581,22 @@ Create a 5-email drip campaign with the following structure:
 
 EMAIL 1 (Day 0 - Welcome/Hook):
 - Purpose: Capture attention, establish relevance, promise value
-- Use a compelling problem or insight atom
+- Use a compelling problem or insight still
 - Short and punchy
 
 EMAIL 2 (Day 3 - Value/Education):
 - Purpose: Deliver educational value, build trust
-- Use data or insight atoms
+- Use data or insight stills
 - Position yourself as a helpful resource
 
 EMAIL 3 (Day 7 - Story/Credibility):
 - Purpose: Social proof, share a success story or case study
-- Use story atoms or quotes
+- Use story stills or quotes
 - Build emotional connection
 
 EMAIL 4 (Day 14 - Solution):
 - Purpose: Present your solution, address objections
-- Use solution atoms
+- Use solution stills
 - Clear value proposition
 
 EMAIL 5 (Day 30 - Action/Urgency):
@@ -608,7 +608,7 @@ Each email should:
 - Have a compelling subject line (under 50 chars)
 - Include preview text
 - Be appropriately lengthed for the persona
-- Reference specific atoms used
+- Reference specific stills used
 - Have a clear CTA
 
 OUTPUT FORMAT (valid JSON):
@@ -622,7 +622,7 @@ OUTPUT FORMAT (valid JSON):
       "preview_text": "Preview text",
       "body": "Full email body with paragraphs",
       "cta": "Call to action text",
-      "atoms_used": ["atom snippets used"]
+      "stills_used": ["still snippets used"]
     }},
     {{
       "day": 3,
@@ -631,7 +631,7 @@ OUTPUT FORMAT (valid JSON):
       "preview_text": "Preview text",
       "body": "Full email body",
       "cta": "Call to action text",
-      "atoms_used": ["atom snippets used"]
+      "stills_used": ["still snippets used"]
     }},
     {{
       "day": 7,
@@ -640,7 +640,7 @@ OUTPUT FORMAT (valid JSON):
       "preview_text": "Preview text",
       "body": "Full email body",
       "cta": "Call to action text",
-      "atoms_used": ["atom snippets used"]
+      "stills_used": ["still snippets used"]
     }},
     {{
       "day": 14,
@@ -649,7 +649,7 @@ OUTPUT FORMAT (valid JSON):
       "preview_text": "Preview text",
       "body": "Full email body",
       "cta": "Call to action text",
-      "atoms_used": ["atom snippets used"]
+      "stills_used": ["still snippets used"]
     }},
     {{
       "day": 30,
@@ -658,7 +658,7 @@ OUTPUT FORMAT (valid JSON):
       "preview_text": "Preview text",
       "body": "Full email body",
       "cta": "Call to action text",
-      "atoms_used": ["atom snippets used"]
+      "stills_used": ["still snippets used"]
     }}
   ]
 }}"""

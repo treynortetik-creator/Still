@@ -187,13 +187,13 @@ async def get_still_outputs(
         if not still:
             raise HTTPException(status_code=404, detail="Still not found")
 
-        # Find outputs containing this still in atoms_used
+        # Find outputs containing this still in stills_used
         rows = await fetchall(db, """
             SELECT o.id, o.content_type, o.created_at, o.status,
                    o.step3_final, o.subject, j.campaign_name
             FROM outputs o
             LEFT JOIN jobs j ON o.job_id = j.id
-            WHERE o.atoms_used LIKE ?
+            WHERE o.stills_used LIKE ?
             ORDER BY o.created_at DESC
             LIMIT 20
         """, (f'%{still_id}%',))

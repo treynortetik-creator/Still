@@ -6,7 +6,7 @@ from typing import Optional, List
 from app.api.auth import get_current_user_id
 from app.services.remix import (
     analyze_library_for_remix,
-    get_atoms_by_topic,
+    get_stills_by_topic,
     get_library_stats,
     generate_remix_content,
 )
@@ -16,7 +16,7 @@ router = APIRouter()
 
 class RemixRequest(BaseModel):
     """Request to generate remixed content."""
-    atom_ids: List[str]
+    still_ids: List[str]
     content_type: Optional[str] = "linkedin"
     angle: Optional[str] = None
 
@@ -26,7 +26,7 @@ async def get_suggestions(
     user_id: int = Depends(get_current_user_id),
 ):
     """
-    Analyze atom library and suggest remix opportunities.
+    Analyze still library and suggest remix opportunities.
 
     Returns topic clusters, comparison opportunities, contrarian takes,
     story expansions, and roundup post ideas.
@@ -52,20 +52,20 @@ async def get_stats(
 
 
 @router.get("/remix/search")
-async def search_atoms(
+async def search_stills(
     topic: str,
     user_id: int = Depends(get_current_user_id),
 ):
-    """Search atoms by topic/keyword."""
+    """Search stills by topic/keyword."""
     if not topic or len(topic) < 2:
         raise HTTPException(status_code=400, detail="Search term must be at least 2 characters")
 
-    atoms = await get_atoms_by_topic(user_id, topic)
+    stills = await get_stills_by_topic(user_id, topic)
 
     return {
         "query": topic,
-        "results": atoms,
-        "count": len(atoms),
+        "results": stills,
+        "count": len(stills),
     }
 
 
@@ -75,27 +75,27 @@ async def generate_remix(
     user_id: int = Depends(get_current_user_id),
 ):
     """
-    Generate remixed content from selected atoms.
+    Generate remixed content from selected stills.
 
-    Combines multiple atoms into a cohesive piece of content.
+    Combines multiple stills into a cohesive piece of content.
     """
-    if not data.atom_ids or len(data.atom_ids) < 1:
-        raise HTTPException(status_code=400, detail="At least one atom ID is required")
+    if not data.still_ids or len(data.still_ids) < 1:
+        raise HTTPException(status_code=400, detail="At least one still ID is required")
 
-    if len(data.atom_ids) > 10:
-        raise HTTPException(status_code=400, detail="Maximum 10 atoms per remix")
+    if len(data.still_ids) > 10:
+        raise HTTPException(status_code=400, detail="Maximum 10 stills per remix")
 
     try:
         content, cost = await generate_remix_content(
             user_id=user_id,
-            atom_ids=data.atom_ids,
+            still_ids=data.still_ids,
             content_type=data.content_type or "linkedin",
             angle=data.angle,
         )
 
         return {
             "content": content,
-            "atom_count": len(data.atom_ids),
+            "still_count": len(data.still_ids),
             "content_type": data.content_type,
             "cost": cost,
         }

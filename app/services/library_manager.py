@@ -439,7 +439,7 @@ async def save_outputs_to_db(outputs: list[dict], job_id: str, campaign_name: Op
                     INSERT INTO outputs (
                         job_id, content_type, variation_number,
                         step1_draft, step2_edited, step3_final,
-                        atoms_used, citations, warnings, quality_scores,
+                        stills_used, citations, warnings, quality_scores,
                         hook_variations, subject, preview_text,
                         email_day, email_purpose, sequence_name,
                         topics, campaign_name
@@ -473,7 +473,7 @@ async def save_outputs_to_db(outputs: list[dict], job_id: str, campaign_name: Op
                     INSERT INTO outputs (
                         job_id, content_type, variation_number,
                         step1_draft, step2_edited, step3_final,
-                        atoms_used, citations, warnings, quality_scores,
+                        stills_used, citations, warnings, quality_scores,
                         hook_variations, subject, preview_text,
                         email_day, email_purpose, sequence_name,
                         topics, campaign_name

@@ -146,14 +146,14 @@ async def test_admin_list_clients(auth_client):
 # ============== Library Generation ==============
 
 @pytest.mark.asyncio
-async def test_generate_from_library_no_atoms(auth_client):
-    """Test generating from library with no atoms."""
+async def test_generate_from_library_no_stills(auth_client):
+    """Test generating from library with no stills."""
     response = await auth_client.post(
         "/api/generate-from-library",
         json={
-            "atom_ids": [],
+            "still_ids": [],
             "target_persona": "ceo_longterm_care",
             "asset_types": ["linkedin"],
         },
     )
-    assert response.status_code == 400  # Should fail with no atoms
+    assert response.status_code == 400  # Should fail with no stills

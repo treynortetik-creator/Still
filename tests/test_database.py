@@ -145,14 +145,14 @@ async def test_update_job_status(test_db):
         # Update status
         await db.execute(
             "UPDATE jobs SET status = ?, progress = ? WHERE id = ?",
-            ("atomizing", 30, job_id)
+            ("distilling", 30, job_id)
         )
         await db.commit()
 
         cursor = await db.execute("SELECT * FROM jobs WHERE id = ?", (job_id,))
         job = await cursor.fetchone()
 
-        assert job["status"] == "atomizing"
+        assert job["status"] == "distilling"
         assert job["progress"] == 30
 
 

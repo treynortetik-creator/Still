@@ -79,7 +79,7 @@ async def get_job_with_outputs(job_id: str, user_id: int) -> tuple[dict, list[di
             """
             SELECT id, content_type, variation_number,
                    step1_draft, step2_edited, step3_final,
-                   atoms_used, citations, warnings, quality_scores,
+                   stills_used, citations, warnings, quality_scores,
                    hook_variations
             FROM outputs WHERE job_id = ?
             ORDER BY content_type, variation_number
@@ -96,7 +96,7 @@ async def get_job_with_outputs(job_id: str, user_id: int) -> tuple[dict, list[di
                 "step1_draft": row["step1_draft"],
                 "step2_edited": row["step2_edited"],
                 "step3_final": row["step3_final"],
-                "atoms_used": json.loads(row["atoms_used"]) if row["atoms_used"] else [],
+                "stills_used": json.loads(row["stills_used"]) if row["stills_used"] else [],
                 "citations": json.loads(row["citations"]) if row["citations"] else [],
                 "warnings": json.loads(row["warnings"]) if row["warnings"] else [],
                 "quality_scores": json.loads(row["quality_scores"]) if row["quality_scores"] else {},
@@ -130,7 +130,7 @@ async def get_job_with_outputs(job_id: str, user_id: int) -> tuple[dict, list[di
         return dict(job), outputs, stills
 
 
-def format_markdown(job: dict, outputs: list[dict], atoms: list[dict]) -> str:
+def format_markdown(job: dict, outputs: list[dict], stills: list[dict]) -> str:
     """Format job results as markdown."""
     lines = []
 
@@ -200,25 +200,25 @@ def format_markdown(job: dict, outputs: list[dict], atoms: list[dict]) -> str:
             lines.append("---")
             lines.append("")
 
-    # Atoms section
-    if atoms:
-        lines.append("## Extracted Atoms")
+    # Stills section
+    if stills:
+        lines.append("## Extracted Stills")
         lines.append("")
 
-        atom_groups = {}
-        for atom in atoms:
-            atom_type = atom["type"]
-            if atom_type not in atom_groups:
-                atom_groups[atom_type] = []
-            atom_groups[atom_type].append(atom)
+        still_groups = {}
+        for still in stills:
+            still_type = still["type"]
+            if still_type not in still_groups:
+                still_groups[still_type] = []
+            still_groups[still_type].append(still)
 
-        for atom_type, items in atom_groups.items():
-            lines.append(f"### {atom_type.title()}")
+        for still_type, items in still_groups.items():
+            lines.append(f"### {still_type.title()}")
             lines.append("")
-            for atom in items:
-                content = atom["content"]
-                if atom.get("quote_attribution"):
-                    lines.append(f"> \"{content}\" — {atom['quote_attribution']}")
+            for still in items:
+                content = still["content"]
+                if still.get("quote_attribution"):
+                    lines.append(f"> \"{content}\" — {still['quote_attribution']}")
                 else:
                     lines.append(f"- {content}")
             lines.append("")
@@ -233,7 +233,7 @@ def serialize_datetime(obj):
     raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 
-def format_json(job: dict, outputs: list[dict], atoms: list[dict]) -> str:
+def format_json(job: dict, outputs: list[dict], stills: list[dict]) -> str:
     """Format job results as JSON."""
     return json.dumps({
         "job": {
@@ -245,11 +245,11 @@ def format_json(job: dict, outputs: list[dict], atoms: list[dict]) -> str:
             "completed_at": job["completed_at"],
         },
         "outputs": outputs,
-        "atoms": atoms,
+        "stills": stills,
     }, indent=2, default=serialize_datetime)
 
 
-def create_docx(job: dict, outputs: list[dict], atoms: list[dict]) -> bytes:
+def create_docx(job: dict, outputs: list[dict], stills: list[dict]) -> bytes:
     """
     Create a DOCX file from job results.
 
@@ -320,25 +320,25 @@ def create_docx(job: dict, outputs: list[dict], atoms: list[dict]) -> bytes:
                     for warning in item["warnings"]:
                         doc.add_paragraph(f"  - {warning}")
 
-        # Atoms section
-        if atoms:
-            doc.add_heading("Extracted Atoms", 1)
+        # Stills section
+        if stills:
+            doc.add_heading("Extracted Stills", 1)
 
-            atom_groups = {}
-            for atom in atoms:
-                atom_type = atom["type"]
-                if atom_type not in atom_groups:
-                    atom_groups[atom_type] = []
-                atom_groups[atom_type].append(atom)
+            still_groups = {}
+            for still in stills:
+                still_type = still["type"]
+                if still_type not in still_groups:
+                    still_groups[still_type] = []
+                still_groups[still_type].append(still)
 
-            for atom_type, items in atom_groups.items():
-                doc.add_heading(atom_type.title(), 2)
-                for atom in items:
-                    content = atom["content"]
-                    if atom.get("quote_attribution"):
+            for still_type, items in still_groups.items():
+                doc.add_heading(still_type.title(), 2)
+                for still in items:
+                    content = still["content"]
+                    if still.get("quote_attribution"):
                         p = doc.add_paragraph()
                         p.add_run(f'"{content}"').italic = True
-                        p.add_run(f" — {atom['quote_attribution']}")
+                        p.add_run(f" — {still['quote_attribution']}")
                     else:
                         doc.add_paragraph(f"  - {content}")
 
@@ -351,7 +351,7 @@ def create_docx(job: dict, outputs: list[dict], atoms: list[dict]) -> bytes:
     except ImportError:
         # Fallback if python-docx not installed
         # Return the markdown as plain text
-        content = format_markdown(job, outputs, atoms)
+        content = format_markdown(job, outputs, stills)
         return content.encode("utf-8")
 
 
@@ -361,9 +361,9 @@ async def export_markdown(
     user_id: int = Depends(get_current_user_id),
 ):
     """Export job results as markdown file."""
-    job, outputs, atoms = await get_job_with_outputs(job_id, user_id)
+    job, outputs, stills = await get_job_with_outputs(job_id, user_id)
 
-    content = format_markdown(job, outputs, atoms)
+    content = format_markdown(job, outputs, stills)
     base_name = sanitize_filename(job['original_filename'].rsplit('.', 1)[0])
     filename = f"{base_name}_export.md"
 
@@ -382,9 +382,9 @@ async def export_json(
     user_id: int = Depends(get_current_user_id),
 ):
     """Export job results as JSON file."""
-    job, outputs, atoms = await get_job_with_outputs(job_id, user_id)
+    job, outputs, stills = await get_job_with_outputs(job_id, user_id)
 
-    content = format_json(job, outputs, atoms)
+    content = format_json(job, outputs, stills)
     base_name = sanitize_filename(job['original_filename'].rsplit('.', 1)[0])
     filename = f"{base_name}_export.json"
 
@@ -403,9 +403,9 @@ async def export_docx(
     user_id: int = Depends(get_current_user_id),
 ):
     """Export job results as Word document."""
-    job, outputs, atoms = await get_job_with_outputs(job_id, user_id)
+    job, outputs, stills = await get_job_with_outputs(job_id, user_id)
 
-    content = create_docx(job, outputs, atoms)
+    content = create_docx(job, outputs, stills)
     base_name = sanitize_filename(job['original_filename'].rsplit('.', 1)[0])
     filename = f"{base_name}_export.docx"
 
@@ -424,7 +424,7 @@ async def export_zip(
     user_id: int = Depends(get_current_user_id),
 ):
     """Export all job outputs as a ZIP file containing markdown, JSON, and individual content files."""
-    job, outputs, atoms = await get_job_with_outputs(job_id, user_id)
+    job, outputs, stills = await get_job_with_outputs(job_id, user_id)
 
     base_name = sanitize_filename(job["original_filename"].rsplit(".", 1)[0])
 
@@ -432,10 +432,10 @@ async def export_zip(
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         # Add full markdown export
-        zf.writestr(f"{base_name}_full_export.md", format_markdown(job, outputs, atoms))
+        zf.writestr(f"{base_name}_full_export.md", format_markdown(job, outputs, stills))
 
         # Add JSON export
-        zf.writestr(f"{base_name}_export.json", format_json(job, outputs, atoms))
+        zf.writestr(f"{base_name}_export.json", format_json(job, outputs, stills))
 
         # Add individual content files
         for output in outputs:
@@ -459,16 +459,16 @@ async def export_zip(
                         hooks_md += "---\n\n"
                     zf.writestr(f"hooks/{content_type}_{variation}_hooks.md", hooks_md)
 
-        # Add atoms export
-        if atoms:
-            atoms_md = "# Extracted Content Atoms\n\n"
-            for atom in atoms:
-                atoms_md += f"## {atom['type'].title()}\n\n"
-                if atom.get("quote_attribution"):
-                    atoms_md += f'> "{atom["content"]}" — {atom["quote_attribution"]}\n\n'
+        # Add stills export
+        if stills:
+            stills_md = "# Extracted Content Stills\n\n"
+            for still in stills:
+                stills_md += f"## {still['type'].title()}\n\n"
+                if still.get("quote_attribution"):
+                    stills_md += f'> "{still["content"]}" — {still["quote_attribution"]}\n\n'
                 else:
-                    atoms_md += f"- {atom['content']}\n\n"
-            zf.writestr("atoms.md", atoms_md)
+                    stills_md += f"- {still['content']}\n\n"
+            zf.writestr("stills.md", stills_md)
 
     buffer.seek(0)
     filename = f"{base_name}_export.zip"

@@ -71,12 +71,12 @@
         <!-- Library Stats -->
         <div id="library-stats" class="grid md:grid-cols-4 gap-4 mb-8">
             <div class="bg-still-card rounded-lg shadow-sm p-4 text-center border border-still-border">
-                <p class="text-3xl font-bold text-still-copper" id="total-atoms">-</p>
-                <p class="text-sm text-still-muted">Total Atoms</p>
+                <p class="text-3xl font-bold text-still-copper" id="total-stills">-</p>
+                <p class="text-sm text-still-muted">Total Stills</p>
             </div>
             <div class="bg-still-card rounded-lg shadow-sm p-4 border border-still-border">
                 <p class="font-medium text-still-muted mb-2">By Type</p>
-                <div id="atoms-by-type" class="text-sm text-still-muted space-y-1">
+                <div id="stills-by-type" class="text-sm text-still-muted space-y-1">
                     <p>Loading...</p>
                 </div>
             </div>
@@ -91,9 +91,9 @@
         <!-- Search -->
         <div class="bg-still-card rounded-lg shadow-sm p-4 mb-8 border border-still-border">
             <div class="flex gap-3">
-                <input type="text" id="search-input" placeholder="Search atoms by topic..."
+                <input type="text" id="search-input" placeholder="Search stills by topic..."
           class="flex-1 input-premium" >
-                <button onclick="searchAtoms()" class="bg-still-border text-still-text px-6 py-2 rounded-lg hover:bg-still-disabled/30 transition">
+                <button onclick="searchStills()" class="bg-still-border text-still-text px-6 py-2 rounded-lg hover:bg-still-disabled/30 transition">
                     Search
                 </button>
             </div>
@@ -181,8 +181,8 @@
             <svg class="mx-auto h-12 w-12 text-still-disabled" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
             </svg>
-            <h3 class="mt-2 text-lg font-medium text-still-text">Not enough atoms</h3>
-            <p class="mt-1 text-still-disabled">Upload some content to build your atom library first.</p>
+            <h3 class="mt-2 text-lg font-medium text-still-text">Not enough stills</h3>
+            <p class="mt-1 text-still-disabled">Upload some content to build your still library first.</p>
             <a href="/upload.html" class="mt-4 inline-block text-still-copper hover:underline">
                 Upload Content
             </a>
@@ -259,7 +259,7 @@
                     tagsDiv.innerHTML = '<span class="text-still-disabled text-sm">No tags yet</span>';
                 }
 
-                if (data.total_atoms < 5) {
+                if ((data.total_stills || data.total_atoms || 0) < 5) {
                     document.getElementById('empty-state').classList.remove('hidden');
                 }
 
@@ -308,7 +308,7 @@
                 document.getElementById('roundup-list').innerHTML = roundups.map(r => `
                     <div class="bg-still-card rounded-lg shadow-sm p-4 border-l-4 border-still-green border border-still-border">
                         <h4 class="font-medium text-still-text mb-2">${escapeHtml(r.post_title || r.theme)}</h4>
-                        <p class="text-sm text-still-muted mb-3">Uses ${r.atom_ids?.length || 0} atoms about "${escapeHtml(r.theme)}"</p>
+                        <p class="text-sm text-still-muted mb-3">Uses ${r.still_ids?.length || r.atom_ids?.length || 0} stills about "${escapeHtml(r.theme)}"</p>
                         <span class="text-xs bg-still-green/20 text-still-green px-2 py-1 rounded">${r.format || 'linkedin'}</span>
                     </div>
                 `).join('');
@@ -322,7 +322,7 @@
                     <div class="bg-still-card rounded-lg shadow-sm p-4 border-l-4 border border-still-border" style="border-left-color: var(--platform-linkedin-border);">
                         <h4 class="font-medium text-still-text mb-2">${escapeHtml(c.post_idea || c.theme)}</h4>
                         <p class="text-sm text-still-muted mb-2">${escapeHtml(c.why_it_works || '')}</p>
-                        <p class="text-xs text-still-disabled">Combines ${c.atom_ids?.length || 0} atoms</p>
+                        <p class="text-xs text-still-disabled">Combines ${c.still_ids?.length || c.atom_ids?.length || 0} stills</p>
                     </div>
                 `).join('');
             }
@@ -364,7 +364,7 @@
             }
         }
 
-        async function searchAtoms() {
+        async function searchStills() {
             const query = document.getElementById('search-input').value.trim();
             if (!query) return;
 
@@ -377,15 +377,15 @@
                 const data = await response.json();
 
                 if (data.results.length === 0) {
-                    resultsDiv.innerHTML = '<p class="text-still-disabled">No atoms found for "' + escapeHtml(query) + '"</p>';
+                    resultsDiv.innerHTML = '<p class="text-still-disabled">No stills found for "' + escapeHtml(query) + '"</p>';
                 } else {
                     resultsDiv.innerHTML = `
-                        <p class="text-sm text-still-muted mb-3">Found ${data.count} atoms for "${escapeHtml(query)}"</p>
+                        <p class="text-sm text-still-muted mb-3">Found ${data.count} stills for "${escapeHtml(query)}"</p>
                         <div class="space-y-2">
-                            ${data.results.map(a => `
+                            ${data.results.map(s => `
                                 <div class="p-3 bg-still-bg rounded border border-still-border">
-                                    <span class="text-xs bg-still-border text-still-muted px-2 py-0.5 rounded">${a.atom_type}</span>
-                                    <p class="text-sm text-still-muted mt-1">${escapeHtml(a.content.substring(0, 150))}...</p>
+                                    <span class="text-xs bg-still-border text-still-muted px-2 py-0.5 rounded">${s.still_type || s.atom_type}</span>
+                                    <p class="text-sm text-still-muted mt-1">${escapeHtml(s.content.substring(0, 150))}...</p>
                                 </div>
                             `).join('')}
                         </div>
@@ -398,7 +398,7 @@
 
         // Enter key for search
         document.getElementById('search-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') searchAtoms();
+            if (e.key === 'Enter') searchStills();
         });
 
         function hideGenerateModal() {

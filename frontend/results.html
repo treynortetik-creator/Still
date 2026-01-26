@@ -312,8 +312,8 @@
                 <button class="tab-btn px-1 pb-4 border-b-2 border-still-copper text-still-copper font-medium" data-tab="outputs" role="tab" aria-selected="true" aria-controls="outputs-tab" id="tab-outputs">
                     Generated Content
                 </button>
-                <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-still-muted hover:text-still-text" data-tab="atoms" role="tab" aria-selected="false" aria-controls="atoms-tab" id="tab-atoms">
-                    Extracted Atoms
+                <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-still-muted hover:text-still-text" data-tab="stills" role="tab" aria-selected="false" aria-controls="stills-tab" id="tab-stills">
+                    Extracted Stills
                 </button>
             </div>
         </div>
@@ -329,18 +329,18 @@
             <div id="outputs-container" class="space-y-6"></div>
         </div>
 
-        <!-- Atoms Tab -->
-        <div id="atoms-tab" class="hidden" role="tabpanel" aria-labelledby="tab-atoms">
-            <div class="mb-4 flex flex-wrap gap-2" role="group" aria-label="Filter atoms by type">
-                <button class="atom-filter px-3 py-1 rounded-full bg-still-border text-still-muted text-sm" data-type="all" aria-pressed="true">All</button>
-                <button class="atom-filter px-3 py-1 rounded-full atom-data text-sm" data-type="data" aria-pressed="false">Data</button>
-                <button class="atom-filter px-3 py-1 rounded-full bg-still-green/30 text-still-green text-sm" data-type="story" aria-pressed="false">Stories</button>
-                <button class="atom-filter px-3 py-1 rounded-full atom-insight text-sm" data-type="insight" aria-pressed="false">Insights</button>
-                <button class="atom-filter px-3 py-1 rounded-full bg-still-error/30 text-still-error text-sm" data-type="problem" aria-pressed="false">Problems</button>
-                <button class="atom-filter px-3 py-1 rounded-full bg-still-amber/30 text-still-amber text-sm" data-type="solution" aria-pressed="false">Solutions</button>
-                <button class="atom-filter px-3 py-1 rounded-full bg-still-copper/30 text-still-copper text-sm" data-type="quote" aria-pressed="false">Quotes</button>
+        <!-- Stills Tab -->
+        <div id="stills-tab" class="hidden" role="tabpanel" aria-labelledby="tab-stills">
+            <div class="mb-4 flex flex-wrap gap-2" role="group" aria-label="Filter stills by type">
+                <button class="still-filter px-3 py-1 rounded-full bg-still-border text-still-muted text-sm" data-type="all" aria-pressed="true">All</button>
+                <button class="still-filter px-3 py-1 rounded-full still-data text-sm" data-type="data" aria-pressed="false">Data</button>
+                <button class="still-filter px-3 py-1 rounded-full bg-still-green/30 text-still-green text-sm" data-type="story" aria-pressed="false">Stories</button>
+                <button class="still-filter px-3 py-1 rounded-full still-insight text-sm" data-type="insight" aria-pressed="false">Insights</button>
+                <button class="still-filter px-3 py-1 rounded-full bg-still-error/30 text-still-error text-sm" data-type="problem" aria-pressed="false">Problems</button>
+                <button class="still-filter px-3 py-1 rounded-full bg-still-amber/30 text-still-amber text-sm" data-type="solution" aria-pressed="false">Solutions</button>
+                <button class="still-filter px-3 py-1 rounded-full bg-still-copper/30 text-still-copper text-sm" data-type="quote" aria-pressed="false">Quotes</button>
             </div>
-            <div id="atoms-container" class="grid md:grid-cols-2 gap-4"></div>
+            <div id="stills-container" class="grid md:grid-cols-2 gap-4"></div>
         </div>
 
     </div>
@@ -361,7 +361,7 @@
         }
 
         let currentTab = 'outputs';
-        let allAtoms = [];
+        let allStills = [];
         let tonePresets = [];
         let feedbackData = {};
         let currentSource = null;
@@ -899,17 +899,17 @@
                 btn.setAttribute('aria-selected', 'true');
 
                 document.getElementById('outputs-tab').classList.toggle('hidden', tab !== 'outputs');
-                document.getElementById('atoms-tab').classList.toggle('hidden', tab !== 'atoms');
+                document.getElementById('stills-tab').classList.toggle('hidden', tab !== 'stills');
             });
         });
 
-        // Atom filtering
-        document.querySelectorAll('.atom-filter').forEach(btn => {
+        // Still filtering
+        document.querySelectorAll('.still-filter').forEach(btn => {
             btn.addEventListener('click', () => {
                 const type = btn.dataset.type;
-                filterAtoms(type);
+                filterStills(type);
 
-                document.querySelectorAll('.atom-filter').forEach(b => {
+                document.querySelectorAll('.still-filter').forEach(b => {
                     b.classList.remove('ring-2', 'ring-offset-2', 'ring-still-copper', 'ring-offset-still-bg');
                     b.setAttribute('aria-pressed', 'false');
                 });
@@ -918,10 +918,10 @@
             });
         });
 
-        function filterAtoms(type) {
-            const container = document.getElementById('atoms-container');
-            const atoms = type === 'all' ? allAtoms : allAtoms.filter(a => a.type === type);
-            renderAtoms(atoms);
+        function filterStills(type) {
+            const container = document.getElementById('stills-container');
+            const stills = type === 'all' ? allStills : allStills.filter(s => s.type === type);
+            renderStills(stills);
         }
 
         // copyToClipboard is now provided by utils.js
@@ -1368,15 +1368,17 @@
 
                 // Update header
                 document.getElementById('job-title').textContent = data.original_filename || 'Results';
+                // Support both stills and atoms (backwards compatibility)
+                const stillsData = data.stills || data.atoms || [];
                 document.getElementById('job-meta').textContent =
-                    `${data.outputs.length} outputs generated | ${data.atoms.length} atoms extracted`;
+                    `${data.outputs.length} outputs generated | ${stillsData.length} stills extracted`;
 
                 // Render outputs
                 renderOutputs(data.outputs);
 
-                // Store atoms and render
-                allAtoms = data.atoms;
-                renderAtoms(allAtoms);
+                // Store stills and render
+                allStills = stillsData;
+                renderStills(allStills);
 
             } catch (err) {
                 console.error('Failed to load results:', err);

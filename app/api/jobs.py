@@ -114,7 +114,7 @@ async def get_job_results(
             """
             SELECT id, content_type, variation_number,
                    step1_draft, step2_edited, step3_final,
-                   atoms_used, citations, warnings, quality_scores,
+                   stills_used, citations, warnings, quality_scores,
                    hook_variations, subject, preview_text,
                    email_day, email_purpose, sequence_name
             FROM outputs WHERE job_id = ?
@@ -157,7 +157,7 @@ async def get_job_results(
                 "step1_draft": row["step1_draft"],
                 "step2_edited": row["step2_edited"],
                 "step3_final": row["step3_final"],
-                "atoms_used": json.loads(row["atoms_used"]) if row["atoms_used"] else [],
+                "stills_used": json.loads(row["stills_used"]) if row["stills_used"] else [],
                 "citations": json.loads(row["citations"]) if row["citations"] else [],
                 "warnings": json.loads(row["warnings"]) if row["warnings"] else [],
                 "quality_scores": json.loads(row["quality_scores"]) if row["quality_scores"] else {},

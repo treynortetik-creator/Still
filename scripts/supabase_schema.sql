@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     cost_incurred FLOAT DEFAULT 0.0
 );
 
--- Stills (content atoms)
+-- Stills (content stills - formerly called atoms)
 CREATE TABLE IF NOT EXISTS stills (
     id TEXT PRIMARY KEY,
     job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS outputs (
     step1_draft TEXT,
     step2_edited TEXT,
     step3_final TEXT,
-    atoms_used JSONB,
+    stills_used JSONB,
     citations JSONB,
     warnings JSONB,
     quality_scores JSONB,

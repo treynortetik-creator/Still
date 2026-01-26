@@ -158,9 +158,9 @@
                     </div>
                 </div>
 
-                <div id="selected-atoms-preview" class="p-3 bg-still-bg rounded text-sm border border-still-border">
-                    <strong class="text-still-text">Selected atoms:</strong>
-                    <div id="atoms-preview-list" class="mt-2 space-y-1"></div>
+                <div id="selected-stills-preview" class="p-3 bg-still-bg rounded text-sm border border-still-border">
+                    <strong class="text-still-text">Selected stills:</strong>
+                    <div id="stills-preview-list" class="mt-2 space-y-1"></div>
                 </div>
             </div>
 
@@ -574,7 +574,7 @@
 
         document.getElementById('generate-btn').addEventListener('click', () => {
             // Populate preview
-            const previewList = document.getElementById('atoms-preview-list');
+            const previewList = document.getElementById('stills-preview-list');
             previewList.innerHTML = '';
 
             const selectedEntries = allEntries.filter(e => selectedIds.has(e.id));
@@ -616,7 +616,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        atom_ids: Array.from(selectedIds),
+                        still_ids: Array.from(selectedIds),
                         target_persona: persona,
                         asset_types: assetTypes,
                         asset_quantities: assetQuantities

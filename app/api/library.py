@@ -31,7 +31,7 @@ class CreateStillRequest(BaseModel):
 class GenerateFromLibraryRequest(BaseModel):
     """Request model for generating content from Reserve stills."""
     still_ids: Optional[list[int]] = None
-    atom_ids: Optional[list[int]] = None  # Backwards compatibility
+    still_ids_legacy: Optional[list[int]] = None  # Backwards compatibility (formerly atom_ids)
     target_persona: Optional[str] = None
     asset_types: list[str] = ["linkedin"]
     asset_quantities: dict[str, int] = {"linkedin": 2}
@@ -444,8 +444,8 @@ async def generate_from_library(
 
     Select stills from the Reserve and generate content without uploading new source material.
     """
-    # Support both still_ids and atom_ids for backwards compatibility
-    ids_to_use = request.still_ids or request.atom_ids
+    # Support both still_ids and still_ids_legacy for backwards compatibility
+    ids_to_use = request.still_ids or request.still_ids_legacy
     target_persona = request.target_persona
     asset_types = request.asset_types
     asset_quantities = request.asset_quantities
