@@ -41,6 +41,7 @@
     <script type="module" src="/static/js/utils.js"></script>
     <script type="module" src="/static/js/auth.js"></script>
     <script type="module" src="/static/js/api-client.js"></script>
+    <script type="module" src="/static/js/request-cache.js"></script>
     <!-- Legacy scripts for components and error logging -->
     <script src="/static/components.js"></script>
     <script src="/static/error-logger.js"></script>
@@ -1222,7 +1223,7 @@
 
         async function loadPersonas() {
             try {
-                const data = await api.get('/api/personas');
+                const data = await cachedFetch('/api/personas', { ttl: 30000 });
                 const filterSelect = document.getElementById('filter-persona');
                 const genSelect = document.getElementById('gen-persona');
 
@@ -1270,7 +1271,7 @@
 
         async function loadFilters() {
             try {
-                const data = await api.get('/api/library/filters');
+                const data = await cachedFetch('/api/library/filters', { ttl: 60000 });
                 const campaignSelect = document.getElementById('filter-campaign');
                 const topicSelect = document.getElementById('filter-topic');
 
@@ -1299,7 +1300,7 @@
 
         async function loadSourceFilters() {
             try {
-                const data = await api.get('/api/library/sources');
+                const data = await cachedFetch('/api/library/sources', { ttl: 60000 });
                 const sourceSelect = document.getElementById('filter-source');
                 sourceSelect.innerHTML = '<option value="">All Sources</option>';
 
@@ -1641,6 +1642,7 @@
 
             try {
                 const data = await api.post('/api/library/batch-delete', { ids: Array.from(selectedIds) });
+                invalidateCache('/api/library', { pattern: true });
                 showToast(`Successfully deleted ${data.deleted_count} stills`, 'success');
                 selectedIds.clear();
                 updateSelectedCount();
@@ -1755,6 +1757,7 @@
 
             try {
                 await api.post('/api/library/add', requestData);
+                invalidateCache('/api/library', { pattern: true });
                 showToast('Still added successfully!', 'success');
                 closeAddStillModal();
                 loadLibrary();  // Refresh the list
@@ -1839,6 +1842,7 @@
 
             try {
                 await api.put(`/api/library/${entryId}`, requestData);
+                invalidateCache('/api/library', { pattern: true });
                 showToast('Still updated successfully!', 'success');
                 closeEditStillModal();
                 loadLibrary();  // Refresh the list
@@ -1865,6 +1869,7 @@
 
             try {
                 await api.delete(`/api/library/${entryId}`);
+                invalidateCache('/api/library', { pattern: true });
                 showToast('Still deleted successfully!', 'success');
                 closeEditStillModal();
                 // Remove from selected if it was selected
