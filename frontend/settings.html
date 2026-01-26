@@ -731,7 +731,7 @@
 
             } catch (err) {
                 console.error('Failed to load personas:', err);
-                showToast('Failed to load personas');
+                showToast('Failed to load personas', 'error');
             }
         }
 
@@ -969,6 +969,7 @@
                 renderMemoryRules();
             } catch (err) {
                 console.error('Failed to load rules:', err);
+                showToast('Failed to load memory rules', 'error');
             }
         }
 
@@ -1286,6 +1287,7 @@
                 renderWebhooks();
             } catch (err) {
                 console.error('Failed to load webhooks:', err);
+                showToast('Failed to load webhooks', 'error');
             }
         }
 
@@ -1426,8 +1428,8 @@
                 // Also log to console for those who need to see it
                 console.log('Webhook Secret Key:', secretKey);
             } catch (err) {
-                showToast('Error fetching secret key');
                 console.error('Failed to get secret key:', err);
+                showToast('Failed to get webhook secret', 'error');
             }
         }
 
