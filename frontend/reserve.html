@@ -1216,6 +1216,7 @@
                 ).join('');
             } catch (err) {
                 console.error('Failed to load examples:', err);
+                showToast('Failed to load examples', 'error');
             }
         }
 
@@ -1263,6 +1264,7 @@
                 }
             } catch (err) {
                 console.error('Failed to load personas:', err);
+                showToast('Failed to load personas', 'error');
             }
         }
 
@@ -1291,6 +1293,7 @@
                 });
             } catch (err) {
                 console.error('Failed to load filters:', err);
+                showToast('Failed to load filters', 'error');
             }
         }
 
@@ -1308,6 +1311,7 @@
                 });
             } catch (err) {
                 console.error('Failed to load source filters:', err);
+                showToast('Failed to load sources', 'error');
             }
         }
 
@@ -1451,6 +1455,7 @@
 
             } catch (err) {
                 console.error('Failed to load Reserve:', err);
+                showToast('Failed to load Reserve', 'error');
             }
         }
 
