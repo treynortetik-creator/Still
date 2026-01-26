@@ -37,8 +37,11 @@
         }
     </script>
     <link rel="stylesheet" href="/static/styles.css">
-    <script src="/static/utils.js"></script>
-    <script src="/static/auth.js"></script>
+    <!-- JS Modules (ES6) - provide window globals for backwards compatibility -->
+    <script type="module" src="/static/js/utils.js"></script>
+    <script type="module" src="/static/js/auth.js"></script>
+    <script type="module" src="/static/js/api-client.js"></script>
+    <!-- Legacy scripts for components and error logging -->
     <script src="/static/components.js"></script>
     <script src="/static/error-logger.js"></script>
     <style>
@@ -846,7 +849,12 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        // Import from modules for cleaner code while maintaining backward compat via window globals
+        import { api, ApiError } from '/static/js/api-client.js';
+        import { escapeHtml, showToast, formatRelativeDate } from '/static/js/utils.js';
+        import Auth from '/static/js/auth.js';
+
         Auth.requireAuth();
 
         let allEntries = [];
@@ -876,19 +884,7 @@
             'proof_point': { bg: 'rgba(34, 197, 94, 0.15)', text: '#22C55E' }
         };
 
-        function formatRelativeDate(dateString) {
-            const date = new Date(dateString);
-            const now = new Date();
-            const diffMs = now - date;
-            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-            if (diffDays === 0) return 'today';
-            if (diffDays === 1) return 'yesterday';
-            if (diffDays < 7) return `${diffDays}d ago`;
-            if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-            if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
-            return `${Math.floor(diffDays / 365)}y ago`;
-        }
+        // formatRelativeDate imported from utils.js module
 
         function setTypeFilter(type) {
             // Update chip states
@@ -1191,21 +1187,10 @@
             `;
 
             try {
-                const response = await Auth.fetchWithAuth('/api/sommelier/search', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query, limit: 10 })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    sommelierResults = data.results;  // Store results for modal preview
-                    document.getElementById('sommelier-results').classList.remove('hidden');
-                    renderSommelierResults(data.results, data.query_understood);
-                } else {
-                    throw new Error(data.detail || 'Search failed');
-                }
+                const data = await api.post('/api/sommelier/search', { query, limit: 10 });
+                sommelierResults = data.results;  // Store results for modal preview
+                document.getElementById('sommelier-results').classList.remove('hidden');
+                renderSommelierResults(data.results, data.query_understood);
             } catch (err) {
                 showToast('Search error: ' + err.message, 'error');
             } finally {
@@ -1221,10 +1206,9 @@
 
         async function loadExampleQueries() {
             try {
-                const response = await Auth.fetchWithAuth('/api/sommelier/examples');
-                const data = await response.json();
-
+                const data = await api.get('/api/sommelier/examples');
                 const container = document.getElementById('example-queries');
+                // Note: escapeHtml() sanitizes the query text before insertion
                 container.innerHTML = data.examples.map(q =>
                     `<button class="filter-chip" onclick="document.getElementById('sommelier-query').value='${escapeHtml(q)}'; searchSommelier();">
                         ${escapeHtml(q)}
@@ -1237,9 +1221,7 @@
 
         async function loadPersonas() {
             try {
-                const response = await Auth.fetchWithAuth('/api/personas');
-                const data = await response.json();
-
+                const data = await api.get('/api/personas');
                 const filterSelect = document.getElementById('filter-persona');
                 const genSelect = document.getElementById('gen-persona');
 
@@ -1286,9 +1268,7 @@
 
         async function loadFilters() {
             try {
-                const response = await Auth.fetchWithAuth('/api/library/filters');
-                const data = await response.json();
-
+                const data = await api.get('/api/library/filters');
                 const campaignSelect = document.getElementById('filter-campaign');
                 const topicSelect = document.getElementById('filter-topic');
 
@@ -1316,9 +1296,7 @@
 
         async function loadSourceFilters() {
             try {
-                const response = await Auth.fetchWithAuth('/api/library/sources');
-                const data = await response.json();
-
+                const data = await api.get('/api/library/sources');
                 const sourceSelect = document.getElementById('filter-source');
                 sourceSelect.innerHTML = '<option value="">All Sources</option>';
 
@@ -1410,9 +1388,7 @@
             }
 
             try {
-                const response = await Auth.fetchWithAuth(`/api/library?${params}`);
-                const data = await response.json();
-
+                const data = await api.get(`/api/library?${params}`);
                 document.getElementById('library-stats').textContent =
                     `${data.total} stills in your Reserve`;
 
@@ -1602,24 +1578,13 @@
             try {
                 // Combine both selection sets for unified blending
                 const allSelectedIds = new Set([...selectedIds, ...sommelierSelectedIds]);
-                const response = await Auth.fetchWithAuth('/api/generate-from-library', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        still_ids: Array.from(allSelectedIds),
-                        target_persona: persona,
-                        asset_types: assetTypes,
-                        asset_quantities: assetQuantities
-                    })
+                const data = await api.post('/api/generate-from-library', {
+                    still_ids: Array.from(allSelectedIds),
+                    target_persona: persona,
+                    asset_types: assetTypes,
+                    asset_quantities: assetQuantities
                 });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    window.location.href = `/status.html?job_id=${data.job_id}`;
-                } else {
-                    throw new Error(data.detail || 'Generation failed');
-                }
+                window.location.href = `/status.html?job_id=${data.job_id}`;
             } catch (err) {
                 showToast('Error: ' + err.message, 'error');
             }
@@ -1670,23 +1635,12 @@
             `;
 
             try {
-                const response = await Auth.fetchWithAuth('/api/library/batch-delete', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ids: Array.from(selectedIds) })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    showToast(`Successfully deleted ${data.deleted_count} stills`, 'success');
-                    selectedIds.clear();
-                    updateSelectedCount();
-                    closeDeleteConfirmModal();
-                    loadLibrary();
-                } else {
-                    throw new Error(data.detail || 'Failed to delete stills');
-                }
+                const data = await api.post('/api/library/batch-delete', { ids: Array.from(selectedIds) });
+                showToast(`Successfully deleted ${data.deleted_count} stills`, 'success');
+                selectedIds.clear();
+                updateSelectedCount();
+                closeDeleteConfirmModal();
+                loadLibrary();
             } catch (err) {
                 showToast('Error: ' + err.message, 'error');
             } finally {
@@ -1795,22 +1749,11 @@
             };
 
             try {
-                const response = await Auth.fetchWithAuth('/api/library/add', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestData)
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    showToast('Still added successfully!', 'success');
-                    closeAddStillModal();
-                    loadLibrary();  // Refresh the list
-                    loadFilters();  // Refresh filter options
-                } else {
-                    throw new Error(data.detail || 'Failed to add still');
-                }
+                await api.post('/api/library/add', requestData);
+                showToast('Still added successfully!', 'success');
+                closeAddStillModal();
+                loadLibrary();  // Refresh the list
+                loadFilters();  // Refresh filter options
             } catch (err) {
                 showToast('Error: ' + err.message, 'error');
             } finally {
@@ -1890,22 +1833,11 @@
             };
 
             try {
-                const response = await Auth.fetchWithAuth(`/api/library/${entryId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestData)
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    showToast('Still updated successfully!', 'success');
-                    closeEditStillModal();
-                    loadLibrary();  // Refresh the list
-                    loadFilters();  // Refresh filter options
-                } else {
-                    throw new Error(data.detail || 'Failed to update still');
-                }
+                await api.put(`/api/library/${entryId}`, requestData);
+                showToast('Still updated successfully!', 'success');
+                closeEditStillModal();
+                loadLibrary();  // Refresh the list
+                loadFilters();  // Refresh filter options
             } catch (err) {
                 showToast('Error: ' + err.message, 'error');
             } finally {
@@ -1927,21 +1859,13 @@
             }
 
             try {
-                const response = await Auth.fetchWithAuth(`/api/library/${entryId}`, {
-                    method: 'DELETE'
-                });
-
-                if (response.ok) {
-                    showToast('Still deleted successfully!', 'success');
-                    closeEditStillModal();
-                    // Remove from selected if it was selected
-                    selectedIds.delete(parseInt(entryId));
-                    updateSelectedCount();
-                    loadLibrary();  // Refresh the list
-                } else {
-                    const data = await response.json();
-                    throw new Error(data.detail || 'Failed to delete still');
-                }
+                await api.delete(`/api/library/${entryId}`);
+                showToast('Still deleted successfully!', 'success');
+                closeEditStillModal();
+                // Remove from selected if it was selected
+                selectedIds.delete(parseInt(entryId));
+                updateSelectedCount();
+                loadLibrary();  // Refresh the list
             } catch (err) {
                 showToast('Error: ' + err.message, 'error');
             }
@@ -1959,21 +1883,16 @@
             currentSOTJobId = jobId;
 
             try {
-                const response = await Auth.fetchWithAuth(`/api/jobs/${jobId}/source`);
-                if (!response.ok) {
-                    if (response.status === 404) {
-                        showToast('Source of Truth not found');
-                        return;
-                    }
-                    throw new Error('Failed to load Source of Truth');
-                }
-
-                currentSOTData = await response.json();
+                currentSOTData = await api.get(`/api/jobs/${jobId}/source`);
                 renderSOTModal(currentSOTData, isApproved);
                 document.getElementById('sot-modal').classList.remove('hidden');
             } catch (err) {
                 console.error('Error loading SOT:', err);
-                showToast('Error loading Source of Truth');
+                if (err instanceof ApiError && err.status === 404) {
+                    showToast('Source of Truth not found');
+                } else {
+                    showToast('Error loading Source of Truth');
+                }
             }
         }
 
@@ -2090,14 +2009,7 @@
             };
 
             try {
-                const response = await Auth.fetchWithAuth(`/api/jobs/${currentSOTJobId}/source`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(updates)
-                });
-
-                if (!response.ok) throw new Error('Failed to save changes');
-
+                await api.put(`/api/jobs/${currentSOTJobId}/source`, updates);
                 showToast('Source of Truth updated!');
 
                 // Update local data and re-render
@@ -2123,6 +2035,27 @@
                 closeSOTModal();
             }
         });
+
+        // Expose functions to window for onclick handlers in HTML
+        window.setTypeFilter = setTypeFilter;
+        window.toggleSelect = toggleSelect;
+        window.toggleSommelierSelect = toggleSommelierSelect;
+        window.openSOTModal = openSOTModal;
+        window.closeSOTModal = closeSOTModal;
+        window.toggleSOTEdit = toggleSOTEdit;
+        window.saveSOTChanges = saveSOTChanges;
+        window.openEditStillModal = openEditStillModal;
+        window.closeEditStillModal = closeEditStillModal;
+        window.deleteStill = deleteStill;
+        window.openAddStillModal = openAddStillModal;
+        window.closeAddStillModal = closeAddStillModal;
+        window.closeDeleteConfirmModal = closeDeleteConfirmModal;
+        window.clearAllFilters = clearAllFilters;
+        window.openGenerateModal = openGenerateModal;
+        window.closeGenerateModal = closeGenerateModal;
+        window.searchSommelier = searchSommelier;
+        // Also expose escapeHtml for the inline onclick handlers that use it
+        window.escapeHtml = escapeHtml;
 
         // Initial load
         loadPersonas();
