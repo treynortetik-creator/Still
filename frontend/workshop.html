@@ -159,9 +159,23 @@
                         placeholder="Your content will appear here..."></textarea>
 
                     <!-- Character Count -->
-                    <div class="flex justify-between items-center mt-2">
-                        <span id="char-count" class="text-sm text-still-muted">0 characters</span>
-                        <span id="char-limit" class="text-sm text-still-muted"></span>
+                    <div class="mt-2">
+                        <div class="flex justify-between items-center mb-1">
+                            <span id="char-count" class="text-sm text-still-muted">0 characters</span>
+                            <span id="char-limit" class="text-sm text-still-muted"></span>
+                        </div>
+                        <!-- Character limit progress bar (shown for LinkedIn/Twitter) -->
+                        <div id="char-progress-container" class="hidden">
+                            <div class="w-full bg-still-border rounded-full h-1.5">
+                                <div id="char-progress-bar" class="h-1.5 rounded-full transition-all duration-200" style="width: 0%"></div>
+                            </div>
+                            <div id="char-warning" class="hidden mt-2 p-2 rounded-lg text-sm flex items-center gap-2">
+                                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                </svg>
+                                <span id="char-warning-text"></span>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Action Buttons -->
@@ -666,25 +680,52 @@
             const count = content.length;
             const countEl = document.getElementById('char-count');
             const limitEl = document.getElementById('char-limit');
+            const progressContainer = document.getElementById('char-progress-container');
+            const progressBar = document.getElementById('char-progress-bar');
+            const warningEl = document.getElementById('char-warning');
+            const warningTextEl = document.getElementById('char-warning-text');
 
             countEl.textContent = `${count.toLocaleString()} characters`;
 
             const limit = charLimits[currentOutput?.content_type];
             if (limit) {
                 limitEl.textContent = `/ ${limit.toLocaleString()}`;
+                progressContainer.classList.remove('hidden');
 
+                // Calculate percentage
+                const percentage = Math.min((count / limit) * 100, 100);
+                progressBar.style.width = `${percentage}%`;
+
+                // Update colors and warnings based on proximity to limit
                 if (count > limit) {
+                    // Over limit - red
                     countEl.classList.add('text-still-error');
                     countEl.classList.remove('text-still-amber', 'text-still-muted');
+                    progressBar.classList.remove('bg-still-green', 'bg-still-amber');
+                    progressBar.classList.add('bg-still-error');
+                    warningEl.classList.remove('hidden', 'bg-still-amber/10', 'text-still-amber');
+                    warningEl.classList.add('bg-still-error/10', 'text-still-error');
+                    warningTextEl.textContent = `${(count - limit).toLocaleString()} characters over limit! Content will be truncated.`;
                 } else if (count > limit * 0.9) {
+                    // Approaching limit (90%+) - amber warning
                     countEl.classList.add('text-still-amber');
                     countEl.classList.remove('text-still-error', 'text-still-muted');
+                    progressBar.classList.remove('bg-still-green', 'bg-still-error');
+                    progressBar.classList.add('bg-still-amber');
+                    warningEl.classList.remove('hidden', 'bg-still-error/10', 'text-still-error');
+                    warningEl.classList.add('bg-still-amber/10', 'text-still-amber');
+                    warningTextEl.textContent = `${(limit - count).toLocaleString()} characters remaining`;
                 } else {
+                    // Under 90% - normal
                     countEl.classList.add('text-still-muted');
                     countEl.classList.remove('text-still-error', 'text-still-amber');
+                    progressBar.classList.remove('bg-still-amber', 'bg-still-error');
+                    progressBar.classList.add('bg-still-green');
+                    warningEl.classList.add('hidden');
                 }
             } else {
                 limitEl.textContent = '';
+                progressContainer.classList.add('hidden');
                 countEl.classList.add('text-still-muted');
                 countEl.classList.remove('text-still-error', 'text-still-amber');
             }
