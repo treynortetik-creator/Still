@@ -99,6 +99,15 @@
         .status-step-pending { background: var(--still-border); color: var(--still-muted); }
         .status-step-active { background: var(--still-copper); color: white; }
         .status-step-complete { background: var(--still-green); color: white; }
+        /* Pipeline timeline styles */
+        .pipeline-step.complete .pipeline-icon { background: var(--still-green); color: white; }
+        .pipeline-step.active .pipeline-icon { background: var(--still-copper); color: white; animation: pulse 2s infinite; }
+        .pipeline-step.complete .font-medium { color: var(--still-green); }
+        .pipeline-step.active .font-medium { color: var(--still-copper); }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(212, 117, 43, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(212, 117, 43, 0); }
+        }
         /* Skeleton loader for stills */
         .skeleton-still {
             height: 80px;
@@ -329,10 +338,98 @@
             </div>
         </div>
 
-        <!-- Loading State -->
-        <div id="loading" class="text-center py-12">
-            <div class="animate-spin h-8 w-8 border-4 border-still-copper border-t-transparent rounded-full mx-auto"></div>
-            <p class="mt-4 text-still-muted">Loading results...</p>
+        <!-- Loading State with Pipeline Progress -->
+        <div id="loading" class="py-12">
+            <div class="max-w-2xl mx-auto">
+                <div class="text-center mb-8">
+                    <div class="animate-spin h-8 w-8 border-4 border-still-copper border-t-transparent rounded-full mx-auto"></div>
+                    <p class="mt-4 text-still-muted" id="loading-message">Loading results...</p>
+                </div>
+                <!-- Pipeline Progress Timeline -->
+                <div id="pipeline-timeline" class="hidden bg-still-card rounded-lg p-6 border border-still-border">
+                    <h3 class="text-lg font-semibold text-still-text mb-4">Processing Pipeline</h3>
+                    <div class="relative">
+                        <!-- Progress line background -->
+                        <div class="absolute left-5 top-0 bottom-0 w-0.5 bg-still-border"></div>
+                        <!-- Progress line fill -->
+                        <div id="pipeline-progress-line" class="absolute left-5 top-0 w-0.5 bg-still-copper transition-all duration-500" style="height: 0%"></div>
+
+                        <div class="space-y-4">
+                            <div class="pipeline-step flex items-center gap-4" data-step="transcribe">
+                                <div class="pipeline-icon w-10 h-10 rounded-full flex items-center justify-center bg-still-border text-still-muted z-10">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                                    </svg>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="font-medium text-still-muted">Transcribe</div>
+                                    <div class="text-sm text-still-disabled">Converting audio/video to text</div>
+                                </div>
+                            </div>
+
+                            <div class="pipeline-step flex items-center gap-4" data-step="distill">
+                                <div class="pipeline-icon w-10 h-10 rounded-full flex items-center justify-center bg-still-border text-still-muted z-10">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+                                    </svg>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="font-medium text-still-muted">Distill</div>
+                                    <div class="text-sm text-still-disabled">Extracting key insights and stills</div>
+                                </div>
+                            </div>
+
+                            <div class="pipeline-step flex items-center gap-4" data-step="draft">
+                                <div class="pipeline-icon w-10 h-10 rounded-full flex items-center justify-center bg-still-border text-still-muted z-10">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                    </svg>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="font-medium text-still-muted">Draft</div>
+                                    <div class="text-sm text-still-disabled">Creating initial content drafts</div>
+                                </div>
+                            </div>
+
+                            <div class="pipeline-step flex items-center gap-4" data-step="edit">
+                                <div class="pipeline-icon w-10 h-10 rounded-full flex items-center justify-center bg-still-border text-still-muted z-10">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                    </svg>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="font-medium text-still-muted">Edit</div>
+                                    <div class="text-sm text-still-disabled">Polishing for target audience</div>
+                                </div>
+                            </div>
+
+                            <div class="pipeline-step flex items-center gap-4" data-step="factcheck">
+                                <div class="pipeline-icon w-10 h-10 rounded-full flex items-center justify-center bg-still-border text-still-muted z-10">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="font-medium text-still-muted">Factcheck</div>
+                                    <div class="text-sm text-still-disabled">Verifying accuracy and claims</div>
+                                </div>
+                            </div>
+
+                            <div class="pipeline-step flex items-center gap-4" data-step="complete">
+                                <div class="pipeline-icon w-10 h-10 rounded-full flex items-center justify-center bg-still-border text-still-muted z-10">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="font-medium text-still-muted">Complete</div>
+                                    <div class="text-sm text-still-disabled">Ready for review</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Outputs Tab -->
@@ -1460,6 +1557,107 @@
             }
         }
 
+        // Pipeline timeline functions
+        const pipelineSteps = ['transcribe', 'distill', 'draft', 'edit', 'factcheck', 'complete'];
+        let currentPipelineStep = null;
+        let pipelinePollInterval = null;
+
+        function updatePipelineTimeline(stepName, progress = 0) {
+            const timeline = document.getElementById('pipeline-timeline');
+            const progressLine = document.getElementById('pipeline-progress-line');
+            const messageEl = document.getElementById('loading-message');
+
+            if (!timeline) return;
+
+            timeline.classList.remove('hidden');
+
+            const stepIndex = pipelineSteps.indexOf(stepName);
+            if (stepIndex === -1) return;
+
+            // Update step states
+            document.querySelectorAll('.pipeline-step').forEach((stepEl, index) => {
+                stepEl.classList.remove('complete', 'active');
+                if (index < stepIndex) {
+                    stepEl.classList.add('complete');
+                } else if (index === stepIndex) {
+                    stepEl.classList.add('active');
+                }
+            });
+
+            // Update progress line
+            const lineProgress = ((stepIndex + (progress / 100)) / pipelineSteps.length) * 100;
+            progressLine.style.height = `${lineProgress}%`;
+
+            // Update loading message
+            const stepLabels = {
+                transcribe: 'Transcribing content...',
+                distill: 'Distilling key insights...',
+                draft: 'Creating drafts...',
+                edit: 'Editing for audience...',
+                factcheck: 'Fact-checking...',
+                complete: 'Processing complete!'
+            };
+            messageEl.textContent = stepLabels[stepName] || 'Processing...';
+        }
+
+        async function checkJobStatus() {
+            try {
+                const response = await Auth.fetchWithAuth(`/api/job/${jobId}/status`);
+                if (!response.ok) return null;
+
+                const data = await response.json();
+                return data;
+            } catch (err) {
+                console.error('Failed to check job status:', err);
+                return null;
+            }
+        }
+
+        async function pollJobStatusForTimeline() {
+            const status = await checkJobStatus();
+            if (!status) return;
+
+            // Map API status to pipeline step
+            const statusToStep = {
+                'pending': 'transcribe',
+                'transcribing': 'transcribe',
+                'distilling': 'distill',
+                'drafting': 'draft',
+                'editing': 'edit',
+                'factchecking': 'factcheck',
+                'complete': 'complete',
+                'failed': 'complete'
+            };
+
+            const step = statusToStep[status.status] || 'transcribe';
+            updatePipelineTimeline(step, status.progress || 0);
+
+            // If complete or failed, stop polling and reload
+            if (status.status === 'complete') {
+                if (pipelinePollInterval) {
+                    clearInterval(pipelinePollInterval);
+                }
+                // Refresh the page to show results
+                setTimeout(() => window.location.reload(), 1000);
+            } else if (status.status === 'failed') {
+                if (pipelinePollInterval) {
+                    clearInterval(pipelinePollInterval);
+                }
+                document.getElementById('loading-message').textContent = 'Processing failed. Please try again.';
+            }
+        }
+
+        // Start polling for job status if results aren't ready yet
+        async function initPipelinePolling() {
+            const status = await checkJobStatus();
+            if (status && status.status !== 'complete') {
+                // Show pipeline timeline for in-progress jobs
+                pipelinePollInterval = setInterval(pollJobStatusForTimeline, 2000);
+                pollJobStatusForTimeline();
+            }
+        }
+
+        initPipelinePolling();
         loadSourceOfTruth(jobId);
         loadResults();
     </script>
