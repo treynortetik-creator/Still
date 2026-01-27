@@ -116,6 +116,97 @@
             animation: shimmer 1.5s infinite linear;
             border-radius: var(--radius-md);
         }
+        /* Live Agent Streaming Terminal */
+        .agent-terminal {
+            background: #1a1a2e;
+            border: 1px solid #16213e;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            overflow: hidden;
+        }
+        .agent-terminal-header {
+            background: #16213e;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid #0f3460;
+        }
+        .agent-terminal-header .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        .agent-terminal-header .dot.red { background: #ff5f56; }
+        .agent-terminal-header .dot.yellow { background: #ffbd2e; }
+        .agent-terminal-header .dot.green { background: #27c93f; }
+        .agent-terminal-header .title {
+            color: #a0a0a0;
+            font-size: 12px;
+            margin-left: auto;
+        }
+        .agent-terminal-body {
+            padding: 16px;
+            max-height: 300px;
+            overflow-y: auto;
+            color: #e0e0e0;
+        }
+        .agent-terminal-body::-webkit-scrollbar {
+            width: 6px;
+        }
+        .agent-terminal-body::-webkit-scrollbar-track {
+            background: #1a1a2e;
+        }
+        .agent-terminal-body::-webkit-scrollbar-thumb {
+            background: #0f3460;
+            border-radius: 3px;
+        }
+        .agent-step-marker {
+            color: #00d9ff;
+            font-weight: 600;
+            margin: 12px 0 4px 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .agent-step-marker::before {
+            content: '▶';
+            font-size: 10px;
+        }
+        .agent-chunk {
+            color: #b8d4b8;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .agent-cursor {
+            display: inline-block;
+            width: 8px;
+            height: 14px;
+            background: #00d9ff;
+            animation: blink 1s infinite;
+            vertical-align: middle;
+            margin-left: 2px;
+        }
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        .agent-error {
+            color: #ff6b6b;
+            font-weight: 500;
+        }
+        .agent-complete {
+            color: #51cf66;
+            font-weight: 500;
+        }
+        @media (max-width: 768px) {
+            .agent-terminal-body {
+                max-height: 200px;
+                font-size: 11px;
+            }
+        }
     </style>
     <script>
         window.addEventListener('load', () => {

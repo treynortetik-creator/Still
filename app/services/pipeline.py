@@ -25,6 +25,7 @@ from app.services.pipeline_steps import (
     update_job_status,
     enrich_outputs_with_topics,
 )
+from app.services.stream_manager import get_or_create_stream, get_stream
 from app.utils.error_messages import format_pipeline_error
 
 logger = logging.getLogger(__name__)
@@ -124,6 +125,11 @@ async def _handle_pipeline_error(
     # Get user-friendly error message
     user_error = format_pipeline_error(e, step_context, job_id)
 
+    # Emit error to stream
+    stream = get_stream(job_id)
+    if stream:
+        await stream.emit_error(user_error)
+
     await update_job_status(
         job_id, JobStatus.FAILED,
         "Failed", 0, total_cost, user_error
@@ -144,6 +150,10 @@ async def process_job(job_id: str):
     """
     total_cost = 0.0
     user_id = None
+
+    # Initialize stream for live updates
+    stream = get_or_create_stream(job_id)
+    await stream.emit_step("transcribe", "Starting content processing")
 
     try:
         # Get job data
@@ -496,6 +506,10 @@ async def resume_pipeline_from_distillation(job_id: str):
     """
     total_cost = 0.0
     user_id = None
+
+    # Initialize stream for live updates
+    stream = get_or_create_stream(job_id)
+    await stream.emit_step("distill", "Resuming pipeline after Source of Truth approval")
 
     try:
         job_data = await get_job_data(job_id)

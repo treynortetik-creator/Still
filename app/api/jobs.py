@@ -1,6 +1,7 @@
 """Job management API endpoints."""
 import json
 from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi.responses import StreamingResponse
 from typing import Optional
 
 from app.config import get_settings
@@ -9,6 +10,7 @@ from app.db_utils import fetchone, fetchall, fetchval, sql
 from app.models.job import JobStatus, JobStatusResponse
 from app.api.auth import get_current_user_id
 from app.rate_limiter import limiter
+from app.services.stream_manager import get_stream, get_or_create_stream
 
 settings = get_settings()
 
@@ -78,6 +80,73 @@ async def get_job_status(
             "error_message": row["error_message"],
             "partial_transcript": partial_transcript,
         }
+
+
+@router.get("/job/{job_id}/stream")
+async def stream_job_progress(
+    request: Request,
+    job_id: str,
+    user_id: int = Depends(get_current_user_id),
+):
+    """
+    Stream job processing progress via Server-Sent Events (SSE).
+
+    Returns a stream of events showing real-time LLM responses and step markers.
+    Event types:
+    - step: Pipeline step change (e.g., {"step": "distilling", "description": "..."})
+    - chunk: Text chunk from LLM streaming
+    - complete: Processing finished
+    - error: Processing failed
+    """
+    # Verify job ownership
+    async with get_db() as db:
+        job = await fetchone(
+            db,
+            "SELECT id, user_id, status FROM jobs WHERE id = ? AND user_id = ?",
+            (job_id, user_id)
+        )
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Get or create stream for this job
+    stream = get_or_create_stream(job_id)
+
+    # If job is already complete or failed, send that status
+    if job["status"] == "complete":
+        async def completed_stream():
+            yield "event: complete\ndata: Processing already complete\n\n"
+        return StreamingResponse(
+            completed_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            }
+        )
+    elif job["status"] == "failed":
+        async def failed_stream():
+            yield "event: error\ndata: Processing failed\n\n"
+        return StreamingResponse(
+            failed_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            }
+        )
+
+    return StreamingResponse(
+        stream.subscribe(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 
 @router.get("/job/{job_id}/results")

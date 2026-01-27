@@ -29,9 +29,17 @@ from app.services.webhook_manager import (
     get_job_webhook_payload,
     get_content_webhook_payload,
 )
+from app.services.stream_manager import get_or_create_stream, get_stream
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+async def emit_stream_step(job_id: str, step_name: str, description: str = ""):
+    """Emit a step marker to the job's stream if it exists."""
+    stream = get_stream(job_id)
+    if stream:
+        await stream.emit_step(step_name, description)
 
 
 @dataclass
@@ -150,6 +158,9 @@ async def step_distill(ctx: PipelineContext) -> StepResult:
     """Step 1: Distillation (Pass 1 + Pass 2) with parallel summarization."""
     total_cost = 0.0
 
+    # Emit stream step marker
+    await emit_stream_step(ctx.job_id, "distill", "Extracting key insights and stills from content")
+
     # Start summarization in parallel with distillation
     summary_task = asyncio.create_task(
         generate_source_summary(ctx.cleaned_transcript, ctx.job_id, ctx.user_id)
@@ -228,6 +239,9 @@ async def step_distill(ctx: PipelineContext) -> StepResult:
 async def step_draft(ctx: PipelineContext) -> StepResult:
     """Step 2: Draft content for all requested asset types."""
     total_cost = 0.0
+
+    # Emit stream step marker
+    await emit_stream_step(ctx.job_id, "draft", "Creating initial content drafts")
 
     await update_job_status(
         ctx.job_id, JobStatus.DRAFTING, "Step 2: Drafting content", 50, ctx.total_cost
@@ -317,6 +331,9 @@ async def step_draft(ctx: PipelineContext) -> StepResult:
 
 async def step_edit(ctx: PipelineContext) -> StepResult:
     """Step 3: Edit drafts for audience."""
+    # Emit stream step marker
+    await emit_stream_step(ctx.job_id, "edit", "Polishing content for target audience")
+
     await update_job_status(
         ctx.job_id, JobStatus.EDITING, "Step 3: Editing for audience", 70, ctx.total_cost
     )
@@ -332,6 +349,9 @@ async def step_edit(ctx: PipelineContext) -> StepResult:
 
 async def step_factcheck(ctx: PipelineContext) -> StepResult:
     """Step 4: Fact-check content against source."""
+    # Emit stream step marker
+    await emit_stream_step(ctx.job_id, "factcheck", "Verifying accuracy and claims")
+
     await update_job_status(
         ctx.job_id, JobStatus.FACTCHECKING, "Step 4: Fact-checking content", 85, ctx.total_cost
     )
@@ -405,12 +425,20 @@ async def step_image_prompts(ctx: PipelineContext) -> StepResult:
 
 async def step_finalize(ctx: PipelineContext) -> StepResult:
     """Final step: Save results and trigger webhooks."""
+    # Emit stream step marker
+    await emit_stream_step(ctx.job_id, "complete", "Processing complete - saving results")
+
     # Enrich outputs with topics from their stills
     enriched_outputs = enrich_outputs_with_topics(ctx.drafts, ctx.stills)
     await save_outputs_to_db(enriched_outputs, ctx.job_id, campaign_name=ctx.campaign_name)
 
     # Mark job complete
     await update_job_status(ctx.job_id, JobStatus.COMPLETE, "Complete", 100, ctx.total_cost)
+
+    # Emit completion to stream
+    stream = get_stream(ctx.job_id)
+    if stream:
+        await stream.emit_complete("All content generated successfully")
 
     # Update completed_at timestamp
     async with get_db() as db:
