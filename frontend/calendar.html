@@ -85,6 +85,38 @@
                 </div>
                 <span id="current-month" class="text-lg font-semibold text-still-text">January 2025</span>
                 <button onclick="goToToday()" class="px-3 py-1 text-sm border border-still-border rounded-lg hover:bg-still-card text-still-text">Today</button>
+                <!-- Export Dropdown -->
+                <div class="relative" id="export-dropdown">
+                    <button onclick="toggleExportMenu()" class="flex items-center gap-2 px-3 py-1 text-sm border border-still-border rounded-lg hover:bg-still-card text-still-text">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        Export
+                    </button>
+                    <div id="export-menu" class="hidden absolute right-0 mt-2 w-56 bg-still-card rounded-lg shadow-lg border border-still-border z-10">
+                        <div class="p-2 border-b border-still-border">
+                            <span class="text-xs text-still-muted uppercase tracking-wide">Export Format</span>
+                        </div>
+                        <a href="#" onclick="exportCalendar('csv')" class="flex items-center gap-3 px-4 py-2 text-still-muted hover:bg-still-border hover:text-still-text">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            <div>
+                                <div class="font-medium">CSV</div>
+                                <div class="text-xs text-still-disabled">For Hootsuite, Buffer</div>
+                            </div>
+                        </a>
+                        <a href="#" onclick="exportCalendar('ics')" class="flex items-center gap-3 px-4 py-2 text-still-muted hover:bg-still-border hover:text-still-text">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                            <div>
+                                <div class="font-medium">ICS</div>
+                                <div class="text-xs text-still-disabled">Google, Apple, Outlook Calendar</div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -539,6 +571,148 @@
                 .replace(/"/g, '\\"')
                 .replace(/\n/g, '\\n')
                 .replace(/\r/g, '\\r');
+        }
+
+        // Export Menu Toggle
+        function toggleExportMenu() {
+            const menu = document.getElementById('export-menu');
+            menu.classList.toggle('hidden');
+        }
+
+        // Close export menu when clicking outside
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById('export-dropdown');
+            if (dropdown && !dropdown.contains(e.target)) {
+                document.getElementById('export-menu').classList.add('hidden');
+            }
+        });
+
+        // Export Calendar
+        function exportCalendar(format) {
+            document.getElementById('export-menu').classList.add('hidden');
+
+            // Collect all scheduled items from the current view
+            const scheduledItems = [];
+            for (const [date, items] of Object.entries(calendarData.days)) {
+                items.forEach(item => {
+                    scheduledItems.push({
+                        date: date,
+                        time: item.scheduled_time,
+                        platform: item.platform,
+                        content: item.content_preview,
+                        notes: item.notes || ''
+                    });
+                });
+            }
+
+            if (scheduledItems.length === 0) {
+                showToast('No scheduled content to export', 'warning');
+                return;
+            }
+
+            if (format === 'csv') {
+                exportAsCSV(scheduledItems);
+            } else if (format === 'ics') {
+                exportAsICS(scheduledItems);
+            }
+        }
+
+        // Export as CSV (compatible with Hootsuite, Buffer)
+        function exportAsCSV(items) {
+            // CSV headers following common social media scheduler format
+            const headers = ['Date', 'Time', 'Platform', 'Content', 'Notes'];
+            const rows = [headers.join(',')];
+
+            items.forEach(item => {
+                const row = [
+                    item.date,
+                    item.time.substring(0, 5), // HH:MM format
+                    item.platform,
+                    `"${item.content.replace(/"/g, '""')}"`, // Escape quotes in CSV
+                    `"${(item.notes || '').replace(/"/g, '""')}"`
+                ];
+                rows.push(row.join(','));
+            });
+
+            const csvContent = rows.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            downloadBlob(blob, `content-calendar-${formatDateForFilename(new Date())}.csv`);
+            showToast('CSV exported successfully');
+        }
+
+        // Export as ICS (calendar format)
+        function exportAsICS(items) {
+            const icsLines = [
+                'BEGIN:VCALENDAR',
+                'VERSION:2.0',
+                'PRODID:-//Still Content Calendar//EN',
+                'CALSCALE:GREGORIAN',
+                'METHOD:PUBLISH'
+            ];
+
+            items.forEach((item, index) => {
+                const startDate = new Date(`${item.date}T${item.time}`);
+                const endDate = new Date(startDate.getTime() + 30 * 60000); // 30 min duration
+
+                const uid = `still-${item.date}-${index}@still.app`;
+                const dtstamp = formatICSDate(new Date());
+                const dtstart = formatICSDate(startDate);
+                const dtend = formatICSDate(endDate);
+
+                // Truncate content for calendar event title
+                const title = `[${item.platform.toUpperCase()}] ${item.content.substring(0, 50)}${item.content.length > 50 ? '...' : ''}`;
+                const description = item.content.replace(/\n/g, '\\n');
+
+                icsLines.push(
+                    'BEGIN:VEVENT',
+                    `UID:${uid}`,
+                    `DTSTAMP:${dtstamp}`,
+                    `DTSTART:${dtstart}`,
+                    `DTEND:${dtend}`,
+                    `SUMMARY:${escapeICSText(title)}`,
+                    `DESCRIPTION:${escapeICSText(description)}`,
+                    `CATEGORIES:${item.platform.toUpperCase()}`,
+                    'END:VEVENT'
+                );
+            });
+
+            icsLines.push('END:VCALENDAR');
+
+            const icsContent = icsLines.join('\r\n');
+            const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+            downloadBlob(blob, `content-calendar-${formatDateForFilename(new Date())}.ics`);
+            showToast('ICS exported successfully');
+        }
+
+        // Format date for ICS (YYYYMMDDTHHmmssZ)
+        function formatICSDate(date) {
+            return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        }
+
+        // Escape text for ICS format
+        function escapeICSText(text) {
+            return text
+                .replace(/\\/g, '\\\\')
+                .replace(/;/g, '\\;')
+                .replace(/,/g, '\\,')
+                .replace(/\n/g, '\\n');
+        }
+
+        // Format date for filename
+        function formatDateForFilename(date) {
+            return date.toISOString().split('T')[0];
+        }
+
+        // Download blob as file
+        function downloadBlob(blob, filename) {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
         }
     </script>
 </body>
