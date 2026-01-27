@@ -38,6 +38,72 @@ const Utils = {
     },
 
     /**
+     * Copy text to clipboard with visual checkmark feedback on the button.
+     * Shows a checkmark icon replacing the button content for 2 seconds.
+     * @param {string} text - The text to copy
+     * @param {HTMLElement|Event} buttonOrEvent - The button element or click event
+     */
+    async copyWithFeedback(text, buttonOrEvent) {
+        // Get button element from event or direct reference
+        const button = buttonOrEvent?.target?.closest('button') ||
+                       buttonOrEvent?.currentTarget ||
+                       buttonOrEvent;
+
+        if (!button) {
+            return this.copyToClipboard(text);
+        }
+
+        try {
+            await navigator.clipboard.writeText(text);
+
+            // Store original content
+            const originalChildren = Array.from(button.childNodes).map(node => node.cloneNode(true));
+            const originalWidth = button.offsetWidth;
+
+            // Set minimum width to prevent button from shrinking
+            button.style.minWidth = `${originalWidth}px`;
+
+            // Clear button and add checkmark using DOM methods
+            button.textContent = '';
+
+            const wrapper = document.createElement('span');
+            wrapper.className = 'inline-flex items-center gap-1 text-still-green';
+
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('class', 'w-4 h-4');
+            svg.setAttribute('fill', 'none');
+            svg.setAttribute('stroke', 'currentColor');
+            svg.setAttribute('viewBox', '0 0 24 24');
+
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('stroke-linecap', 'round');
+            path.setAttribute('stroke-linejoin', 'round');
+            path.setAttribute('stroke-width', '2');
+            path.setAttribute('d', 'M5 13l4 4L19 7');
+
+            svg.appendChild(path);
+            wrapper.appendChild(svg);
+            wrapper.appendChild(document.createTextNode(' Copied!'));
+            button.appendChild(wrapper);
+            button.classList.add('copy-success');
+
+            // Restore after 2 seconds
+            setTimeout(() => {
+                button.textContent = '';
+                originalChildren.forEach(child => button.appendChild(child));
+                button.style.minWidth = '';
+                button.classList.remove('copy-success');
+            }, 2000);
+
+            return true;
+        } catch (err) {
+            console.error('Failed to copy:', err);
+            this.showToast('Failed to copy to clipboard', 'error');
+            return false;
+        }
+    },
+
+    /**
      * Show a toast notification.
      * Creates the toast element if it doesn't exist.
      * @param {string} message - The message to display
@@ -151,6 +217,10 @@ function escapeHtml(text) {
 
 function copyToClipboard(text) {
     return Utils.copyToClipboard(text);
+}
+
+function copyWithFeedback(text, buttonOrEvent) {
+    return Utils.copyWithFeedback(text, buttonOrEvent);
 }
 
 function showToast(message, type = 'success') {

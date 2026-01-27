@@ -191,7 +191,10 @@
                             class="px-4 py-2 border border-still-green text-still-green rounded-lg hover:bg-still-green/10">
                             Mark as Published
                         </button>
-                        <button onclick="copyToClipboard()" class="px-4 py-2 border border-still-border text-still-muted rounded-lg hover:text-still-text hover:border-still-muted">
+                        <button onclick="copyToClipboardWithFeedback(event)" id="btn-copy" class="px-4 py-2 border border-still-border text-still-muted rounded-lg hover:text-still-text hover:border-still-muted inline-flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                            </svg>
                             Copy to Clipboard
                         </button>
                         <button onclick="copyAsMarkdown()" id="btn-markdown" class="px-4 py-2 border border-still-border text-still-muted rounded-lg hover:text-still-text hover:border-still-muted">
@@ -759,16 +762,68 @@
             `).join('');
         }
 
-        // Copy to clipboard
-        async function copyToClipboard() {
-            let content;
-            if (currentOutput.content_type === 'email_sequence') {
-                // Copy current tab content
-                content = document.getElementById('content-editor').value;
-            } else {
-                content = document.getElementById('content-editor').value;
+        // Copy to clipboard with visual feedback
+        async function copyToClipboardWithFeedback(event) {
+            let content = document.getElementById('content-editor').value;
+
+            const button = event?.target?.closest('button') || document.getElementById('btn-copy');
+            if (!button) {
+                try {
+                    await navigator.clipboard.writeText(content);
+                    showToast('Copied to clipboard');
+                } catch (err) {
+                    showToast('Failed to copy', 'error');
+                }
+                return;
             }
 
+            try {
+                await navigator.clipboard.writeText(content);
+
+                // Store original content
+                const originalChildren = Array.from(button.childNodes).map(node => node.cloneNode(true));
+                const originalWidth = button.offsetWidth;
+
+                // Set minimum width to prevent button from shrinking
+                button.style.minWidth = `${originalWidth}px`;
+
+                // Clear button and add checkmark using DOM methods
+                button.textContent = '';
+
+                const wrapper = document.createElement('span');
+                wrapper.className = 'inline-flex items-center gap-2 text-still-green';
+
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('class', 'w-4 h-4');
+                svg.setAttribute('fill', 'none');
+                svg.setAttribute('stroke', 'currentColor');
+                svg.setAttribute('viewBox', '0 0 24 24');
+
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('stroke-linecap', 'round');
+                path.setAttribute('stroke-linejoin', 'round');
+                path.setAttribute('stroke-width', '2');
+                path.setAttribute('d', 'M5 13l4 4L19 7');
+
+                svg.appendChild(path);
+                wrapper.appendChild(svg);
+                wrapper.appendChild(document.createTextNode(' Copied!'));
+                button.appendChild(wrapper);
+
+                // Restore after 2 seconds
+                setTimeout(() => {
+                    button.textContent = '';
+                    originalChildren.forEach(child => button.appendChild(child));
+                    button.style.minWidth = '';
+                }, 2000);
+            } catch (err) {
+                showToast('Failed to copy', 'error');
+            }
+        }
+
+        // Legacy function for backwards compatibility
+        async function copyToClipboard() {
+            let content = document.getElementById('content-editor').value;
             try {
                 await navigator.clipboard.writeText(content);
                 showToast('Copied to clipboard');
