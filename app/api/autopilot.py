@@ -62,14 +62,15 @@ async def create_source(
             raise HTTPException(status_code=400, detail="Source URL already exists")
 
         # Insert source
-        if settings.use_postgres:
-            row = await db.fetchrow(
-                """
-                INSERT INTO autopilot_sources
-                (user_id, source_type, source_url, source_name, check_frequency, target_persona, asset_types)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-                RETURNING *
-                """,
+        from app.db_utils import execute_insert_returning_id
+        source_id = await execute_insert_returning_id(
+            db,
+            """
+            INSERT INTO autopilot_sources
+            (user_id, source_type, source_url, source_name, check_frequency, target_persona, asset_types)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
                 user_id,
                 source.source_type,
                 source.source_url,
@@ -77,32 +78,13 @@ async def create_source(
                 source.check_frequency,
                 source.target_persona,
                 json.dumps(source.asset_types),
-            )
-        else:
-            cursor = await db.execute(
-                """
-                INSERT INTO autopilot_sources
-                (user_id, source_type, source_url, source_name, check_frequency, target_persona, asset_types)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    user_id,
-                    source.source_type,
-                    source.source_url,
-                    source.source_name,
-                    source.check_frequency,
-                    source.target_persona,
-                    json.dumps(source.asset_types),
-                ),
-            )
-            source_id = cursor.lastrowid
-            await db.commit()
+            ),
+        )
 
-            # Fetch created source
-            row = await fetchone(
-                db,
-                "SELECT * FROM autopilot_sources WHERE id = ?", (source_id,)
-            )
+        row = await fetchone(
+            db,
+            "SELECT * FROM autopilot_sources WHERE id = ?", (source_id,)
+        )
 
     return parse_source_row(row)
 
@@ -357,30 +339,19 @@ async def get_autopilot_stats(
         )
         pending_items = row["count"] if row else 0
 
-        # Items processed today - use CURRENT_DATE for PostgreSQL compatibility
-        if settings.use_postgres:
-            row = await db.fetchrow(
-                """
-                SELECT COUNT(*) as count FROM autopilot_items ai
-                JOIN autopilot_sources s ON ai.source_id = s.id
-                WHERE s.user_id = $1
-                AND ai.processing_status = 'complete'
-                AND DATE(ai.created_at) = CURRENT_DATE
-                """,
-                user_id,
-            )
-        else:
-            row = await fetchone(
-                db,
-                """
-                SELECT COUNT(*) as count FROM autopilot_items ai
-                JOIN autopilot_sources s ON ai.source_id = s.id
-                WHERE s.user_id = ?
-                AND ai.processing_status = 'complete'
-                AND DATE(ai.created_at) = DATE('now')
-                """,
-                (user_id,),
-            )
+        # Items processed today
+        today_date_expr = "CURRENT_DATE" if settings.use_postgres else "DATE('now')"
+        row = await fetchone(
+            db,
+            f"""
+            SELECT COUNT(*) as count FROM autopilot_items ai
+            JOIN autopilot_sources s ON ai.source_id = s.id
+            WHERE s.user_id = ?
+            AND ai.processing_status = 'complete'
+            AND DATE(ai.created_at) = {today_date_expr}
+            """,
+            (user_id,),
+        )
         items_today = row["count"] if row else 0
 
         # Total items processed
