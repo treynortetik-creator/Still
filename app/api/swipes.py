@@ -1,6 +1,6 @@
 """Swipe File API endpoints for collecting and managing content examples."""
 import json
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
@@ -9,6 +9,7 @@ from app.config import get_settings
 from app.database import get_db
 from app.db_utils import execute, fetchone, fetchall
 from app.api.auth import get_current_user_id
+from app.rate_limiter import limiter
 
 settings = get_settings()
 from app.services.swipe_analyzer import (
@@ -49,23 +50,42 @@ async def list_swipes(
     user_id: int = Depends(get_current_user_id),
 ):
     """List all swipe files for the current user."""
+    limit = max(1, min(limit, 200))
     async with get_db() as db:
         # Build query with optional filters
         query = "SELECT * FROM swipe_files WHERE user_id = ?"
-        params = [user_id]
+        count_query = "SELECT COUNT(*) as count FROM swipe_files WHERE user_id = ?"
+        params: list = [user_id]
+        count_params: list = [user_id]
 
         if source_type:
             query += " AND source_type = ?"
+            count_query += " AND source_type = ?"
             params.append(source_type)
+            count_params.append(source_type)
+
+        # Filter by tag in the database using JSON array contains check
+        if tag:
+            if settings.use_postgres:
+                query += " AND tags::jsonb ? ?"
+                count_query += " AND tags::jsonb ? ?"
+            else:
+                query += " AND json_extract(tags, '$') LIKE ?"
+                count_query += " AND json_extract(tags, '$') LIKE ?"
+                tag_like = f'%"{tag}"%'
+                params.append(tag_like)
+                count_params.append(tag_like)
+            if settings.use_postgres:
+                params.append(tag)
+                count_params.append(tag)
 
         query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
 
         rows = await fetchall(db, query, tuple(params))
 
-        swipes = []
-        for row in rows:
-            swipe = {
+        swipes = [
+            {
                 "id": row["id"],
                 "content": row["content"],
                 "source_url": row["source_url"],
@@ -75,19 +95,11 @@ async def list_swipes(
                 "notes": row["notes"],
                 "created_at": row["created_at"],
             }
+            for row in rows
+        ]
 
-            # Filter by tag if specified
-            if tag and tag not in swipe["tags"]:
-                continue
-
-            swipes.append(swipe)
-
-        # Get total count
-        count_row = await fetchone(
-            db,
-            "SELECT COUNT(*) as count FROM swipe_files WHERE user_id = ?",
-            (user_id,)
-        )
+        # Get total count (respects all filters including tag)
+        count_row = await fetchone(db, count_query, tuple(count_params))
         total = count_row["count"]
 
         return {
@@ -106,6 +118,9 @@ async def create_swipe(
     """Create a new swipe file entry."""
     if not data.content or len(data.content.strip()) < 10:
         raise HTTPException(status_code=400, detail="Content must be at least 10 characters")
+
+    if len(data.content) > 50000:
+        raise HTTPException(status_code=400, detail="Content must be less than 50,000 characters")
 
     async with get_db() as db:
         if settings.use_postgres:
@@ -322,7 +337,9 @@ async def get_analysis(
 
 
 @router.post("/swipes/analyze")
+@limiter.limit("10/hour")
 async def run_analysis(
+    request: Request,
     user_id: int = Depends(get_current_user_id),
 ):
     """
@@ -350,7 +367,9 @@ class SingleSwipeAnalysis(BaseModel):
 
 
 @router.post("/swipes/analyze-single")
+@limiter.limit("20/hour")
 async def analyze_single(
+    request: Request,
     data: SingleSwipeAnalysis,
     user_id: int = Depends(get_current_user_id),
 ):

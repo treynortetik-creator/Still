@@ -610,11 +610,23 @@ async def batch_delete_library_entries(
     return {"message": f"Successfully deleted {len(request.ids)} entries", "deleted_count": len(request.ids)}
 
 
+class UpdateNotesRequest(BaseModel):
+    """Request model for updating library entry notes."""
+    notes: str
+
+
 @router.put("/library/{entry_id}/notes")
-async def update_library_notes(entry_id: int, notes: str, user_id: int = Depends(get_current_user_id)):
+async def update_library_notes(
+    entry_id: int,
+    data: UpdateNotesRequest,
+    user_id: int = Depends(get_current_user_id),
+):
     """
     Update user notes for a library entry.
     """
+    if len(data.notes) > 5000:
+        raise HTTPException(status_code=400, detail="Notes must be less than 5,000 characters")
+    notes = data.notes
     async with get_db() as db:
         row = await fetchone(
             db,
