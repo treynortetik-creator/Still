@@ -3,13 +3,14 @@ import json
 import uuid
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 
 from app.config import get_settings
 from app.database import get_db
 from app.db_utils import execute, fetchone, fetchall
 from app.api.auth import get_current_user_id
 from app.models.persona import PersonaCreate, PersonaUpdate, PersonaResponse, PersonaListResponse
+from app.rate_limiter import limiter
 
 settings = get_settings()
 router = APIRouter()
@@ -37,7 +38,9 @@ def _row_to_persona_dict(row) -> dict:
 
 
 @router.post("/custom-personas", response_model=PersonaResponse)
+@limiter.limit("20/hour")
 async def create_persona(
+    request: Request,
     persona_data: PersonaCreate,
     user_id: int = Depends(get_current_user_id),
 ):

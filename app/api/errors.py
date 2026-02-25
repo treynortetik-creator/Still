@@ -1,7 +1,7 @@
 # app/api/errors.py
 """Error logging API endpoint for frontend errors."""
 from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 from app.api.auth import get_current_user_id_optional
@@ -12,10 +12,10 @@ router = APIRouter()
 
 
 class ErrorLogRequest(BaseModel):
-    error_type: str
-    error_message: str
-    endpoint: Optional[str] = None
-    stack_trace: Optional[str] = None
+    error_type: str = Field(..., max_length=200)
+    error_message: str = Field(..., max_length=2000)
+    endpoint: Optional[str] = Field(None, max_length=500)
+    stack_trace: Optional[str] = Field(None, max_length=10000)
     additional_context: Optional[dict] = None
 
 

@@ -26,7 +26,7 @@ def generate_csrf_token() -> str:
     signature = hmac.new(
         settings.secret_key.encode(),
         data.encode(),
-        "sha256"
+        digestmod="sha256"
     ).hexdigest()[:16]
     return f"{data}:{signature}"
 
@@ -47,7 +47,7 @@ def verify_csrf_token(token: str, max_age: int = 3600) -> bool:
         expected_signature = hmac.new(
             settings.secret_key.encode(),
             data.encode(),
-            "sha256"
+            digestmod="sha256"
         ).hexdigest()[:16]
         return hmac.compare_digest(signature, expected_signature)
     except (ValueError, TypeError):
@@ -96,7 +96,7 @@ def verify_admin_session(request: Request) -> bool:
             expected_token = hmac.new(
                 settings.secret_key.encode(),
                 f"{settings.admin_username}:admin".encode(),
-                "sha256"
+                digestmod="sha256"
             ).hexdigest()
             if hmac.compare_digest(admin_session, expected_token):
                 return True
@@ -146,7 +146,7 @@ def create_admin_response(request: Request, template_name: str) -> HTMLResponse:
     session_token = hmac.new(
         settings.secret_key.encode(),
         f"{settings.admin_username}:admin".encode(),
-        "sha256"
+        digestmod="sha256"
     ).hexdigest()
 
     response = templates.TemplateResponse(template_name, {"request": request})
@@ -289,7 +289,7 @@ async def admin_login_submit(
         session_token = hmac.new(
             settings.secret_key.encode(),
             f"{settings.admin_username}:admin".encode(),
-            "sha256"
+            digestmod="sha256"
         ).hexdigest()
 
         # Validate redirect URL to prevent open redirect attacks

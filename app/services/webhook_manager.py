@@ -12,7 +12,7 @@ import httpx
 
 from app.database import get_db
 from app.config import get_settings
-from app.db_utils import execute, fetchone, fetchall
+from app.db_utils import execute, fetchone, fetchall, execute_insert_returning_id
 from app.utils.background_tasks import create_background_task
 
 logger = logging.getLogger(__name__)
@@ -70,30 +70,14 @@ async def trigger_webhook_event(event_type: str, user_id: int, data: dict):
             }
 
             # Create delivery record and get ID
-            if settings.use_postgres:
-                row = await db.fetchrow(
-                    """
-                    INSERT INTO webhook_deliveries (webhook_id, event_type, payload, attempts)
-                    VALUES ($1, $2, $3, 0)
-                    RETURNING id
-                    """,
-                    webhook["id"], event_type, json.dumps(payload)
-                )
-                delivery_id = row["id"]
-            else:
-                await execute(
-                    db,
-                    """
-                    INSERT INTO webhook_deliveries (webhook_id, event_type, payload, attempts)
-                    VALUES (?, ?, ?, 0)
-                    """,
-                    (webhook["id"], event_type, json.dumps(payload))
-                )
-                await db.commit()
-
-                # Get the delivery ID
-                cursor = await db.execute("SELECT last_insert_rowid()")
-                delivery_id = (await cursor.fetchone())[0]
+            delivery_id = await execute_insert_returning_id(
+                db,
+                """
+                INSERT INTO webhook_deliveries (webhook_id, event_type, payload, attempts)
+                VALUES (?, ?, ?, 0)
+                """,
+                (webhook["id"], event_type, json.dumps(payload)),
+            )
 
             # Trigger async delivery (fire and forget)
             create_background_task(

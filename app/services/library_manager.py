@@ -6,7 +6,7 @@ from difflib import SequenceMatcher
 
 from app.config import get_settings
 from app.database import get_db
-from app.db_utils import execute, fetchone, fetchall, fetchval
+from app.db_utils import execute, fetchone, fetchall, fetchval, execute_insert_returning_id
 from app.services.settings_manager import get_global_setting
 
 settings = get_settings()
@@ -432,20 +432,19 @@ async def save_outputs_to_db(outputs: list[dict], job_id: str, campaign_name: Op
             # Validate and sanitize the output data
             validated = validate_output(output)
 
-            if settings.use_postgres:
-                # PostgreSQL: use RETURNING to get the inserted ID
-                row = await db.fetchrow(
-                    """
-                    INSERT INTO outputs (
-                        job_id, content_type, variation_number,
-                        step1_draft, step2_edited, step3_final,
-                        stills_used, citations, warnings, quality_scores,
-                        hook_variations, subject, preview_text,
-                        email_day, email_purpose, sequence_name,
-                        topics, campaign_name
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-                    RETURNING id
-                    """,
+            output_id = await execute_insert_returning_id(
+                db,
+                """
+                INSERT INTO outputs (
+                    job_id, content_type, variation_number,
+                    step1_draft, step2_edited, step3_final,
+                    stills_used, citations, warnings, quality_scores,
+                    hook_variations, subject, preview_text,
+                    email_day, email_purpose, sequence_name,
+                    topics, campaign_name
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
                     job_id,
                     validated["content_type"],
                     validated["variation_number"],
@@ -464,43 +463,8 @@ async def save_outputs_to_db(outputs: list[dict], job_id: str, campaign_name: Op
                     validated["sequence_name"],
                     json.dumps(validated["topics"]),
                     campaign_name or validated["campaign_name"],
-                )
-                output_id = row["id"]
-            else:
-                # SQLite: use lastrowid
-                cursor = await db.execute(
-                    """
-                    INSERT INTO outputs (
-                        job_id, content_type, variation_number,
-                        step1_draft, step2_edited, step3_final,
-                        stills_used, citations, warnings, quality_scores,
-                        hook_variations, subject, preview_text,
-                        email_day, email_purpose, sequence_name,
-                        topics, campaign_name
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        job_id,
-                        validated["content_type"],
-                        validated["variation_number"],
-                        validated["content"] or validated["step1_draft"],
-                        validated["step2_edited"],
-                        validated["step3_final"],
-                        json.dumps(validated["stills_used"]),
-                        json.dumps(validated["citations"]),
-                        json.dumps(validated["warnings"]),
-                        json.dumps(validated["quality_scores"]) if validated["quality_scores"] else None,
-                        json.dumps(validated["hook_variations"]) if validated["hook_variations"] else None,
-                        validated["subject"],
-                        validated["preview_text"],
-                        validated["email_day"],
-                        validated["email_purpose"],
-                        validated["sequence_name"],
-                        json.dumps(validated["topics"]),
-                        campaign_name or validated["campaign_name"],
-                    )
-                )
-                output_id = cursor.lastrowid
+                ),
+            )
 
             count += 1
 
