@@ -1,11 +1,12 @@
 """Webhooks API endpoints for Zapier/external integrations."""
 import json
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 
 from app.config import get_settings
 from app.database import get_db
 from app.db_utils import execute, fetchone, fetchall
 from app.api.auth import get_current_user_id
+from app.rate_limiter import limiter
 
 settings = get_settings()
 from app.models.webhook import (
@@ -31,7 +32,9 @@ router = APIRouter()
 
 
 @router.post("/webhooks", response_model=WebhookCreateResponse)
+@limiter.limit("20/hour")
 async def create_webhook(
+    request: Request,
     data: WebhookCreate,
     user_id: int = Depends(get_current_user_id),
 ):
@@ -298,7 +301,9 @@ async def delete_webhook(
 
 
 @router.post("/webhooks/{webhook_id}/test", response_model=WebhookTestResponse)
+@limiter.limit("10/hour")
 async def test_webhook_endpoint(
+    request: Request,
     webhook_id: int,
     user_id: int = Depends(get_current_user_id),
 ):

@@ -1,6 +1,6 @@
 """Brand Voice API endpoints for voice analysis and management."""
 import json
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel, field_validator
 from typing import Optional, List
 
@@ -8,6 +8,7 @@ from app.config import get_settings
 from app.api.auth import get_current_user_id
 from app.database import get_db
 from app.db_utils import execute, fetchone
+from app.rate_limiter import limiter
 from app.services.brand_voice_analyzer import (
     analyze_brand_voice,
     get_brand_voice_profile,
@@ -102,7 +103,9 @@ async def remove_sample(
 
 
 @router.post("/brand-voice/analyze")
+@limiter.limit("10/hour")
 async def run_analysis(
+    request: Request,
     user_id: int = Depends(get_current_user_id),
 ):
     """
