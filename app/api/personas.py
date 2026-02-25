@@ -1,10 +1,11 @@
 """Persona management and brand voice preview API."""
 import json
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from app.api.auth import get_current_user_id
+from app.rate_limiter import limiter
 from app.database import get_db
 from app.db_utils import fetchall
 from app.services.persona_manager import get_persona, list_personas, load_personas
@@ -106,8 +107,10 @@ async def get_persona_details(
 
 
 @router.post("/personas/preview-voice", response_model=BrandVoicePreviewResponse)
+@limiter.limit("20/hour")
 async def preview_brand_voice(
-    request: BrandVoicePreviewRequest,
+    request: Request,
+    data: BrandVoicePreviewRequest,
     user_id: int = Depends(get_current_user_id),
 ):
     """
@@ -116,14 +119,14 @@ async def preview_brand_voice(
     This is a quick preview that doesn't run the full pipeline - just transforms
     sample text to demonstrate the brand voice transformation.
     """
-    if not request.sample_text or len(request.sample_text) < 10:
+    if not data.sample_text or len(data.sample_text) < 10:
         raise HTTPException(status_code=400, detail="Sample text must be at least 10 characters")
 
-    if len(request.sample_text) > 2000:
+    if len(data.sample_text) > 2000:
         raise HTTPException(status_code=400, detail="Sample text must be less than 2000 characters")
 
     # Pass user_id to get_persona so it can find custom personas
-    persona = await get_persona(request.persona_id, user_id=user_id)
+    persona = await get_persona(data.persona_id, user_id=user_id)
     if not persona:
         raise HTTPException(status_code=404, detail="Persona not found")
 
@@ -145,7 +148,7 @@ TRANSFORMATION GUIDELINES:
 5. Make it actionable for this specific audience
 
 ORIGINAL TEXT:
-{request.sample_text}
+{data.sample_text}
 
 OUTPUT FORMAT (valid JSON):
 {{
@@ -167,8 +170,8 @@ OUTPUT FORMAT (valid JSON):
         result = parse_llm_json(response_text, context="brand voice preview")
 
         return BrandVoicePreviewResponse(
-            original_text=request.sample_text,
-            transformed_text=result.get("transformed_text", request.sample_text),
+            original_text=data.sample_text,
+            transformed_text=result.get("transformed_text", data.sample_text),
             changes_summary=result.get("changes_summary", []),
             persona_applied={
                 "id": persona["id"],
