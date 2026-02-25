@@ -198,13 +198,13 @@ async def get_job_results(
         # Fetch all image prompts for these outputs in a single query (fixes N+1)
         image_prompts_by_output = {}
         if output_ids:
-            # Build parameterized IN clause
-            if settings.use_postgres:
-                placeholders = ",".join(f"${i+1}" for i in range(len(output_ids)))
-            else:
-                placeholders = ",".join("?" * len(output_ids))
-            query = f"SELECT id, output_id, prompt_text, platform, dimensions, style_modifiers FROM image_prompts WHERE output_id IN ({placeholders})"
-            prompt_rows = await fetchall(db, query, tuple(output_ids)) if not settings.use_postgres else await db.fetch(query, *output_ids)
+            # Build parameterized IN clause using ? placeholders (db_utils converts for PostgreSQL)
+            placeholders = ",".join("?" * len(output_ids))
+            prompt_rows = await fetchall(
+                db,
+                f"SELECT id, output_id, prompt_text, platform, dimensions, style_modifiers FROM image_prompts WHERE output_id IN ({placeholders})",
+                tuple(output_ids),
+            )
             for p in prompt_rows:
                 output_id = p["output_id"]
                 if output_id not in image_prompts_by_output:
@@ -302,6 +302,8 @@ async def list_jobs(
     """
     List all jobs for the current user with optional status filter.
     """
+    # Clamp limit to prevent resource exhaustion
+    limit = max(1, min(limit, 100))
     async with get_db() as db:
         query = """
             SELECT id, status, original_filename, target_persona,

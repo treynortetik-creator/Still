@@ -334,6 +334,7 @@ async def list_batches(
     offset: int = 0,
 ):
     """List all batches for the current user."""
+    limit = max(1, min(limit, 100))
     async with get_db() as db:
         rows = await fetchall(
             db,
