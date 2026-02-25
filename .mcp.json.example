@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "still": {
+      "command": "node",
+      "args": ["mcp-server/dist/index.js"],
+      "env": {
+        "STILL_URL": "${STILL_URL}",
+        "STILL_API_KEY": "${STILL_API_KEY}"
+      }
+    }
+  }
+}
