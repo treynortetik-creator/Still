@@ -96,7 +96,17 @@ async def create_rule(
     if len(data.rule_text) > 1000:
         raise HTTPException(status_code=400, detail="Rule text must be less than 1,000 characters")
 
+    MAX_RULES_PER_USER = 100
     async with get_db() as db:
+        from app.db_utils import fetchval as _fetchval
+        rule_count = await _fetchval(
+            db, "SELECT COUNT(*) FROM memory_rules WHERE user_id = ?", (user_id,)
+        )
+        if rule_count and rule_count >= MAX_RULES_PER_USER:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Maximum {MAX_RULES_PER_USER} memory rules allowed per user"
+            )
         if settings.use_postgres:
             row = await db.fetchrow(
                 """
@@ -146,6 +156,10 @@ async def update_rule(
         params = []
 
         if data.rule_text is not None:
+            if len(data.rule_text.strip()) < 3:
+                raise HTTPException(status_code=400, detail="Rule text must be at least 3 characters")
+            if len(data.rule_text) > 1000:
+                raise HTTPException(status_code=400, detail="Rule text must be less than 1,000 characters")
             updates.append("rule_text = ?")
             params.append(data.rule_text.strip())
         if data.rule_type is not None:

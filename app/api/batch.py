@@ -53,6 +53,18 @@ async def upload_batch(
     if len(files) < 1:
         raise HTTPException(status_code=400, detail="At least 1 file required")
 
+    # Validate string input lengths
+    if campaign_name and len(campaign_name) > settings.max_campaign_name_chars:
+        raise HTTPException(
+            status_code=400,
+            detail=f"campaign_name must be less than {settings.max_campaign_name_chars} characters"
+        )
+    if magic_words and len(magic_words) > settings.max_magic_words_chars:
+        raise HTTPException(
+            status_code=400,
+            detail=f"magic_words must be less than {settings.max_magic_words_chars} characters"
+        )
+
     # Parse JSON fields
     try:
         asset_types_list = json.loads(asset_types)
@@ -62,6 +74,11 @@ async def upload_batch(
             status_code=400,
             detail="Invalid JSON in asset_types or asset_quantities"
         )
+
+    if not isinstance(asset_types_list, list) or not asset_types_list:
+        raise HTTPException(status_code=400, detail="asset_types must be a non-empty JSON array")
+    if not isinstance(asset_quantities_dict, dict):
+        raise HTTPException(status_code=400, detail="asset_quantities must be a JSON object")
 
     # Validate all files first
     for file in files:
