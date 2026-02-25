@@ -384,18 +384,21 @@ async def get_usage_stats(request: Request, user_id: int = Depends(get_current_u
 
         # Get cost breakdown by month (last 6 months)
         if settings.use_postgres:
-            monthly_query = """
+            monthly_rows = await fetchall(
+                db,
+                """
                 SELECT
                     TO_CHAR(created_at, 'YYYY-MM') as month,
                     SUM(cost_incurred) as cost,
                     COUNT(*) as job_count
                 FROM jobs
-                WHERE user_id = $1
+                WHERE user_id = ?
                     AND created_at >= CURRENT_DATE - INTERVAL '6 months'
                 GROUP BY TO_CHAR(created_at, 'YYYY-MM')
                 ORDER BY month DESC
-            """
-            monthly_rows = await db.fetch(monthly_query, user_id)
+                """,
+                (user_id,)
+            )
             monthly_costs = [
                 {"month": row["month"], "cost": row["cost"], "jobs": row["job_count"]}
                 for row in monthly_rows

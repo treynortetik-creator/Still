@@ -256,7 +256,7 @@ async def verify_admin(
             expected_token = hmac.new(
                 settings.secret_key.encode(),
                 f"{settings.admin_username}:admin".encode(),
-                "sha256"
+                digestmod="sha256"
             ).hexdigest()
             if hmac.compare_digest(admin_session, expected_token):
                 return True

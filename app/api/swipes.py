@@ -20,6 +20,13 @@ from app.services.swipe_analyzer import (
 
 router = APIRouter()
 
+VALID_SOURCE_TYPES = {"linkedin", "twitter", "email", "blog", "general"}
+MAX_SWIPE_CONTENT = 50_000
+MAX_SWIPE_TITLE = 200
+MAX_SWIPE_NOTES = 2_000
+MAX_SWIPE_TAGS = 20
+MAX_TAG_LENGTH = 50
+
 
 class SwipeCreate(BaseModel):
     """Request to create a new swipe file entry."""
@@ -67,17 +74,19 @@ async def list_swipes(
         # Filter by tag in the database using JSON array contains check
         if tag:
             if settings.use_postgres:
-                query += " AND tags::jsonb ? ?"
-                count_query += " AND tags::jsonb ? ?"
+                # Use @> (contains) operator so db_utils ? placeholder conversion doesn't
+                # collide with the JSONB ? (key-exists) operator
+                query += " AND tags::jsonb @> ?::jsonb"
+                count_query += " AND tags::jsonb @> ?::jsonb"
+                import json as _json
+                params.append(_json.dumps([tag]))
+                count_params.append(_json.dumps([tag]))
             else:
                 query += " AND json_extract(tags, '$') LIKE ?"
                 count_query += " AND json_extract(tags, '$') LIKE ?"
                 tag_like = f'%"{tag}"%'
                 params.append(tag_like)
                 count_params.append(tag_like)
-            if settings.use_postgres:
-                params.append(tag)
-                count_params.append(tag)
 
         query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
@@ -119,8 +128,24 @@ async def create_swipe(
     if not data.content or len(data.content.strip()) < 10:
         raise HTTPException(status_code=400, detail="Content must be at least 10 characters")
 
-    if len(data.content) > 50000:
-        raise HTTPException(status_code=400, detail="Content must be less than 50,000 characters")
+    if len(data.content) > MAX_SWIPE_CONTENT:
+        raise HTTPException(status_code=400, detail=f"Content must be less than {MAX_SWIPE_CONTENT:,} characters")
+
+    if data.source_type and data.source_type not in VALID_SOURCE_TYPES:
+        raise HTTPException(status_code=400, detail=f"Invalid source_type. Must be one of: {', '.join(sorted(VALID_SOURCE_TYPES))}")
+
+    if data.title and len(data.title) > MAX_SWIPE_TITLE:
+        raise HTTPException(status_code=400, detail=f"Title must be less than {MAX_SWIPE_TITLE} characters")
+
+    if data.notes and len(data.notes) > MAX_SWIPE_NOTES:
+        raise HTTPException(status_code=400, detail=f"Notes must be less than {MAX_SWIPE_NOTES} characters")
+
+    if data.tags:
+        if len(data.tags) > MAX_SWIPE_TAGS:
+            raise HTTPException(status_code=400, detail=f"Maximum {MAX_SWIPE_TAGS} tags allowed")
+        for t in data.tags:
+            if len(t) > MAX_TAG_LENGTH:
+                raise HTTPException(status_code=400, detail=f"Each tag must be less than {MAX_TAG_LENGTH} characters")
 
     async with get_db() as db:
         if settings.use_postgres:
@@ -199,6 +224,28 @@ async def update_swipe(
     user_id: int = Depends(get_current_user_id),
 ):
     """Update a swipe file entry."""
+    if data.content is not None:
+        if len(data.content.strip()) < 10:
+            raise HTTPException(status_code=400, detail="Content must be at least 10 characters")
+        if len(data.content) > MAX_SWIPE_CONTENT:
+            raise HTTPException(status_code=400, detail=f"Content must be less than {MAX_SWIPE_CONTENT:,} characters")
+
+    if data.source_type is not None and data.source_type not in VALID_SOURCE_TYPES:
+        raise HTTPException(status_code=400, detail=f"Invalid source_type. Must be one of: {', '.join(sorted(VALID_SOURCE_TYPES))}")
+
+    if data.title is not None and len(data.title) > MAX_SWIPE_TITLE:
+        raise HTTPException(status_code=400, detail=f"Title must be less than {MAX_SWIPE_TITLE} characters")
+
+    if data.notes is not None and len(data.notes) > MAX_SWIPE_NOTES:
+        raise HTTPException(status_code=400, detail=f"Notes must be less than {MAX_SWIPE_NOTES} characters")
+
+    if data.tags is not None:
+        if len(data.tags) > MAX_SWIPE_TAGS:
+            raise HTTPException(status_code=400, detail=f"Maximum {MAX_SWIPE_TAGS} tags allowed")
+        for t in data.tags:
+            if len(t) > MAX_TAG_LENGTH:
+                raise HTTPException(status_code=400, detail=f"Each tag must be less than {MAX_TAG_LENGTH} characters")
+
     async with get_db() as db:
         # Check ownership
         existing = await fetchone(
@@ -380,6 +427,9 @@ async def analyze_single(
     """
     if not data.content or len(data.content.strip()) < 20:
         raise HTTPException(status_code=400, detail="Content must be at least 20 characters")
+
+    if len(data.content) > MAX_SWIPE_CONTENT:
+        raise HTTPException(status_code=400, detail=f"Content must be less than {MAX_SWIPE_CONTENT:,} characters")
 
     try:
         result, cost = await analyze_single_swipe(data.content, user_id)

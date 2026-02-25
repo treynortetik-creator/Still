@@ -24,6 +24,11 @@ from app.models.autopilot import (
 
 router = APIRouter()
 
+VALID_SOURCE_TYPES = {"rss", "podcast", "youtube"}
+VALID_CHECK_FREQUENCIES = {"hourly", "daily", "weekly"}
+MAX_SOURCE_NAME_LEN = 200
+MAX_SOURCE_URL_LEN = 2048
+
 
 def parse_source_row(row) -> SourceResponse:
     """Convert database row to SourceResponse."""
@@ -51,6 +56,27 @@ async def create_source(
     user_id: int = Depends(get_current_user_id),
 ):
     """Add a new monitored source."""
+    if source.source_type not in VALID_SOURCE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid source_type. Must be one of: {', '.join(sorted(VALID_SOURCE_TYPES))}"
+        )
+    if source.check_frequency not in VALID_CHECK_FREQUENCIES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid check_frequency. Must be one of: {', '.join(sorted(VALID_CHECK_FREQUENCIES))}"
+        )
+    if not source.source_name or not source.source_name.strip():
+        raise HTTPException(status_code=400, detail="source_name is required")
+    if len(source.source_name) > MAX_SOURCE_NAME_LEN:
+        raise HTTPException(status_code=400, detail=f"source_name must be less than {MAX_SOURCE_NAME_LEN} characters")
+    if not source.source_url or not source.source_url.strip():
+        raise HTTPException(status_code=400, detail="source_url is required")
+    if len(source.source_url) > MAX_SOURCE_URL_LEN:
+        raise HTTPException(status_code=400, detail=f"source_url must be less than {MAX_SOURCE_URL_LEN} characters")
+    if not source.asset_types:
+        raise HTTPException(status_code=400, detail="At least one asset_type is required")
+
     async with get_db() as db:
         # Check for duplicate URL
         existing = await fetchone(
@@ -135,6 +161,16 @@ async def update_source(
     user_id: int = Depends(get_current_user_id),
 ):
     """Update a monitored source."""
+    if update.check_frequency is not None and update.check_frequency not in VALID_CHECK_FREQUENCIES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid check_frequency. Must be one of: {', '.join(sorted(VALID_CHECK_FREQUENCIES))}"
+        )
+    if update.source_name is not None and len(update.source_name) > MAX_SOURCE_NAME_LEN:
+        raise HTTPException(status_code=400, detail=f"source_name must be less than {MAX_SOURCE_NAME_LEN} characters")
+    if update.asset_types is not None and not update.asset_types:
+        raise HTTPException(status_code=400, detail="At least one asset_type is required")
+
     async with get_db() as db:
         # Verify ownership
         existing = await fetchone(
@@ -265,6 +301,7 @@ async def get_source_items(
     user_id: int = Depends(get_current_user_id),
 ):
     """Get recent items from a source."""
+    limit = max(1, min(limit, 100))
     async with get_db() as db:
         # Verify ownership
         existing = await fetchone(
