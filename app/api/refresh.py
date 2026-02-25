@@ -209,10 +209,14 @@ async def mark_output_performer(
 ):
     """Mark an output as high performer and update contributing stills."""
     async with get_db() as db:
-        # Verify output exists
+        # Verify output exists and belongs to the current user via its job
         output = await fetchone(db,
-            "SELECT id, job_id FROM outputs WHERE id = ?",
-            (output_id,)
+            """
+            SELECT o.id, o.job_id FROM outputs o
+            JOIN jobs j ON o.job_id = j.id
+            WHERE o.id = ? AND j.user_id = ?
+            """,
+            (output_id, user_id)
         )
         if not output:
             raise HTTPException(status_code=404, detail="Output not found")

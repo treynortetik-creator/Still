@@ -1,9 +1,10 @@
 """Smart Content Remix API endpoints."""
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request, Query
 from pydantic import BaseModel
 from typing import Optional, List
 
 from app.api.auth import get_current_user_id
+from app.rate_limiter import limiter
 from app.services.remix import (
     analyze_library_for_remix,
     get_stills_by_topic,
@@ -22,7 +23,9 @@ class RemixRequest(BaseModel):
 
 
 @router.get("/remix/suggestions")
+@limiter.limit("10/hour")
 async def get_suggestions(
+    request: Request,
     user_id: int = Depends(get_current_user_id),
 ):
     """
@@ -53,7 +56,7 @@ async def get_stats(
 
 @router.get("/remix/search")
 async def search_stills(
-    topic: str,
+    topic: str = Query(..., min_length=2, max_length=200),
     user_id: int = Depends(get_current_user_id),
 ):
     """Search stills by topic/keyword."""
@@ -70,7 +73,9 @@ async def search_stills(
 
 
 @router.post("/remix/generate")
+@limiter.limit("20/hour")
 async def generate_remix(
+    request: Request,
     data: RemixRequest,
     user_id: int = Depends(get_current_user_id),
 ):
