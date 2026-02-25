@@ -340,8 +340,8 @@ async def get_autopilot_stats(
         # Active sources
         row = await fetchone(
             db,
-            "SELECT COUNT(*) as count FROM autopilot_sources WHERE user_id = ? AND is_active = TRUE",
-            (user_id,),
+            "SELECT COUNT(*) as count FROM autopilot_sources WHERE user_id = ? AND is_active = ?",
+            (user_id, True),
         )
         active_sources = row["count"] if row else 0
 

@@ -183,7 +183,8 @@ async def get_current_user_id(authorization: Optional[str] = Header(None)) -> in
         raise HTTPException(status_code=401, detail="Invalid authorization header")
 
     token = parts[1]
-    payload = decode_access_token(token)
+    # Use async version that checks the token blacklist so logged-out tokens are rejected
+    payload = await decode_access_token_async(token)
 
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
@@ -208,7 +209,8 @@ async def get_current_user_id_optional(authorization: Optional[str] = Header(Non
         return None
 
     token = parts[1]
-    payload = decode_access_token(token)
+    # Use async version that checks the token blacklist
+    payload = await decode_access_token_async(token)
 
     if not payload:
         return None

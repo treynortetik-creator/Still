@@ -54,7 +54,8 @@ async def list_rules(
         params = [user_id]
 
         if active_only:
-            query += " AND is_active = TRUE"
+            query += " AND is_active = ?"
+            params.append(True)
 
         query += " ORDER BY priority DESC, created_at DESC"
 
@@ -91,6 +92,9 @@ async def create_rule(
 
     if not data.rule_text or len(data.rule_text.strip()) < 3:
         raise HTTPException(status_code=400, detail="Rule text must be at least 3 characters")
+
+    if len(data.rule_text) > 1000:
+        raise HTTPException(status_code=400, detail="Rule text must be less than 1,000 characters")
 
     async with get_db() as db:
         if settings.use_postgres:
@@ -257,10 +261,10 @@ async def get_memory_rules_context(user_id: int) -> str:
             """
             SELECT rule_type, rule_text
             FROM memory_rules
-            WHERE user_id = ? AND is_active = TRUE
+            WHERE user_id = ? AND is_active = ?
             ORDER BY priority DESC
             """,
-            (user_id,)
+            (user_id, True)
         )
 
         if not rows:
