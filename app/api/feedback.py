@@ -1,7 +1,7 @@
 """Feedback API endpoints for thumbs up/down ratings on outputs."""
 import json
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Literal
 from datetime import datetime
 
@@ -19,7 +19,7 @@ class FeedbackCreate(BaseModel):
     """Create/update feedback for an output."""
     output_id: int
     feedback: Literal["thumbs_up", "thumbs_down"]
-    comment: Optional[str] = None
+    comment: Optional[str] = Field(None, max_length=2000)
 
 
 class FeedbackResponse(BaseModel):

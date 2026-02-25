@@ -161,6 +161,13 @@ async def get_calendar(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
 
+    if end_date_obj < start_date_obj:
+        raise HTTPException(status_code=400, detail="end_date must be on or after start_date")
+
+    # Limit range to 366 days to prevent unbounded queries
+    if (end_date_obj - start_date_obj).days > 366:
+        raise HTTPException(status_code=400, detail="Date range cannot exceed 366 days")
+
     async with get_db() as db:
         # Get scheduled content
         scheduled = await fetchall(
