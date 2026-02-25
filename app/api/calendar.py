@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 
 from app.config import get_settings
 from app.database import get_db
-from app.db_utils import execute, fetchone, fetchall
+from app.db_utils import execute, fetchone, fetchall, execute_insert_returning_id
 from app.api.auth import get_current_user_id
 
 settings = get_settings()
@@ -80,50 +80,30 @@ async def schedule_content(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM:SS")
 
-        if settings.use_postgres:
-            row = await db.fetchrow(
-                """
-                INSERT INTO content_schedule
-                (user_id, output_id, scheduled_date, scheduled_time, platform, notes)
-                VALUES ($1, $2, $3, $4, $5, $6)
-                RETURNING *
-                """,
+        # Store date/time as ISO strings for SQLite compatibility; asyncpg handles Python
+        # date/time objects natively, and db_utils passes params through unchanged.
+        schedule_id = await execute_insert_returning_id(
+            db,
+            """
+            INSERT INTO content_schedule
+            (user_id, output_id, scheduled_date, scheduled_time, platform, notes)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
                 user_id,
                 data.output_id,
-                scheduled_date_obj,
-                scheduled_time_obj,
+                scheduled_date_obj.isoformat(),
+                scheduled_time_obj.isoformat(),
                 data.platform,
-                data.notes
+                data.notes,
             )
-            schedule = dict(row)
-        else:
-            await execute(
-                db,
-                """
-                INSERT INTO content_schedule
-                (user_id, output_id, scheduled_date, scheduled_time, platform, notes)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    user_id,
-                    data.output_id,
-                    scheduled_date_obj.isoformat(),  # SQLite stores dates as strings
-                    scheduled_time_obj.isoformat(),  # SQLite stores times as strings
-                    data.platform,
-                    data.notes
-                )
-            )
-            await db.commit()
+        )
 
-            # Get created schedule
-            cursor = await db.execute("SELECT last_insert_rowid()")
-            schedule_id = (await cursor.fetchone())[0]
-
-            schedule = await fetchone(
-                db,
-                "SELECT * FROM content_schedule WHERE id = ?",
-                (schedule_id,)
-            )
+        schedule = await fetchone(
+            db,
+            "SELECT * FROM content_schedule WHERE id = ?",
+            (schedule_id,)
+        )
 
         if not schedule:
             raise HTTPException(

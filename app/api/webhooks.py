@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 
 from app.config import get_settings
 from app.database import get_db
-from app.db_utils import execute, fetchone, fetchall
+from app.db_utils import execute, fetchone, fetchall, execute_insert_returning_id
 from app.api.auth import get_current_user_id
 from app.rate_limiter import limiter
 
@@ -72,45 +72,26 @@ async def create_webhook(
             )
 
         # Create webhook
-        if settings.use_postgres:
-            webhook = await db.fetchrow(
-                """
-                INSERT INTO webhooks (user_id, name, url, secret_key, trigger_events)
-                VALUES ($1, $2, $3, $4, $5)
-                RETURNING *
-                """,
+        webhook_id = await execute_insert_returning_id(
+            db,
+            """
+            INSERT INTO webhooks (user_id, name, url, secret_key, trigger_events)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
                 user_id,
                 data.name,
                 data.url,
                 secret_key,
-                json.dumps(data.trigger_events)
+                json.dumps(data.trigger_events),
             )
-        else:
-            await execute(
-                db,
-                """
-                INSERT INTO webhooks (user_id, name, url, secret_key, trigger_events)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (
-                    user_id,
-                    data.name,
-                    data.url,
-                    secret_key,
-                    json.dumps(data.trigger_events)
-                )
-            )
-            await db.commit()
+        )
 
-            # Get the created webhook
-            cursor = await db.execute("SELECT last_insert_rowid()")
-            webhook_id = (await cursor.fetchone())[0]
-
-            webhook = await fetchone(
-                db,
-                "SELECT * FROM webhooks WHERE id = ?",
-                (webhook_id,)
-            )
+        webhook = await fetchone(
+            db,
+            "SELECT * FROM webhooks WHERE id = ?",
+            (webhook_id,)
+        )
 
         if not webhook:
             raise HTTPException(

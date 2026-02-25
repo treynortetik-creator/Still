@@ -508,25 +508,16 @@ async def generate_from_library(
         if not settings.use_postgres:
             await db.commit()
 
-        # Update usage stats for the stills
-        for still_id in ids_to_use:
-            if settings.use_postgres:
-                await db.execute(
-                    "UPDATE content_library SET times_used = times_used + 1, last_used = NOW() WHERE id = $1",
-                    still_id
-                )
-            else:
-                await execute(
-                    db,
-                    """
-                    UPDATE content_library
-                    SET times_used = times_used + 1, last_used = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                    """,
-                    (still_id,)
-                )
-        if not settings.use_postgres:
-            await db.commit()
+        # Update usage stats for the stills (batch update using IN clause)
+        if ids_to_use:
+            placeholders_update = ",".join("?" * len(ids_to_use))
+            await execute(
+                db,
+                f"UPDATE content_library SET times_used = times_used + 1, last_used = datetime('now') WHERE id IN ({placeholders_update})",
+                tuple(ids_to_use),
+            )
+            if not settings.use_postgres:
+                await db.commit()
 
     # Start background processing (skip transcription and distillation)
     from app.services.pipeline import process_job_from_library
