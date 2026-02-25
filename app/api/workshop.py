@@ -1,13 +1,14 @@
 """Workshop API endpoints for content editing."""
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 
 from app.config import get_settings
 from app.database import get_db
 from app.db_utils import execute, fetchone, fetchall
 from app.api.auth import get_current_user_id
 from app.services.ai_editor import get_ai_edit_suggestions
+from app.rate_limiter import limiter
 from app.models.workshop import (
     WorkshopOutputListItem,
     WorkshopOutputList,
@@ -33,6 +34,8 @@ def to_iso_string(value):
 @router.get("/workshop", response_model=WorkshopOutputList)
 async def list_workshop_outputs(
     status: Optional[str] = Query(None, description="Filter by status: draft, polished, published"),
+    limit: int = Query(50, description="Number of results", ge=1, le=200),
+    offset: int = Query(0, description="Offset for pagination", ge=0),
     user_id: int = Depends(get_current_user_id),
 ):
     """List all outputs for the current user in the workshop."""
@@ -52,9 +55,23 @@ async def list_workshop_outputs(
             query += " AND o.status = ?"
             params.append(status)
 
-        query += " ORDER BY COALESCE(o.last_edited, o.created_at) DESC"
+        query += " ORDER BY COALESCE(o.last_edited, o.created_at) DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
 
         rows = await fetchall(db, query, tuple(params))
+
+        # Get accurate total count (without LIMIT/OFFSET)
+        from app.db_utils import fetchval
+        count_query = """
+            SELECT COUNT(*) FROM outputs o
+            JOIN jobs j ON o.job_id = j.id
+            WHERE j.user_id = ?
+        """
+        count_params = [user_id]
+        if status:
+            count_query += " AND o.status = ?"
+            count_params.append(status)
+        total = await fetchval(db, count_query, tuple(count_params))
 
         outputs = []
         for row in rows:
@@ -86,7 +103,7 @@ async def list_workshop_outputs(
                 email_day=row["email_day"],
             ))
 
-        return WorkshopOutputList(outputs=outputs, total=len(outputs))
+        return WorkshopOutputList(outputs=outputs, total=total or 0)
 
 
 @router.get("/workshop/{output_id}", response_model=WorkshopOutputDetail)
@@ -291,7 +308,9 @@ async def delete_workshop_output(
 
 
 @router.post("/workshop/{output_id}/ai-edit")
+@limiter.limit("30/hour")
 async def request_ai_edit(
+    request: Request,
     output_id: int,
     data: AIEditRequest,
     user_id: int = Depends(get_current_user_id),

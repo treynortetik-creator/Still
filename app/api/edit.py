@@ -1,7 +1,7 @@
 """Edit API endpoints for tone adjustment and content regeneration."""
 import json
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Depends, Request
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 
@@ -9,6 +9,7 @@ from app.config import get_settings
 from app.database import get_db
 from app.db_utils import execute, fetchone, fetchall
 from app.api.auth import get_current_user_id
+from app.rate_limiter import limiter
 from app.services.content_editor import (
     adjust_tone,
     apply_edit_instructions,
@@ -23,14 +24,14 @@ router = APIRouter()
 class ToneAdjustRequest(BaseModel):
     """Request to adjust content tone."""
     output_id: int
-    tone_preset: str
-    custom_instructions: Optional[str] = None
+    tone_preset: str = Field(..., max_length=100)
+    custom_instructions: Optional[str] = Field(None, max_length=2000)
 
 
 class EditRequest(BaseModel):
     """Request to apply custom edits."""
     output_id: int
-    instructions: str
+    instructions: str = Field(..., min_length=1, max_length=2000)
 
 
 class SaveEditRequest(BaseModel):
@@ -49,7 +50,9 @@ async def list_tone_presets():
 
 
 @router.post("/edit/adjust-tone")
+@limiter.limit("30/hour")
 async def adjust_content_tone(
+    request: Request,
     data: ToneAdjustRequest,
     user_id: int = Depends(get_current_user_id),
 ):
@@ -118,7 +121,9 @@ async def adjust_content_tone(
 
 
 @router.post("/edit/apply-changes")
+@limiter.limit("30/hour")
 async def apply_changes(
+    request: Request,
     data: EditRequest,
     user_id: int = Depends(get_current_user_id),
 ):
