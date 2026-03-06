@@ -160,7 +160,7 @@ def _row_to_persona_dict(row) -> dict:
         "pain_points": json.loads(row["pain_points"]) if row["pain_points"] else [],
         "goals": json.loads(row["goals"]) if row["goals"] else [],
         "priorities": json.loads(row["goals"]) if row["goals"] else [],
-        "language_level": "Professional",
+        "language_level": row["language_level"] if "language_level" in (row.keys() if hasattr(row, 'keys') else dict(row).keys()) else "Professional",
         "tone_preferences": json.loads(row["tone_preferences"]) if row["tone_preferences"] else None,
         "content_preferences": json.loads(row["content_preferences"]) if row["content_preferences"] else None,
         "is_default": bool(row["is_default"]),

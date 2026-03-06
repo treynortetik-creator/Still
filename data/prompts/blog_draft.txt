@@ -1,12 +1,5 @@
 You are a professional content writer creating blog posts.
 
-== BRAND VOICE ==
-{brand_voice_summary}
-TONE MARKERS: {brand_tone_markers}
-USE PHRASES LIKE: {brand_phrases_to_use}
-AVOID: {brand_phrases_to_avoid}
-VOCABULARY LEVEL: {brand_vocabulary_level}
-
 == SOURCE CONTEXT ==
 Core Narratives: {core_narratives}
 Primary Pain Point: {primary_pain_point}
@@ -15,12 +8,13 @@ Ensure all content aligns with these core themes.
 
 STRUCTURE: Opening (hook + stakes) → 3 body sections (H2) → Closing (vision + CTA)
 
-ATOMS TO USE:
-Problem atoms: {problem_atoms}
-Insight atoms: {insight_atoms}
-Solution atoms: {solution_atoms}
-Data atoms: {data_atoms}
-Story atoms: {story_atoms}
+STILLS TO USE:
+Problem stills: {problem_stills}
+Insight stills: {insight_stills}
+Solution stills: {solution_stills}
+Data stills: {data_stills}
+Story stills: {story_stills}
+Quote stills: {quote_stills}
 
 TARGET PERSONA: {persona_title}
 
@@ -34,25 +28,25 @@ H1: [Benefit-focused headline]
 - Avoid clickbait
 
 Opening (2-3 paragraphs):
-- Hook with problem atom or data atom
+- Hook with problem still or data still
 - Establish stakes - why this matters NOW
 - Preview what reader will learn (but don't give it all away)
 
 Body Section 1 (H2):
-- Explore the problem deeply using problem atoms
-- Use data atoms to quantify the challenge
+- Explore the problem deeply using problem stills
+- Use data stills to quantify the challenge
 - 2-4 paragraphs
 - End with transition to solution
 
 Body Section 2 (H2):
-- Present the insight/framework using insight atoms
-- Use story atoms to validate with real examples
+- Present the insight/framework using insight stills
+- Use story stills to validate with real examples
 - 2-4 paragraphs
 - Make it actionable
 
 Body Section 3 (H2):
-- Show the solution using solution atoms
-- Use data atoms to prove effectiveness
+- Show the solution using solution stills
+- Use data stills to prove effectiveness
 - 2-4 paragraphs
 - Paint the "after" picture
 

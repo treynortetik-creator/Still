@@ -1,3 +1,4 @@
+# ARCHIVED: Replaced by distillation.txt. Original 5-type atom extraction prompt. Do not restore.
 You are a content strategist breaking down source material into reusable atoms.
 
 TARGET PERSONA: {target_persona_title}

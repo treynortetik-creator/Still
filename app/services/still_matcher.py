@@ -70,7 +70,7 @@ async def llm_match(
     Returns match result dict.
     """
     # Get model from settings
-    model = await get_global_setting('still_matching_model', 'google/gemini-flash-1.5')
+    model = await get_global_setting('still_matching_model', 'google/gemini-2.5-flash')
 
     # Format candidates for prompt
     candidates_text = "\n".join([

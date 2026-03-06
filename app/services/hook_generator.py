@@ -8,6 +8,7 @@ from typing import Tuple
 
 from app.services.ai_client import call_llm_text, calculate_openrouter_cost
 from app.services.persona_manager import get_persona
+from app.services.prompt_manager import get_rendered_prompt
 from app.utils.json_parser import parse_llm_json
 
 
@@ -55,64 +56,13 @@ async def generate_hook_variations(
     persona_title = persona["title"] if persona else "Professional"
     persona_pain_points = ", ".join(persona.get("pain_points", [])) if persona else ""
 
-    prompt = f"""You are an expert LinkedIn content strategist. Generate 5 different hook variations for this LinkedIn post.
+    variables = {
+        "persona_title": persona_title,
+        "persona_pain_points": persona_pain_points,
+        "post_content": post_content,
+    }
 
-TARGET AUDIENCE: {persona_title}
-PAIN POINTS: {persona_pain_points}
-
-ORIGINAL POST:
-{post_content}
-
-Create 5 hook variations, one for each type:
-
-1. QUESTION HOOK: Opens with a thought-provoking question that creates curiosity
-2. STAT HOOK: Opens with a surprising statistic FROM THE ORIGINAL POST ONLY. If no specific stat/data exists in the original, write "NO_STAT_AVAILABLE" for this hook instead of inventing one
-3. STORY HOOK: Opens with a brief story starter or personal angle
-4. BOLD CLAIM HOOK: Opens with a contrarian or provocative statement
-5. PROBLEM HOOK: Opens by directly addressing a specific pain point
-
-RULES:
-- Each hook should be 1-2 sentences max
-- The hook must lead naturally into the rest of the post
-- Keep the core message and CTA of the original post
-- Adapt the hook style to resonate with the target persona
-- Make each hook distinctly different in approach
-
-OUTPUT FORMAT (valid JSON):
-{{
-  "hooks": [
-    {{
-      "hook_type": "question",
-      "hook_text": "The opening hook line only",
-      "full_post": "Complete post starting with this hook (include the rest of the content)",
-      "explanation": "Brief explanation of why this hook works for this audience"
-    }},
-    {{
-      "hook_type": "stat",
-      "hook_text": "The opening hook line only",
-      "full_post": "Complete post starting with this hook",
-      "explanation": "Brief explanation"
-    }},
-    {{
-      "hook_type": "story",
-      "hook_text": "The opening hook line only",
-      "full_post": "Complete post starting with this hook",
-      "explanation": "Brief explanation"
-    }},
-    {{
-      "hook_type": "bold_claim",
-      "hook_text": "The opening hook line only",
-      "full_post": "Complete post starting with this hook",
-      "explanation": "Brief explanation"
-    }},
-    {{
-      "hook_type": "problem",
-      "hook_text": "The opening hook line only",
-      "full_post": "Complete post starting with this hook",
-      "explanation": "Brief explanation"
-    }}
-  ]
-}}"""
+    prompt, config = await get_rendered_prompt("hook_generator", variables)
 
     # Call LLM via unified client (no token limit)
     response_text, input_tokens, output_tokens, model = await call_llm_text(

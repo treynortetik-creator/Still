@@ -726,7 +726,7 @@ async def _init_postgres_tables(conn: asyncpg.Connection):
 
     # Insert default refresh settings
     refresh_settings = [
-        ('still_matching_model', 'google/gemini-flash-1.5', 'string', 'AI model for matching stills during refresh'),
+        ('still_matching_model', 'google/gemini-2.5-flash', 'string', 'AI model for matching stills during refresh'),
         ('fuzzy_match_high_threshold', '0.85', 'float', 'High confidence threshold for fuzzy matching'),
         ('fuzzy_match_low_threshold', '0.50', 'float', 'Low confidence threshold for fuzzy matching'),
         ('auto_retire_expired', 'true', 'boolean', 'Automatically retire expired stills'),
@@ -1327,7 +1327,7 @@ async def _init_sqlite_db():
 
         # Insert default refresh settings
         refresh_settings = [
-            ('still_matching_model', 'google/gemini-flash-1.5', 'string', 'AI model for matching stills during refresh'),
+            ('still_matching_model', 'google/gemini-2.5-flash', 'string', 'AI model for matching stills during refresh'),
             ('fuzzy_match_high_threshold', '0.85', 'float', 'High confidence threshold for fuzzy matching'),
             ('fuzzy_match_low_threshold', '0.50', 'float', 'Low confidence threshold for fuzzy matching'),
             ('auto_retire_expired', 'true', 'boolean', 'Automatically retire expired stills'),

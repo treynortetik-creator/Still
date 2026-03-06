@@ -69,6 +69,18 @@ class AutopilotScheduler:
         if jobs_created > 0:
             logger.info(f"Created {jobs_created} jobs from feed items")
 
+        # 3. Check for expiring stills (daily)
+        if not hasattr(self, '_last_lifecycle_check') or \
+           (datetime.utcnow() - self._last_lifecycle_check).total_seconds() > 86400:
+            try:
+                from app.services.lifecycle import check_expiring_stills
+                flagged = await check_expiring_stills()
+                if flagged > 0:
+                    logger.info(f"Flagged {flagged} expiring stills for review")
+                self._last_lifecycle_check = datetime.utcnow()
+            except Exception as e:
+                logger.error(f"Lifecycle check failed: {e}")
+
 
 # Global scheduler instance
 _scheduler = None

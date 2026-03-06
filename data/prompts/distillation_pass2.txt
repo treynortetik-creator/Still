@@ -35,19 +35,6 @@ Priorities: {persona_priorities}
 9. **SOLUTION** - Quick recommendations or tips
 10. **INSIGHT** - Wisdom buried in transitions or asides
 
-## OUTPUT FORMAT (same as first pass):
-{{
-  "type": "data|insight|story|problem|solution|quote|framework|definition|question|proof_point",
-  "content": "The extracted content",
-  "source_location": "timestamp or section",
-  "best_formats": ["linkedin", "blog", "email", "sales", "case_study", "carousel"],
-  "funnel_stage": "awareness|consideration|decision",
-  "expiration_date": "YYYY-MM-DD or null",
-  "relevance_to_persona": 1-5,
-  "why_relevant": "Brief explanation",
-  "tags": ["keyword1", "keyword2"]
-}}
-
 ## RULES:
 - ONLY extract content NOT already in the first pass list above
 - Do NOT rephrase or duplicate existing stills

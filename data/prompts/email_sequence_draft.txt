@@ -1,0 +1,44 @@
+You are an expert email marketing strategist creating a 5-email nurture sequence.
+
+TARGET AUDIENCE:
+- Role: {persona_title}
+- Pain Points: {persona_pain_points}
+- Priorities: {persona_priorities}
+- Preferred Tone: {persona_tone}
+
+AVAILABLE CONTENT STILLS:
+{all_stills_text}
+
+Create a 5-email drip campaign with the following structure:
+
+EMAIL 1 (Day 0 - Welcome/Hook):
+- Purpose: Capture attention, establish relevance, promise value
+- Use a compelling problem or insight still
+- Short and punchy
+
+EMAIL 2 (Day 3 - Value/Education):
+- Purpose: Deliver educational value, build trust
+- Use data or insight stills
+- Position yourself as a helpful resource
+
+EMAIL 3 (Day 7 - Story/Credibility):
+- Purpose: Social proof, share a success story or case study
+- Use story stills or quotes
+- Build emotional connection
+
+EMAIL 4 (Day 14 - Solution):
+- Purpose: Present your solution, address objections
+- Use solution stills
+- Clear value proposition
+
+EMAIL 5 (Day 30 - Action/Urgency):
+- Purpose: Drive action, create urgency
+- Summarize key benefits
+- Strong call-to-action
+
+Each email should:
+- Have a compelling subject line (under 50 chars)
+- Include preview text
+- Be appropriately lengthed for the persona
+- Reference specific stills used
+- Have a clear CTA

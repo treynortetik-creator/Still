@@ -183,47 +183,58 @@ async def search_stills(
 
     # Step 2: Search database with expanded keywords
     async with get_db() as db:
-        # First, check if user has ANY content in their Reserve
-        total_count = await fetchone(
+        # Check if user has any content in either table
+        stills_count_row = await fetchone(
+            db,
+            "SELECT COUNT(*) as count FROM stills WHERE user_id = ?",
+            (user_id,)
+        )
+        reserve_count_row = await fetchone(
             db,
             "SELECT COUNT(*) as count FROM content_library WHERE user_id = ?",
             (user_id,)
         )
+        stills_total = (stills_count_row["count"] if stills_count_row else 0)
+        reserve_total = (reserve_count_row["count"] if reserve_count_row else 0)
+        total = stills_total + reserve_total
 
-        if not total_count or total_count["count"] == 0:
-            logger.info(f"Sommelier: User {user_id} has no content in Reserve")
-            return [], "Your Reserve is empty. Save some stills from your processed content first!", total_cost
+        if total == 0:
+            logger.info(f"Sommelier: User {user_id} has no content")
+            return [], "Your library is empty. Process some content or save stills to your Reserve first!", total_cost
 
-        logger.info(f"Sommelier: User {user_id} has {total_count['count']} items in Reserve, searching with keywords: {search_keywords[:5]}")
+        logger.info(f"Sommelier: User {user_id} has {stills_total} stills + {reserve_total} Reserve items, searching with keywords: {search_keywords[:5]}")
 
-        # Build search query - search across content and tags
-        # Note: tags is JSONB in PostgreSQL, need to cast to text for LIKE
+        # Build search query - search across content and tags in BOTH tables
+        like_op = "ILIKE" if settings.use_postgres else "LIKE"
+
+        # Build keyword conditions
         conditions = []
-        params = [user_id]
-
+        keyword_params = []
         for keyword in search_keywords[:10]:  # Limit to 10 keywords
-            if settings.use_postgres:
-                # PostgreSQL: cast JSONB to text for LIKE operator
-                conditions.append("(content LIKE ? OR tags::text LIKE ?)")
-            else:
-                # SQLite: tags stored as text
-                conditions.append("(content LIKE ? OR tags LIKE ?)")
-            params.extend([f"%{keyword}%", f"%{keyword}%"])
+            conditions.append(f"(content {like_op} ? OR CAST(tags AS TEXT) {like_op} ?)")
+            keyword_params.extend([f"%{keyword}%", f"%{keyword}%"])
 
         where_clause = " OR ".join(conditions) if conditions else "1=1"
 
+        # UNION query across both tables
         query = f"""
-            SELECT id, entry_type, content, source, tags, persona_relevance, times_used
+            SELECT id, still_type as entry_type, content, campaign_name as source, tags, 'stills' as source_table
+            FROM stills
+            WHERE user_id = ? AND ({where_clause})
+            UNION ALL
+            SELECT id, entry_type, content, source, tags, 'reserve' as source_table
             FROM content_library
             WHERE user_id = ? AND ({where_clause})
-            ORDER BY times_used DESC
+            ORDER BY source_table ASC
             LIMIT 50
         """
+        # params: user_id + keyword_params for stills, then user_id + keyword_params for content_library
+        all_params = tuple([user_id] + keyword_params + [user_id] + keyword_params)
 
         logger.debug(f"Sommelier query: {query}")
-        logger.debug(f"Sommelier params count: {len(params)}")
+        logger.debug(f"Sommelier params count: {len(all_params)}")
 
-        rows = await fetchall(db, query, tuple(params))
+        rows = await fetchall(db, query, all_params)
 
         logger.info(f"Sommelier: Found {len(rows)} matching items for user {user_id}")
 
@@ -239,6 +250,7 @@ async def search_stills(
                 "content": row["content"][:500],  # Truncate for prompt
                 "source": row["source"],
                 "tags": json.loads(row["tags"]) if row["tags"] else [],
+                "source_table": row["source_table"],
             })
 
     # Step 3: AI reranking with relevance explanations
@@ -296,25 +308,33 @@ async def search_stills(
             if still["id"] in ranked_ids:
                 ranking = ranked_ids[still["id"]]
 
-                # Get full still data
-                row = await fetchone(
-                    db,
-                    "SELECT * FROM content_library WHERE id = ?",
-                    (still["id"],)
-                )
+                # Get full still data from the correct table
+                if still.get("source_table") == "stills":
+                    row = await fetchone(
+                        db,
+                        "SELECT id, still_type as entry_type, content, campaign_name as source, tags, usage_count as times_used FROM stills WHERE id = ?",
+                        (still["id"],)
+                    )
+                else:
+                    row = await fetchone(
+                        db,
+                        "SELECT id, entry_type, content, source, tags, source_timestamp, persona_relevance, times_used FROM content_library WHERE id = ?",
+                        (still["id"],)
+                    )
 
                 if row:
                     results.append({
                         "id": row["id"],
                         "entry_type": row["entry_type"],
                         "content": row["content"],
-                        "source": row["source"],
-                        "source_timestamp": row["source_timestamp"],
+                        "source": row.get("source", ""),
+                        "source_timestamp": row.get("source_timestamp"),
                         "tags": json.loads(row["tags"]) if row["tags"] else [],
-                        "persona_relevance": json.loads(row["persona_relevance"]) if row["persona_relevance"] else {},
-                        "times_used": row["times_used"],
+                        "persona_relevance": json.loads(row["persona_relevance"]) if row.get("persona_relevance") else {},
+                        "times_used": row.get("times_used", 0),
                         "relevance_score": ranking.get("relevance_score", 3),
                         "why_relevant": ranking.get("why_relevant", "Matched search criteria"),
+                        "source_table": still.get("source_table", "stills"),
                     })
 
         # Sort by relevance score

@@ -16,6 +16,8 @@ async def score_content(
     brand_voice_summary: str = "",
     brand_tone_markers: str = "",
     brand_phrases_to_avoid: str = "",
+    user_id: int = None,
+    job_id: str = None,
 ) -> Tuple[dict, float]:
     """
     Score content quality across 4 dimensions (0-100 each).
@@ -80,6 +82,8 @@ OUTPUT FORMAT (valid JSON):
         prompt=prompt,
         step="scoring",
         response_format="json",
+        user_id=user_id,
+        job_id=job_id,
     )
 
     try:
@@ -115,6 +119,8 @@ async def batch_score_content(
     brand_voice_summary: str = "",
     brand_tone_markers: str = "",
     brand_phrases_to_avoid: str = "",
+    user_id: int = None,
+    job_id: str = None,
 ) -> Tuple[list[dict], float]:
     """
     Score multiple content outputs.
@@ -141,6 +147,8 @@ async def batch_score_content(
                 brand_voice_summary,
                 brand_tone_markers,
                 brand_phrases_to_avoid,
+                user_id=user_id,
+                job_id=job_id,
             )
             total_cost += cost
 

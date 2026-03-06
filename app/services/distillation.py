@@ -189,8 +189,7 @@ STILL TYPE GUIDELINES:
 
     # Process stills
     stills = []
-    # Handle both "stills" and "atoms" keys for backwards compatibility with prompts
-    still_data_list = result.get("stills", result.get("atoms", []))
+    still_data_list = result.get("stills", [])
     for still_data in still_data_list:
         # Build persona relevance - use "general" if no persona specified
         relevance_key = target_persona_id if persona else "general"

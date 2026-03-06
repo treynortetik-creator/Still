@@ -5,6 +5,8 @@ from typing import Tuple
 from app.services.ai_client import call_llm_text, calculate_openrouter_cost
 from app.services.prompt_manager import get_rendered_prompt
 from app.services.persona_manager import get_persona
+from app.services.brand_voice_analyzer import get_brand_voice_template_vars
+from app.services.source_of_truth import get_source_of_truth_template_vars
 from app.utils.json_parser import parse_llm_json
 
 # Default persona values when no persona is selected
@@ -42,6 +44,16 @@ async def edit_for_audience(
         "persona_priorities": ", ".join(persona["priorities"]),
         "draft_from_step1": draft_content,
     }
+
+    # Inject brand voice variables if user_id provided
+    if user_id:
+        brand_vars = await get_brand_voice_template_vars(user_id, content_type=content_type)
+        variables.update(brand_vars)
+
+    # Inject SOT variables if job_id provided
+    if job_id:
+        sot_vars = await get_source_of_truth_template_vars(job_id)
+        variables.update(sot_vars)
 
     prompt, config = await get_rendered_prompt("audience_edit", variables)
 

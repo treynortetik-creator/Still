@@ -29,6 +29,7 @@ def _row_to_persona_dict(row) -> dict:
         "priorities": json.loads(row["goals"]) if row["goals"] else [],  # Alias for compatibility
         "tone_preferences": json.loads(row["tone_preferences"]) if row["tone_preferences"] else None,
         "content_preferences": json.loads(row["content_preferences"]) if row["content_preferences"] else None,
+        "language_level": row["language_level"] if "language_level" in (row.keys() if hasattr(row, 'keys') else dict(row).keys()) else "Professional",
         "is_default": bool(row["is_default"]),
         "is_custom": True,
         "created_at": row["created_at"],
@@ -70,6 +71,19 @@ async def create_persona(
         )
         if not settings.use_postgres:
             await db.commit()
+
+        # Set language_level if column exists (safe for pre-migration DBs)
+        try:
+            if hasattr(persona_data, 'language_level') and persona_data.language_level:
+                await execute(
+                    db,
+                    "UPDATE personas SET language_level = ? WHERE id = ?",
+                    (persona_data.language_level, persona_id)
+                )
+                if not settings.use_postgres:
+                    await db.commit()
+        except Exception:
+            pass  # Column doesn't exist yet - migration pending
 
         # Fetch the created persona
         row = await fetchone(

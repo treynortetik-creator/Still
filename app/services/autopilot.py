@@ -202,6 +202,56 @@ async def check_source(source_id: int) -> dict:
         return {'source_id': source_id, 'new_items': new_items}
 
 
+async def fetch_article_content(url: str) -> tuple[str, bool]:
+    """
+    Fetch article text content from a URL.
+    Returns (content, success) tuple.
+    """
+    try:
+        import trafilatura
+    except ImportError:
+        logger.warning("trafilatura not installed, falling back to raw HTML extraction")
+        trafilatura = None
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            response = await client.get(url)
+            if response.status_code != 200:
+                return f"Failed to fetch URL: HTTP {response.status_code}", False
+
+            if trafilatura:
+                text = trafilatura.extract(response.text)
+                if text and len(text.strip()) > 100:
+                    return text, True
+
+            # Fallback: basic text extraction
+            from html.parser import HTMLParser
+            class TextExtractor(HTMLParser):
+                def __init__(self):
+                    super().__init__()
+                    self.text_parts = []
+                    self._skip = False
+                def handle_starttag(self, tag, attrs):
+                    if tag in ('script', 'style', 'nav', 'header', 'footer'):
+                        self._skip = True
+                def handle_endtag(self, tag):
+                    if tag in ('script', 'style', 'nav', 'header', 'footer'):
+                        self._skip = False
+                def handle_data(self, data):
+                    if not self._skip and data.strip():
+                        self.text_parts.append(data.strip())
+
+            extractor = TextExtractor()
+            extractor.feed(response.text)
+            text = ' '.join(extractor.text_parts)
+            if len(text) > 200:
+                return text[:15000], True
+
+            return "Could not extract meaningful content from URL", False
+    except Exception as e:
+        return f"Content fetch error: {str(e)}", False
+
+
 async def create_job_from_feed_item(item_id: int) -> Optional[str]:
     """
     Create a job from a feed item for automatic processing.
@@ -234,8 +284,21 @@ async def create_job_from_feed_item(item_id: int) -> Optional[str]:
 
         campaign_name = f"Auto: {item['source_name']} - {(item['item_title'] or 'Untitled')[:30]}"
 
-        # Create job record
-        # Store the URL as the content to be fetched
+        # Fetch actual article content instead of storing metadata
+        article_content, fetch_success = await fetch_article_content(item['item_url'])
+
+        if not fetch_success:
+            await execute(
+                db,
+                "UPDATE autopilot_items SET processing_status = 'failed' WHERE id = ?",
+                (item_id,)
+            )
+            if not settings.use_postgres:
+                await db.commit()
+            logger.warning(f"Autopilot: Failed to fetch content for item {item_id} ({item['item_url']}): {article_content}")
+            return None
+
+        # Create job record with fetched article content
         await execute(
             db,
             """
@@ -258,11 +321,7 @@ async def create_job_from_feed_item(item_id: int) -> Optional[str]:
                 campaign_name,
                 'Queued for autopilot processing',
                 5,
-                json.dumps({
-                    'autopilot_item_id': item_id,
-                    'source_url': item['item_url'],
-                    'source_title': item['item_title']
-                })
+                article_content
             )
         )
 

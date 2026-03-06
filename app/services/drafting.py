@@ -557,6 +557,25 @@ QUOTES:
 {format_stills_for_sequence(grouped.get("quote", []))}
 """
 
+    variables = {
+        "persona_title": persona["title"],
+        "persona_pain_points": ", ".join(persona.get("pain_points", [])),
+        "persona_priorities": ", ".join(persona.get("priorities", [])),
+        "persona_tone": persona.get("content_preferences", {}).get("tone", "Professional"),
+        "all_stills_text": all_stills_text,
+    }
+
+    # Inject brand voice if available
+    if user_id:
+        brand_vars = await get_brand_voice_template_vars(user_id, content_type="email")
+        variables.update(brand_vars)
+
+    if job_id:
+        sot_vars = await get_source_of_truth_template_vars(job_id)
+        variables.update(sot_vars)
+
+    prompt, config = await get_rendered_prompt("email_sequence_draft", variables)
+
     # Get user-specific context (memory rules, style DNA, brand voice)
     user_context = ""
     if user_id:
@@ -565,57 +584,14 @@ QUOTES:
     # Get source context for multi-source generation
     source_context = await build_source_context(stills)
 
-    prompt = f"""{source_context}You are an expert email marketing strategist creating a 5-email nurture sequence.
-{user_context}
-
-TARGET AUDIENCE:
-- Role: {persona["title"]}
-- Pain Points: {", ".join(persona.get("pain_points", []))}
-- Priorities: {", ".join(persona.get("priorities", []))}
-- Preferred Tone: {persona.get("content_preferences", {}).get("tone", "Professional")}
-
-AVAILABLE CONTENT STILLS:
-{all_stills_text}
-
-Create a 5-email drip campaign with the following structure:
-
-EMAIL 1 (Day 0 - Welcome/Hook):
-- Purpose: Capture attention, establish relevance, promise value
-- Use a compelling problem or insight still
-- Short and punchy
-
-EMAIL 2 (Day 3 - Value/Education):
-- Purpose: Deliver educational value, build trust
-- Use data or insight stills
-- Position yourself as a helpful resource
-
-EMAIL 3 (Day 7 - Story/Credibility):
-- Purpose: Social proof, share a success story or case study
-- Use story stills or quotes
-- Build emotional connection
-
-EMAIL 4 (Day 14 - Solution):
-- Purpose: Present your solution, address objections
-- Use solution stills
-- Clear value proposition
-
-EMAIL 5 (Day 30 - Action/Urgency):
-- Purpose: Drive action, create urgency
-- Summarize key benefits
-- Strong call-to-action
-
-Each email should:
-- Have a compelling subject line (under 50 chars)
-- Include preview text
-- Be appropriately lengthed for the persona
-- Reference specific stills used
-- Have a clear CTA
+    # Build full prompt with source/user context and JSON output format
+    full_prompt = source_context + prompt + user_context + """
 
 OUTPUT FORMAT (valid JSON):
-{{
+{
   "sequence_name": "Name for this email sequence",
   "emails": [
-    {{
+    {
       "day": 0,
       "purpose": "Welcome/Hook",
       "subject": "Subject line",
@@ -623,8 +599,8 @@ OUTPUT FORMAT (valid JSON):
       "body": "Full email body with paragraphs",
       "cta": "Call to action text",
       "stills_used": ["still snippets used"]
-    }},
-    {{
+    },
+    {
       "day": 3,
       "purpose": "Value/Education",
       "subject": "Subject line",
@@ -632,8 +608,8 @@ OUTPUT FORMAT (valid JSON):
       "body": "Full email body",
       "cta": "Call to action text",
       "stills_used": ["still snippets used"]
-    }},
-    {{
+    },
+    {
       "day": 7,
       "purpose": "Story/Credibility",
       "subject": "Subject line",
@@ -641,8 +617,8 @@ OUTPUT FORMAT (valid JSON):
       "body": "Full email body",
       "cta": "Call to action text",
       "stills_used": ["still snippets used"]
-    }},
-    {{
+    },
+    {
       "day": 14,
       "purpose": "Solution",
       "subject": "Subject line",
@@ -650,8 +626,8 @@ OUTPUT FORMAT (valid JSON):
       "body": "Full email body",
       "cta": "Call to action text",
       "stills_used": ["still snippets used"]
-    }},
-    {{
+    },
+    {
       "day": 30,
       "purpose": "Action/Urgency",
       "subject": "Subject line",
@@ -659,13 +635,13 @@ OUTPUT FORMAT (valid JSON):
       "body": "Full email body",
       "cta": "Call to action text",
       "stills_used": ["still snippets used"]
-    }}
+    }
   ]
-}}"""
+}"""
 
     # Call LLM via unified client
     response_text, input_tokens, output_tokens, model = await call_llm_text(
-        prompt=prompt,
+        prompt=full_prompt,
         step="drafting",
         response_format="json",
         job_id=job_id,

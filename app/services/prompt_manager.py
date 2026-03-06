@@ -20,6 +20,9 @@ async def init_prompts_from_files():
     prompts_dir = settings.prompts_dir
 
     # Default prompts with their configurations
+    # NOTE: The 'model' field is stored in DB for reference but NOT used for actual model selection.
+    # The active model for each pipeline step is configured in the ai_model_config table
+    # and managed via Admin > AI Models. This field is metadata-only.
     default_prompts = {
         "transcription": {
             "model": "gemini-2.5-flash",
@@ -51,7 +54,7 @@ async def init_prompts_from_files():
             "model": "claude-opus-4-5-20251101",
             "max_tokens": 4000,
             "variables": [
-                "selected_atoms_for_linkedin", "persona_title",
+                "selected_stills_for_linkedin", "persona_title",
                 "persona_priorities", "persona_pain_points"
             ],
         },
@@ -59,15 +62,15 @@ async def init_prompts_from_files():
             "model": "claude-opus-4-5-20251101",
             "max_tokens": 8000,
             "variables": [
-                "problem_atoms", "insight_atoms", "solution_atoms",
-                "data_atoms", "story_atoms", "persona_title"
+                "problem_stills", "insight_stills", "solution_stills",
+                "data_stills", "story_stills", "quote_stills", "persona_title"
             ],
         },
         "email_draft": {
             "model": "claude-opus-4-5-20251101",
             "max_tokens": 4000,
             "variables": [
-                "selected_atoms", "persona_title", "persona_priorities",
+                "selected_stills", "persona_title", "persona_priorities",
                 "persona_pain_points"
             ],
         },
@@ -76,7 +79,11 @@ async def init_prompts_from_files():
             "max_tokens": 8000,
             "variables": [
                 "persona_title", "persona_language_level",
-                "persona_priorities", "draft_from_step1"
+                "persona_priorities", "draft_from_step1",
+                "brand_voice_summary", "brand_tone_markers",
+                "brand_phrases_to_use", "brand_phrases_to_avoid",
+                "brand_vocabulary_level",
+                "core_narratives", "primary_pain_point", "the_promise",
             ],
         },
         "factcheck": {
@@ -95,6 +102,21 @@ async def init_prompts_from_files():
             "variables": [
                 "old_still_content", "old_still_type",
                 "new_still_candidates", "source_context"
+            ],
+        },
+        "hook_generator": {
+            "model": "gemini-2.5-flash",
+            "max_tokens": 4000,
+            "variables": [
+                "persona_title", "persona_pain_points", "post_content",
+            ],
+        },
+        "email_sequence_draft": {
+            "model": "claude-opus-4-5-20251101",
+            "max_tokens": 8000,
+            "variables": [
+                "persona_title", "persona_pain_points", "persona_priorities",
+                "persona_tone", "all_stills_text",
             ],
         },
     }

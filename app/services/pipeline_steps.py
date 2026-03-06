@@ -376,7 +376,19 @@ async def step_score(ctx: PipelineContext) -> StepResult:
     persona = await get_persona(ctx.target_persona, user_id=ctx.user_id)
     persona_title = persona.get("title", "") if persona else ""
 
-    scored_drafts, score_cost = await batch_score_content(ctx.drafts, persona_title)
+    # Load brand voice for scoring context
+    from app.services.brand_voice_analyzer import get_brand_voice_template_vars
+    brand_vars = await get_brand_voice_template_vars(ctx.user_id)
+
+    scored_drafts, score_cost = await batch_score_content(
+        ctx.drafts,
+        persona_title,
+        brand_voice_summary=brand_vars.get("brand_voice_summary", ""),
+        brand_tone_markers=brand_vars.get("brand_tone_markers", ""),
+        brand_phrases_to_avoid=brand_vars.get("brand_phrases_to_avoid", ""),
+        user_id=ctx.user_id,
+        job_id=ctx.job_id,
+    )
 
     ctx.drafts = scored_drafts
     return StepResult(success=True, cost=score_cost)
