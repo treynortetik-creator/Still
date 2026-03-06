@@ -164,7 +164,7 @@
                             <span id="char-count" class="text-sm text-still-muted">0 characters</span>
                             <span id="char-limit" class="text-sm text-still-muted"></span>
                         </div>
-                        <!-- Character limit progress bar (shown for LinkedIn/Twitter) -->
+                        <!-- Character limit progress bar (shown for LinkedIn) -->
                         <div id="char-progress-container" class="hidden">
                             <div class="w-full bg-still-border rounded-full h-1.5">
                                 <div id="char-progress-bar" class="h-1.5 rounded-full transition-all duration-200" style="width: 0%"></div>
@@ -346,7 +346,6 @@
         // Character limits by content type
         const charLimits = {
             linkedin: 3000,
-            twitter: 280,
         };
 
         // Initialize
@@ -411,8 +410,7 @@
                     linkedin: 'LinkedIn',
                     blog: 'Blog',
                     email: 'Email',
-                    email_sequence: 'Email Sequence',
-                    twitter: 'Twitter'
+                    email_sequence: 'Email Sequence'
                 };
 
                 const lastEdited = output.last_edited
@@ -475,8 +473,7 @@
                     linkedin: 'LinkedIn Post',
                     blog: 'Blog Post',
                     email: 'Email',
-                    email_sequence: 'Email Sequence',
-                    twitter: 'Twitter Thread'
+                    email_sequence: 'Email Sequence'
                 };
                 document.getElementById('editor-type-badge').textContent = typeLabels[currentOutput.content_type] || currentOutput.content_type;
 
@@ -744,8 +741,8 @@
             }
 
             const typeColors = {
-                insight: 'atom-insight',
-                quote: 'atom-quote',
+                insight: 'bg-purple-900/30 text-purple-400',
+                quote: 'bg-blue-900/30 text-blue-400',
                 data: 'bg-green-900/30 text-green-400',
                 story: 'bg-amber-900/30 text-amber-400',
                 problem: 'bg-red-900/30 text-red-400',

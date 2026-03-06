@@ -1223,7 +1223,7 @@
 
         async function loadPersonas() {
             try {
-                const data = await cachedFetch('/api/personas', { ttl: 30000 });
+                const data = await cachedFetch('/api/personas/all', { ttl: 30000 });
                 const filterSelect = document.getElementById('filter-persona');
                 const genSelect = document.getElementById('gen-persona');
 

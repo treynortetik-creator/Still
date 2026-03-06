@@ -111,12 +111,6 @@
                         </label>
                         <input type="text" id="tone-email" class="w-full input-premium" placeholder="Friendly and direct">
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-still-muted mb-1">
-                            <i class="fab fa-twitter text-still-copper mr-1"></i>Twitter/X Tone
-                        </label>
-                        <input type="text" id="tone-twitter" class="w-full input-premium" placeholder="Conversational and punchy">
-                    </div>
                 </div>
             </div>
 
@@ -210,7 +204,6 @@
             tone_linkedin: '',
             tone_blog: '',
             tone_email: '',
-            tone_twitter: '',
             core_principles: [],
             phrases_to_use: [],
             phrases_to_avoid: [],
@@ -241,7 +234,6 @@
             document.getElementById('tone-linkedin').value = config.tone_linkedin || '';
             document.getElementById('tone-blog').value = config.tone_blog || '';
             document.getElementById('tone-email').value = config.tone_email || '';
-            document.getElementById('tone-twitter').value = config.tone_twitter || '';
             document.getElementById('vocabulary-level').value = config.vocabulary_level || 'professional';
 
             renderPrinciples();
@@ -340,7 +332,6 @@
                 tone_linkedin: document.getElementById('tone-linkedin').value,
                 tone_blog: document.getElementById('tone-blog').value,
                 tone_email: document.getElementById('tone-email').value,
-                tone_twitter: document.getElementById('tone-twitter').value,
                 core_principles: config.core_principles || [],
                 phrases_to_use: config.phrases_to_use || [],
                 phrases_to_avoid: config.phrases_to_avoid || [],

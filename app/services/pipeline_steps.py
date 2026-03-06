@@ -110,7 +110,7 @@ async def update_job_status(
     cost_to_add: float = 0.0,
     error_message: str = None,
 ):
-    """Update job status in database and track user costs."""
+    """Update job status in database."""
     async with get_db() as db:
         if error_message:
             await execute(
@@ -118,31 +118,20 @@ async def update_job_status(
                 """
                 UPDATE jobs SET
                     status = ?, current_step = ?, progress = ?,
-                    cost_incurred = cost_incurred + ?, error_message = ?
+                    error_message = ?
                 WHERE id = ?
                 """,
-                (status.value, current_step, progress, cost_to_add, error_message, job_id),
+                (status.value, current_step, progress, error_message, job_id),
             )
         else:
             await execute(
                 db,
                 """
                 UPDATE jobs SET
-                    status = ?, current_step = ?, progress = ?,
-                    cost_incurred = cost_incurred + ?
+                    status = ?, current_step = ?, progress = ?
                 WHERE id = ?
                 """,
-                (status.value, current_step, progress, cost_to_add, job_id),
-            )
-
-        if cost_to_add > 0:
-            await execute(
-                db,
-                """
-                UPDATE users SET total_cost_incurred = total_cost_incurred + ?
-                WHERE id = (SELECT user_id FROM jobs WHERE id = ?)
-                """,
-                (cost_to_add, job_id),
+                (status.value, current_step, progress, job_id),
             )
 
         if not settings.use_postgres:

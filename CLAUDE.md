@@ -3,10 +3,9 @@
 ## Project Overview
 AI-powered content repurposing platform (FastAPI + vanilla JS frontend) deployed on Railway.
 
-## Current Priority: Supabase PostgreSQL Migration
+## Database: PostgreSQL (Supabase) — Only Supported Database
 
-### Migration Status: ALL PHASES COMPLETE
-**Approach:** Hybrid Option A - Migrate 2-5 related features per phase, test, deploy, repeat.
+SQLite support has been removed. `config.use_postgres` always returns True.
 
 ### Connection Details (DO NOT COMMIT ACTUAL CREDENTIALS)
 - Use Transaction Mode: port `6543` (NOT 5432)

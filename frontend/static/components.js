@@ -6,8 +6,9 @@ function renderPremiumNav(activePage = '') {
         { href: '/refresh.html', label: 'Refresh', hasBadge: true },
         { href: '/workshop.html', label: 'Workshop' },
         { href: '/calendar.html', label: 'Calendar' },
-        // { href: '/autopilot.html', label: 'Autopilot' },  // Hidden for MVP - feature ready for future
+        { href: '/autopilot.html', label: 'Autopilot' },
         { href: '/settings.html', label: 'Settings' },
+        { href: '/brand-voice.html', label: 'Brand Voice' },
     ];
 
     const linksHtml = navLinks.map(link => {

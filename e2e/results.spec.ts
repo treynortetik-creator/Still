@@ -32,13 +32,13 @@ test.describe('Results Page', () => {
       expect(hasContent).toBe(true);
     });
 
-    test('should have tabs for outputs and atoms', async ({ page }) => {
+    test('should have tabs for outputs and stills', async ({ page }) => {
       await page.goto('/results.html');
 
-      const tabs = page.locator('[role="tab"], .tab, button:has-text("Generated"), button:has-text("Atoms"), button:has-text("Stills")');
+      const tabs = page.locator('[role="tab"], .tab, button:has-text("Generated"), button:has-text("Stills")');
       const tabCount = await tabs.count();
 
-      // Tabs separate outputs from extracted atoms
+      // Tabs separate outputs from extracted stills
     });
 
     test('should have export options', async ({ page }) => {
@@ -362,28 +362,27 @@ test.describe('Results Page', () => {
     });
   });
 
-  test.describe('Atoms/Stills Tab', () => {
-    test('should switch to atoms tab', async ({ page }) => {
+  test.describe('Stills Tab', () => {
+    test('should switch to stills tab', async ({ page }) => {
       await page.goto('/results.html');
 
-      const atomsTab = page.locator('button:has-text("Atoms"), button:has-text("Stills"), [data-tab="atoms"]');
+      const stillsTab = page.locator('button:has-text("Stills"), [data-tab="stills"]');
 
-      if (await atomsTab.count() > 0) {
-        await atomsTab.first().click();
+      if (await stillsTab.count() > 0) {
+        await stillsTab.first().click();
         await page.waitForTimeout(300);
 
-        // Should show atoms/stills content
+        // Should show stills content
       }
     });
 
-    test('should filter atoms by type', async ({ page }) => {
+    test('should filter stills by type', async ({ page }) => {
       await page.goto('/results.html');
 
-      // Switch to atoms tab
-      const atomsTab = page.locator('button:has-text("Atoms"), button:has-text("Stills")');
+      const stillsTab = page.locator('button:has-text("Stills"), [data-tab="stills"]');
 
-      if (await atomsTab.count() > 0) {
-        await atomsTab.first().click();
+      if (await stillsTab.count() > 0) {
+        await stillsTab.first().click();
         await page.waitForTimeout(300);
 
         // Filter by type
@@ -396,17 +395,17 @@ test.describe('Results Page', () => {
       }
     });
 
-    test('should show relevance scores on atoms', async ({ page }) => {
+    test('should show relevance scores on stills', async ({ page }) => {
       await page.goto('/results.html');
 
-      const atomsTab = page.locator('button:has-text("Atoms"), button:has-text("Stills")');
+      const stillsTab = page.locator('button:has-text("Stills"), [data-tab="stills"]');
 
-      if (await atomsTab.count() > 0) {
-        await atomsTab.first().click();
+      if (await stillsTab.count() > 0) {
+        await stillsTab.first().click();
         await page.waitForTimeout(300);
 
         const relevance = page.locator('.relevance, .dots, .score');
-        // Relevance helps prioritize atoms
+        // Relevance helps prioritize stills
       }
     });
   });

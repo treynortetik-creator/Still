@@ -487,8 +487,12 @@ async def approve_job_source(
     # Approve the source
     await approve_source_of_truth(job["source_id"])
 
-    # Resume pipeline in background
-    asyncio.create_task(resume_pipeline_from_distillation(job_id))
+    # Resume pipeline in background with proper error handling
+    from app.utils.background_tasks import create_background_task
+    create_background_task(
+        resume_pipeline_from_distillation(job_id),
+        name=f"resume_pipeline_{job_id}"
+    )
 
     return {
         "status": "approved",

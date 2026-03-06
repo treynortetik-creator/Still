@@ -216,8 +216,7 @@ class TestUserJourney:
                 print(f"  {content_type}: Quality score {overall}/100")
                 assert 0 <= overall <= 100, f"Invalid quality score: {overall}"
 
-        # Verify stills (support both keys for backwards compatibility)
-        stills = data.get("stills", data.get("atoms", []))
+        stills = data.get("stills", [])
         assert len(stills) > 0, "No stills extracted"
         print(f"Extracted {len(stills)} stills")
 
@@ -245,7 +244,7 @@ class TestUserJourney:
         # Check still types
         still_types = set()
         for entry in entries:
-            stills = entry.get("stills", entry.get("atoms", []))
+            stills = entry.get("stills", [])
             for still in stills:
                 still_types.add(still.get("type", "unknown"))
 

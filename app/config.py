@@ -119,8 +119,8 @@ class Settings(BaseSettings):
 
     @property
     def use_postgres(self) -> bool:
-        """Check if PostgreSQL is configured (vs SQLite fallback)."""
-        return bool(self.database_url and self.database_url.startswith("postgresql"))
+        """PostgreSQL is the only supported database."""
+        return True
 
     class Config:
         env_file = ".env"

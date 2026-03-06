@@ -145,21 +145,21 @@ const Auth = {
             // Escape email to prevent XSS
             const safeEmail = this.escapeHtml(user.email || '');
             navbarUserSection.innerHTML = `
-                <a href="/admin/dashboard" class="text-gray-600 hover:text-gray-900 text-sm">
+                <a href="/admin/dashboard" class="text-still-muted hover:text-still-text text-sm">
                     <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
                     </svg>
                     <span class="ml-1">Admin</span>
                 </a>
-                <span class="text-gray-600 text-sm ml-4">${safeEmail}</span>
-                <button onclick="Auth.logout()" class="text-gray-600 hover:text-gray-900 text-sm ml-4">
+                <span class="text-still-muted text-sm ml-4">${safeEmail}</span>
+                <button onclick="Auth.logout()" class="text-still-muted hover:text-still-text text-sm ml-4">
                     Logout
                 </button>
             `;
         } else if (navbarUserSection) {
             navbarUserSection.innerHTML = `
-                <a href="/login.html" class="text-gray-600 hover:text-gray-900">Login</a>
-                <a href="/register.html" class="ml-4 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
+                <a href="/login.html" class="text-still-muted hover:text-still-text">Login</a>
+                <a href="/register.html" class="ml-4 bg-still-copper text-white px-4 py-2 rounded-lg hover:bg-still-copper/80">
                     Get Started
                 </a>
             `;

@@ -98,7 +98,7 @@ def _determine_step_context(current_step: str) -> str:
 
 
 async def _handle_pipeline_error(
-    e: Exception, job_id: str, user_id: int, total_cost: float
+    e: Exception, job_id: str, user_id: int, total_cost: float = 0.0
 ):
     """Common error handling for pipeline failures."""
     error_type = type(e).__name__
@@ -472,29 +472,7 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
                 await db.commit()
 
     except Exception as e:
-        error_type = type(e).__name__
-        error_message = str(e)
-        stack_trace = traceback.format_exc()
-        error_detail = f"{error_type}: {error_message}\n{stack_trace}"
-        logger.error(f"[RESERVE] Job {job_id} failed: {error_detail}")
-
-        try:
-            await log_error_to_db(
-                job_id,
-                user_id,
-                f"RESERVE_{error_type}",
-                error_message,
-                stack_trace
-            )
-        except Exception as log_err:
-            logger.error(f"[RESERVE] Failed to log error to DB: {log_err}")
-
-        user_error = format_pipeline_error(e, "generation", job_id)
-
-        await update_job_status(
-            job_id, JobStatus.FAILED,
-            "Failed", 0, total_cost, user_error
-        )
+        await _handle_pipeline_error(e, job_id, user_id)
 
 
 async def resume_pipeline_from_distillation(job_id: str):
@@ -556,28 +534,4 @@ async def resume_pipeline_from_distillation(job_id: str):
         await run_pipeline_steps(ctx)
 
     except Exception as e:
-        error_type = type(e).__name__
-        error_message = str(e)
-        stack_trace = traceback.format_exc()
-        error_detail = f"{error_type}: {error_message}\n{stack_trace}"
-        logger.error(f"Job {job_id} failed during resume: {error_detail}")
-
-        job_data_check = await get_job_data(job_id)
-        step_context = "unknown"
-        if job_data_check:
-            step_context = _determine_step_context(job_data_check.get("current_step", ""))
-
-        await log_error_to_db(
-            job_id,
-            user_id if user_id else 0,
-            f"{step_context.upper()}_{error_type}",
-            error_message,
-            stack_trace
-        )
-
-        user_error = format_pipeline_error(e, step_context, job_id)
-
-        await update_job_status(
-            job_id, JobStatus.FAILED,
-            "Failed", 0, total_cost, user_error
-        )
+        await _handle_pipeline_error(e, job_id, user_id if user_id else 0)

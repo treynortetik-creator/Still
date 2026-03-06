@@ -67,7 +67,7 @@ def get_model_for_step(step: str) -> str:
     if _is_cache_stale():
         try:
             import asyncio
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             if loop.is_running():
                 # Schedule refresh as a task if we're in an async context
                 asyncio.create_task(refresh_settings_cache())
@@ -96,7 +96,7 @@ def is_openrouter_enabled() -> bool:
     if _is_cache_stale():
         try:
             import asyncio
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             if loop.is_running():
                 asyncio.create_task(refresh_settings_cache())
         except RuntimeError:
@@ -112,7 +112,7 @@ def get_settings() -> Dict[str, Any]:
     if _is_cache_stale():
         try:
             import asyncio
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             if loop.is_running():
                 asyncio.create_task(refresh_settings_cache())
         except RuntimeError:

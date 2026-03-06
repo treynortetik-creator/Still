@@ -59,20 +59,20 @@
 
         <!-- Tabs -->
         <div class="mb-6 border-b border-still-border">
-            <div class="flex space-x-8">
-                <button class="tab-btn px-1 pb-4 border-b-2 border-still-copper text-still-copper font-medium" data-tab="voice-test">
+            <div class="flex space-x-8" role="tablist">
+                <button class="tab-btn px-1 pb-4 border-b-2 border-still-copper text-still-copper font-medium" data-tab="voice-test" role="tab" aria-selected="true">
                     Brand Voice Testing
                 </button>
-                <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-still-muted hover:text-still-text" data-tab="memory">
+                <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-still-muted hover:text-still-text" data-tab="memory" role="tab" aria-selected="false">
                     Memory Rules
                 </button>
-                <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-still-muted hover:text-still-text" data-tab="brand-voice">
+                <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-still-muted hover:text-still-text" data-tab="brand-voice" role="tab" aria-selected="false">
                     Brand Information
                 </button>
-                <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-still-muted hover:text-still-text" data-tab="personas">
+                <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-still-muted hover:text-still-text" data-tab="personas" role="tab" aria-selected="false">
                     Personas
                 </button>
-                <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-still-muted hover:text-still-text" data-tab="webhooks">
+                <button class="tab-btn px-1 pb-4 border-b-2 border-transparent text-still-muted hover:text-still-text" data-tab="webhooks" role="tab" aria-selected="false">
                     Webhooks
                 </button>
             </div>
@@ -663,9 +663,11 @@
                 document.querySelectorAll('.tab-btn').forEach(b => {
                     b.classList.remove('border-still-copper', 'text-still-copper');
                     b.classList.add('border-transparent', 'text-still-muted');
+                    b.setAttribute('aria-selected', 'false');
                 });
                 btn.classList.remove('border-transparent', 'text-still-muted');
                 btn.classList.add('border-still-copper', 'text-still-copper');
+                btn.setAttribute('aria-selected', 'true');
 
                 document.getElementById('voice-test-tab').classList.toggle('hidden', tab !== 'voice-test');
                 document.getElementById('memory-tab').classList.toggle('hidden', tab !== 'memory');

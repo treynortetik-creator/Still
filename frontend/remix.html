@@ -235,10 +235,10 @@
                 const response = await Auth.fetchWithAuth('/api/remix/stats');
                 const data = await response.json();
 
-                document.getElementById('total-atoms').textContent = data.total_atoms || 0;
+                document.getElementById('total-stills').textContent = data.total_stills || 0;
 
                 // By type
-                const byTypeDiv = document.getElementById('atoms-by-type');
+                const byTypeDiv = document.getElementById('stills-by-type');
                 const types = data.by_type || {};
                 if (Object.keys(types).length > 0) {
                     byTypeDiv.innerHTML = Object.entries(types)
@@ -259,7 +259,7 @@
                     tagsDiv.innerHTML = '<span class="text-still-disabled text-sm">No tags yet</span>';
                 }
 
-                if ((data.total_stills || data.total_atoms || 0) < 5) {
+                if ((data.total_stills || 0) < 5) {
                     document.getElementById('empty-state').classList.remove('hidden');
                 }
 
@@ -308,7 +308,7 @@
                 document.getElementById('roundup-list').innerHTML = roundups.map(r => `
                     <div class="bg-still-card rounded-lg shadow-sm p-4 border-l-4 border-still-green border border-still-border">
                         <h4 class="font-medium text-still-text mb-2">${escapeHtml(r.post_title || r.theme)}</h4>
-                        <p class="text-sm text-still-muted mb-3">Uses ${r.still_ids?.length || r.atom_ids?.length || 0} stills about "${escapeHtml(r.theme)}"</p>
+                        <p class="text-sm text-still-muted mb-3">Uses ${r.still_ids?.length || 0} stills about "${escapeHtml(r.theme)}"</p>
                         <span class="text-xs bg-still-green/20 text-still-green px-2 py-1 rounded">${r.format || 'linkedin'}</span>
                     </div>
                 `).join('');
@@ -322,7 +322,7 @@
                     <div class="bg-still-card rounded-lg shadow-sm p-4 border-l-4 border border-still-border" style="border-left-color: var(--platform-linkedin-border);">
                         <h4 class="font-medium text-still-text mb-2">${escapeHtml(c.post_idea || c.theme)}</h4>
                         <p class="text-sm text-still-muted mb-2">${escapeHtml(c.why_it_works || '')}</p>
-                        <p class="text-xs text-still-disabled">Combines ${c.still_ids?.length || c.atom_ids?.length || 0} stills</p>
+                        <p class="text-xs text-still-disabled">Combines ${c.still_ids?.length || 0} stills</p>
                     </div>
                 `).join('');
             }
@@ -384,7 +384,7 @@
                         <div class="space-y-2">
                             ${data.results.map(s => `
                                 <div class="p-3 bg-still-bg rounded border border-still-border">
-                                    <span class="text-xs bg-still-border text-still-muted px-2 py-0.5 rounded">${s.still_type || s.atom_type}</span>
+                                    <span class="text-xs bg-still-border text-still-muted px-2 py-0.5 rounded">${s.still_type}</span>
                                     <p class="text-sm text-still-muted mt-1">${escapeHtml(s.content.substring(0, 150))}...</p>
                                 </div>
                             `).join('')}
