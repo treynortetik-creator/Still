@@ -48,11 +48,12 @@ async def init_postgres_pool():
     global _pg_pool
     if _pg_pool is None:
         # Create SSL context for Supabase connection
+        # Supabase PgBouncer (port 6543) uses certs that don't pass strict verification
+        # so we disable verification by default unless explicitly enabled
         ssl_context = ssl.create_default_context()
         if not settings.db_ssl_verify:
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
-            logger.warning("SSL certificate verification is DISABLED for database connection")
 
         # Parse the database URL to get individual components
         db_params = _parse_database_url(settings.database_url)

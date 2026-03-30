@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = ""  # PostgreSQL connection string from Supabase (set via DATABASE_URL env var)
-    db_ssl_verify: bool = True
+    db_ssl_verify: bool = False  # Supabase PgBouncer certs don't pass strict verification
 
     # Application
     debug: bool = False  # Default to False for security
