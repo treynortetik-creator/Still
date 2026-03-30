@@ -3,7 +3,8 @@ import hashlib
 from datetime import datetime, timedelta
 from typing import Optional
 from passlib.context import CryptContext
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError
 
 from app.config import get_settings
 from app.database import get_db
@@ -55,7 +56,7 @@ def decode_access_token(token: str) -> Optional[dict]:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
-    except JWTError:
+    except PyJWTError:
         return None
 
 
@@ -68,7 +69,7 @@ async def decode_access_token_async(token: str) -> Optional[dict]:
 
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
-    except JWTError:
+    except PyJWTError:
         return None
 
 
@@ -80,7 +81,7 @@ async def blacklist_token(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_exp": False})
         expires_at = datetime.utcfromtimestamp(payload.get("exp", 0))
-    except JWTError:
+    except PyJWTError:
         # If we can't decode, set expiration to 7 days from now
         expires_at = datetime.utcnow() + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
 
