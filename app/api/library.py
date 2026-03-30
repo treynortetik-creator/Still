@@ -1,6 +1,7 @@
 """The Reserve (content library) API endpoints."""
 import json
 import uuid
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends
 from pydantic import BaseModel
 from typing import Optional
@@ -175,6 +176,11 @@ async def get_library(
             try:
                 cursor_id, cursor_value = cursor.split(":", 1)
                 cursor_id = int(cursor_id)
+                # Parse datetime strings back into datetime objects for asyncpg
+                if cursor_column in ("date_added", "expiration_date", "last_used", "source_timestamp"):
+                    cursor_value = datetime.fromisoformat(cursor_value)
+                elif cursor_column == "times_used":
+                    cursor_value = int(cursor_value)
                 # For cursor pagination, we need to filter rows after the cursor position
                 if cursor_direction == "DESC":
                     query += f" AND (cl.{cursor_column} < ? OR (cl.{cursor_column} = ? AND cl.id < ?))"
