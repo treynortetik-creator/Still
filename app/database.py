@@ -78,6 +78,9 @@ async def init_postgres_pool():
             logger.warning(f"Could not resolve {host}: {e}")
             ipv4_addr = host  # Fall back to hostname
 
+        # Skip SSL for localhost (e.g. CI) — Supabase/Railway need it, local Postgres doesn't
+        use_ssl = host not in ("localhost", "127.0.0.1")
+
         try:
             _pg_pool = await asyncpg.create_pool(
                 host=ipv4_addr,
@@ -88,7 +91,7 @@ async def init_postgres_pool():
                 min_size=2,  # Reduced for Railway/Supabase free tier limits
                 max_size=10,  # Supabase free tier has connection limits
                 statement_cache_size=0,  # Required for Supabase/PgBouncer
-                ssl=ssl_context,  # Required for Supabase
+                ssl=ssl_context if use_ssl else False,
                 command_timeout=60,  # 60 second timeout for commands
                 timeout=30,  # 30 second connection timeout
             )
