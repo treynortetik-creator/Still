@@ -6,13 +6,10 @@ from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends
 from pydantic import BaseModel
 from typing import Optional
 
-from app.config import get_settings
 from app.database import get_db
-from app.db_utils import execute, fetchone, fetchall, fetchval, execute_insert_returning_id
+from app.db_utils import execute, fetchone, fetchall, fetchval, execute_insert_returning_id, safe_json
 from app.models.job import JobResponse, JobStatus
 from app.api.auth import get_current_user_id
-
-settings = get_settings()
 router = APIRouter()
 
 
@@ -136,16 +133,10 @@ async def get_library(
         # Server-side persona relevance filtering using JSON extraction
         # This moves the persona filtering from client-side to server-side
         if persona and min_relevance > 0:
-            if settings.use_postgres:
-                # PostgreSQL JSONB extraction: persona_relevance->>'persona_key'
-                query += f" AND (cl.persona_relevance::jsonb->>?) IS NOT NULL"
-                query += f" AND CAST(cl.persona_relevance::jsonb->>? AS INTEGER) >= ?"
-                params.extend([persona, persona, min_relevance])
-            else:
-                # SQLite JSON extraction: json_extract(persona_relevance, '$.persona_key')
-                query += f" AND json_extract(cl.persona_relevance, '$.' || ?) IS NOT NULL"
-                query += f" AND CAST(json_extract(cl.persona_relevance, '$.' || ?) AS INTEGER) >= ?"
-                params.extend([persona, persona, min_relevance])
+            # PostgreSQL JSONB extraction: persona_relevance->>'persona_key'
+            query += f" AND (cl.persona_relevance::jsonb->>?) IS NOT NULL"
+            query += f" AND CAST(cl.persona_relevance::jsonb->>? AS INTEGER) >= ?"
+            params.extend([persona, persona, min_relevance])
 
         # Handle sort_by with special filters for some options
         if sort_by == "never_used":
@@ -208,19 +199,10 @@ async def get_library(
         entries = []
         next_cursor = None
         for row in rows:
-            persona_relevance = json.loads(row["persona_relevance"]) if row["persona_relevance"] else {}
+            persona_relevance = safe_json(row["persona_relevance"], {})
 
             # Handle best_formats - it's a TEXT[] in PostgreSQL, may need conversion
-            best_formats = row.get("best_formats")
-            if best_formats is None:
-                best_formats = []
-            elif isinstance(best_formats, str):
-                # SQLite returns JSON string
-                try:
-                    best_formats = json.loads(best_formats)
-                except (json.JSONDecodeError, TypeError):
-                    best_formats = []
-            # PostgreSQL returns list directly, so no conversion needed
+            best_formats = row.get("best_formats") or []
 
             entry = {
                 "id": row["id"],
@@ -230,13 +212,13 @@ async def get_library(
                 "source_timestamp": row["source_timestamp"],
                 "speaker": row["speaker"],
                 "date_added": row["date_added"],
-                "tags": json.loads(row["tags"]) if row["tags"] else [],
+                "tags": safe_json(row["tags"], []),
                 "persona_relevance": persona_relevance,
                 "times_used": row["times_used"] or 0,
                 "last_used": row["last_used"],
                 "user_notes": row["user_notes"],
                 "campaign_name": row["campaign_name"],
-                "topics": json.loads(row["topics"]) if row["topics"] else [],
+                "topics": safe_json(row["topics"], []),
                 "source_file": row.get("source_file"),
                 "job_id": row.get("job_id"),
                 # SOT (Source of Truth) fields
@@ -293,14 +275,9 @@ async def get_library(
 
         # Include persona relevance filter in count
         if persona and min_relevance > 0:
-            if settings.use_postgres:
-                count_query += " AND (persona_relevance::jsonb->>?) IS NOT NULL"
-                count_query += " AND CAST(persona_relevance::jsonb->>? AS INTEGER) >= ?"
-                count_params.extend([persona, persona, min_relevance])
-            else:
-                count_query += " AND json_extract(persona_relevance, '$.' || ?) IS NOT NULL"
-                count_query += " AND CAST(json_extract(persona_relevance, '$.' || ?) AS INTEGER) >= ?"
-                count_params.extend([persona, persona, min_relevance])
+            count_query += " AND (persona_relevance::jsonb->>?) IS NOT NULL"
+            count_query += " AND CAST(persona_relevance::jsonb->>? AS INTEGER) >= ?"
+            count_params.extend([persona, persona, min_relevance])
 
         # Include sort_by filters that affect result set
         if sort_by == "never_used":
@@ -403,7 +380,7 @@ async def get_library_filters(user_id: int = Depends(get_current_user_id)):
         all_topics = set()
         for row in topic_rows:
             if row["topics"]:
-                topics_list = json.loads(row["topics"])
+                topics_list = safe_json(row["topics"], [])
                 all_topics.update(topics_list)
 
         return {
@@ -484,7 +461,7 @@ async def generate_from_library(
                 "id": still["id"],
                 "type": still["entry_type"],
                 "content": still["content"],
-                "persona_relevance": json.loads(still["persona_relevance"]) if still["persona_relevance"] else {},
+                "persona_relevance": safe_json(still["persona_relevance"], {}),
             })
 
         await execute(
@@ -511,28 +488,13 @@ async def generate_from_library(
                 json.dumps(still_content),  # Store still content as transcript
             )
         )
-        if not settings.use_postgres:
-            await db.commit()
 
         # Update usage stats for the stills
         for still_id in ids_to_use:
-            if settings.use_postgres:
-                await db.execute(
-                    "UPDATE content_library SET times_used = times_used + 1, last_used = NOW() WHERE id = $1",
-                    still_id
-                )
-            else:
-                await execute(
-                    db,
-                    """
-                    UPDATE content_library
-                    SET times_used = times_used + 1, last_used = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                    """,
-                    (still_id,)
-                )
-        if not settings.use_postgres:
-            await db.commit()
+            await db.execute(
+                "UPDATE content_library SET times_used = times_used + 1, last_used = NOW() WHERE id = $1",
+                still_id
+            )
 
     # Start background processing (skip transcription and distillation)
     from app.services.pipeline import process_job_from_library
@@ -560,8 +522,6 @@ async def delete_library_entry(entry_id: int, user_id: int = Depends(get_current
             raise HTTPException(status_code=404, detail="Entry not found")
 
         await execute(db, "DELETE FROM content_library WHERE id = ?", (entry_id,))
-        if not settings.use_postgres:
-            await db.commit()
 
     return {"message": "Entry deleted successfully"}
 
@@ -610,8 +570,6 @@ async def batch_delete_library_entries(
             f"DELETE FROM content_library WHERE id IN ({placeholders}) AND user_id = ?",
             (*request.ids, user_id)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
     return {"message": f"Successfully deleted {len(request.ids)} entries", "deleted_count": len(request.ids)}
 
@@ -635,8 +593,6 @@ async def update_library_notes(entry_id: int, notes: str, user_id: int = Depends
             "UPDATE content_library SET user_notes = ? WHERE id = ?",
             (notes, entry_id)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
     return {"message": "Notes updated successfully"}
 
@@ -693,8 +649,6 @@ async def create_library_entry(
             )
         )
 
-        if not settings.use_postgres:
-            await db.commit()
 
     return {
         "message": "Still added successfully",
@@ -806,8 +760,6 @@ async def patch_library_entry(
         query = f"UPDATE content_library SET {', '.join(updates)} WHERE id = ?"
 
         await execute(db, query, tuple(params))
-        if not settings.use_postgres:
-            await db.commit()
 
     return {"message": "Still updated successfully", "id": entry_id}
 
@@ -871,7 +823,5 @@ async def update_library_entry(
                 entry_id,
             )
         )
-        if not settings.use_postgres:
-            await db.commit()
 
     return {"message": "Still updated successfully", "id": entry_id}

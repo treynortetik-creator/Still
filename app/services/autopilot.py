@@ -7,13 +7,11 @@ import httpx
 from datetime import datetime, timedelta
 from typing import Optional
 
-from app.config import get_settings
 from app.database import get_db
-from app.db_utils import execute, fetchone, fetchall
+from app.db_utils import execute, fetchone, fetchall, safe_json
 from app.utils.background_tasks import create_background_task
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 from app.models.job import JobStatus
 
 # Frequency mappings in minutes
@@ -117,8 +115,8 @@ async def check_source(source_id: int) -> dict:
         # Get source config
         source = await fetchone(
             db,
-            "SELECT * FROM autopilot_sources WHERE id = ? AND is_active = TRUE",
-            (source_id,)
+            "SELECT * FROM autopilot_sources WHERE id = ? AND is_active = ?",
+            (source_id, True)
         )
 
         if not source:
@@ -144,8 +142,6 @@ async def check_source(source_id: int) -> dict:
                 """,
                 (result['error'], source_id)
             )
-            if not settings.use_postgres:
-                await db.commit()
             return {'source_id': source_id, 'new_items': 0, 'error': result['error']}
 
         # Process new items
@@ -196,8 +192,6 @@ async def check_source(source_id: int) -> dict:
             """,
             (next_check, new_items, source_id)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
         return {'source_id': source_id, 'new_items': new_items}
 
@@ -275,7 +269,7 @@ async def create_job_from_feed_item(item_id: int) -> Optional[str]:
             return None
 
         job_id = str(uuid.uuid4())
-        asset_types = json.loads(item['asset_types']) if item['asset_types'] else ['linkedin']
+        asset_types = safe_json(item['asset_types'], ['linkedin'])
 
         # Default quantities
         asset_quantities = {}
@@ -293,8 +287,6 @@ async def create_job_from_feed_item(item_id: int) -> Optional[str]:
                 "UPDATE autopilot_items SET processing_status = 'failed' WHERE id = ?",
                 (item_id,)
             )
-            if not settings.use_postgres:
-                await db.commit()
             logger.warning(f"Autopilot: Failed to fetch content for item {item_id} ({item['item_url']}): {article_content}")
             return None
 
@@ -332,8 +324,6 @@ async def create_job_from_feed_item(item_id: int) -> Optional[str]:
             (job_id, item_id)
         )
 
-        if not settings.use_postgres:
-            await db.commit()
 
     return job_id
 
@@ -353,11 +343,11 @@ async def process_pending_items(limit: int = 5) -> int:
             FROM autopilot_items ai
             JOIN autopilot_sources s ON ai.source_id = s.id
             WHERE ai.processing_status = 'pending'
-            AND s.is_active = TRUE
+            AND s.is_active = ?
             ORDER BY ai.created_at ASC
             LIMIT ?
             """,
-            (limit,)
+            (True, limit)
         )
 
     jobs_created = 0
@@ -381,8 +371,6 @@ async def process_pending_items(limit: int = 5) -> int:
                     "UPDATE autopilot_items SET processing_status = 'failed' WHERE id = ?",
                     (item['id'],)
                 )
-                if not settings.use_postgres:
-                    await db.commit()
 
     return jobs_created
 
@@ -399,11 +387,11 @@ async def check_due_sources() -> int:
             db,
             """
             SELECT id, source_name FROM autopilot_sources
-            WHERE is_active = TRUE
+            WHERE is_active = ?
             AND (next_check IS NULL OR next_check <= CURRENT_TIMESTAMP)
             LIMIT 5
             """,
-            ()
+            (True,)
         )
 
     checked = 0

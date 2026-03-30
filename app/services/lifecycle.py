@@ -3,10 +3,8 @@ import logging
 from datetime import date, timedelta
 
 from app.database import get_db
-from app.config import get_settings
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 async def check_expiring_stills(days_threshold: int = 30) -> int:
@@ -23,28 +21,15 @@ async def check_expiring_stills(days_threshold: int = 30) -> int:
 
     try:
         async with get_db() as db:
-            if settings.use_postgres:
-                # PostgreSQL: use RETURNING to get count
-                cursor = await db.fetch("""
-                    UPDATE stills
-                    SET status = 'needs_review'
-                    WHERE status = 'active'
-                      AND expiration_date IS NOT NULL
-                      AND expiration_date <= $1
-                    RETURNING id
-                """, threshold_date)
-                return len(cursor)
-            else:
-                # SQLite: run UPDATE then count affected rows
-                cursor = await db.execute("""
-                    UPDATE stills
-                    SET status = 'needs_review'
-                    WHERE status = 'active'
-                      AND expiration_date IS NOT NULL
-                      AND expiration_date <= ?
-                """, (threshold_date.isoformat(),))
-                await db.commit()
-                return cursor.rowcount
+            cursor = await db.fetch("""
+                UPDATE stills
+                SET status = 'needs_review'
+                WHERE status = 'active'
+                  AND expiration_date IS NOT NULL
+                  AND expiration_date <= $1
+                RETURNING id
+            """, threshold_date)
+            return len(cursor)
     except Exception as e:
         logger.error(f"Failed to check expiring stills: {e}")
         raise
@@ -62,31 +47,16 @@ async def get_lifecycle_summary(user_id: int) -> dict:
     """
     try:
         async with get_db() as db:
-            if settings.use_postgres:
-                # PostgreSQL: use FILTER syntax
-                row = await db.fetchrow("""
-                    SELECT
-                        COUNT(*) FILTER (WHERE status = 'active' OR status IS NULL) as active,
-                        COUNT(*) FILTER (WHERE status = 'evergreen') as evergreen,
-                        COUNT(*) FILTER (WHERE status = 'needs_review') as needs_review,
-                        COUNT(*) FILTER (WHERE status = 'retired') as retired,
-                        COUNT(*) FILTER (WHERE expiration_date <= CURRENT_DATE + INTERVAL '7 days') as expiring_soon
-                    FROM stills
-                    WHERE user_id = $1
-                """, user_id)
-            else:
-                # SQLite: use SUM(CASE WHEN ...) syntax
-                cursor = await db.execute("""
-                    SELECT
-                        SUM(CASE WHEN status = 'active' OR status IS NULL THEN 1 ELSE 0 END) as active,
-                        SUM(CASE WHEN status = 'evergreen' THEN 1 ELSE 0 END) as evergreen,
-                        SUM(CASE WHEN status = 'needs_review' THEN 1 ELSE 0 END) as needs_review,
-                        SUM(CASE WHEN status = 'retired' THEN 1 ELSE 0 END) as retired,
-                        SUM(CASE WHEN expiration_date <= date('now', '+7 days') THEN 1 ELSE 0 END) as expiring_soon
-                    FROM stills
-                    WHERE user_id = ?
-                """, (user_id,))
-                row = await cursor.fetchone()
+            row = await db.fetchrow("""
+                SELECT
+                    COUNT(*) FILTER (WHERE status = 'active' OR status IS NULL) as active,
+                    COUNT(*) FILTER (WHERE status = 'evergreen') as evergreen,
+                    COUNT(*) FILTER (WHERE status = 'needs_review') as needs_review,
+                    COUNT(*) FILTER (WHERE status = 'retired') as retired,
+                    COUNT(*) FILTER (WHERE expiration_date <= CURRENT_DATE + INTERVAL '7 days') as expiring_soon
+                FROM stills
+                WHERE user_id = $1
+            """, user_id)
 
             if row is None:
                 return {
@@ -129,18 +99,11 @@ async def update_still_status(still_id: str, new_status: str) -> bool:
 
     try:
         async with get_db() as db:
-            if settings.use_postgres:
-                result = await db.execute("""
-                    UPDATE stills SET status = $1 WHERE id = $2
-                """, new_status, still_id)
-                # PostgreSQL returns a string like "UPDATE 1"
-                return result.split()[-1] != '0'
-            else:
-                cursor = await db.execute("""
-                    UPDATE stills SET status = ? WHERE id = ?
-                """, (new_status, still_id))
-                await db.commit()
-                return cursor.rowcount > 0
+            result = await db.execute("""
+                UPDATE stills SET status = $1 WHERE id = $2
+            """, new_status, still_id)
+            # PostgreSQL returns a string like "UPDATE 1"
+            return result.split()[-1] != '0'
     except Exception as e:
         logger.error(f"Failed to update still {still_id} status to {new_status}: {e}")
         raise

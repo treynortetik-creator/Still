@@ -131,28 +131,17 @@ def get_settings() -> Dict[str, Any]:
 
 async def refresh_settings_cache():
     """Refresh the in-memory cache from database."""
-    from app.config import get_settings as get_app_settings
     from app.database import get_db
-    from app.db_utils import fetchall, fetchone
-
-    app_settings = get_app_settings()
+    from app.db_utils import fetchall
 
     try:
         async with get_db() as db:
             # Load global settings
-            if app_settings.use_postgres:
-                row = await db.fetchrow(
-                    "SELECT setting_value FROM global_settings WHERE setting_key = $1",
-                    "use_openrouter"
-                )
-                use_openrouter = row["setting_value"].lower() == "true" if row else True
-            else:
-                row = await fetchone(
-                    db,
-                    "SELECT setting_value FROM global_settings WHERE setting_key = ?",
-                    ("use_openrouter",)
-                )
-                use_openrouter = row["setting_value"].lower() == "true" if row else True
+            row = await db.fetchrow(
+                "SELECT setting_value FROM global_settings WHERE setting_key = $1",
+                "use_openrouter"
+            )
+            use_openrouter = row["setting_value"].lower() == "true" if row else True
 
             # Load model configurations
             rows = await fetchall(
@@ -192,86 +181,43 @@ async def get_global_setting(key: str, default: Optional[str] = None) -> Optiona
     Returns:
         The setting value if found, otherwise the default value
     """
-    from app.config import get_settings as get_app_settings
     from app.database import get_db
-    from app.db_utils import fetchone
-
-    app_settings = get_app_settings()
 
     async with get_db() as db:
-        if app_settings.use_postgres:
-            row = await db.fetchrow(
-                "SELECT setting_value FROM global_settings WHERE setting_key = $1",
-                key
-            )
-        else:
-            row = await fetchone(
-                db,
-                "SELECT setting_value FROM global_settings WHERE setting_key = ?",
-                (key,)
-            )
+        row = await db.fetchrow(
+            "SELECT setting_value FROM global_settings WHERE setting_key = $1",
+            key
+        )
 
         return row["setting_value"] if row else default
 
 
 async def set_global_setting(key: str, value: str, setting_type: str = "string", description: str = None):
     """Set a global setting value in database."""
-    from app.config import get_settings as get_app_settings
     from app.database import get_db
-    from app.db_utils import execute, fetchone
-
-    app_settings = get_app_settings()
 
     async with get_db() as db:
-        # Check if exists
-        if app_settings.use_postgres:
-            exists = await db.fetchrow(
-                "SELECT id FROM global_settings WHERE setting_key = $1",
-                key
+        exists = await db.fetchrow(
+            "SELECT id FROM global_settings WHERE setting_key = $1",
+            key
+        )
+        if exists:
+            await db.execute(
+                """
+                UPDATE global_settings
+                SET setting_value = $1, updated_at = NOW()
+                WHERE setting_key = $2
+                """,
+                value, key
             )
-            if exists:
-                await db.execute(
-                    """
-                    UPDATE global_settings
-                    SET setting_value = $1, updated_at = NOW()
-                    WHERE setting_key = $2
-                    """,
-                    value, key
-                )
-            else:
-                await db.execute(
-                    """
-                    INSERT INTO global_settings (setting_key, setting_value, setting_type, description)
-                    VALUES ($1, $2, $3, $4)
-                    """,
-                    key, value, setting_type, description
-                )
         else:
-            exists = await fetchone(
-                db,
-                "SELECT id FROM global_settings WHERE setting_key = ?",
-                (key,)
+            await db.execute(
+                """
+                INSERT INTO global_settings (setting_key, setting_value, setting_type, description)
+                VALUES ($1, $2, $3, $4)
+                """,
+                key, value, setting_type, description
             )
-            if exists:
-                await execute(
-                    db,
-                    """
-                    UPDATE global_settings
-                    SET setting_value = ?, updated_at = CURRENT_TIMESTAMP
-                    WHERE setting_key = ?
-                    """,
-                    (value, key)
-                )
-            else:
-                await execute(
-                    db,
-                    """
-                    INSERT INTO global_settings (setting_key, setting_value, setting_type, description)
-                    VALUES (?, ?, ?, ?)
-                    """,
-                    (key, value, setting_type, description)
-                )
-            await db.commit()
 
     # Refresh cache
     await refresh_settings_cache()
@@ -289,32 +235,17 @@ async def set_openrouter_enabled(enabled: bool):
 
 async def get_model_config_async(service_name: str) -> Optional[Dict[str, Any]]:
     """Get model configuration for a service from database."""
-    from app.config import get_settings as get_app_settings
     from app.database import get_db
-    from app.db_utils import fetchone
-
-    app_settings = get_app_settings()
 
     async with get_db() as db:
-        if app_settings.use_postgres:
-            row = await db.fetchrow(
-                """
-                SELECT service_name, model_id, display_name, is_active,
-                       cost_per_1k_input, cost_per_1k_output, max_tokens
-                FROM ai_model_config WHERE service_name = $1
-                """,
-                service_name
-            )
-        else:
-            row = await fetchone(
-                db,
-                """
-                SELECT service_name, model_id, display_name, is_active,
-                       cost_per_1k_input, cost_per_1k_output, max_tokens
-                FROM ai_model_config WHERE service_name = ?
-                """,
-                (service_name,)
-            )
+        row = await db.fetchrow(
+            """
+            SELECT service_name, model_id, display_name, is_active,
+                   cost_per_1k_input, cost_per_1k_output, max_tokens
+            FROM ai_model_config WHERE service_name = $1
+            """,
+            service_name
+        )
 
         if row:
             return {
@@ -331,61 +262,30 @@ async def get_model_config_async(service_name: str) -> Optional[Dict[str, Any]]:
 
 async def set_model_config_async(service_name: str, model_id: str, display_name: str = None):
     """Set model configuration for a service in database."""
-    from app.config import get_settings as get_app_settings
     from app.database import get_db
-    from app.db_utils import execute, fetchone
-
-    app_settings = get_app_settings()
 
     async with get_db() as db:
-        if app_settings.use_postgres:
-            exists = await db.fetchrow(
-                "SELECT id FROM ai_model_config WHERE service_name = $1",
-                service_name
+        exists = await db.fetchrow(
+            "SELECT id FROM ai_model_config WHERE service_name = $1",
+            service_name
+        )
+        if exists:
+            await db.execute(
+                """
+                UPDATE ai_model_config
+                SET model_id = $1, display_name = $2, updated_at = NOW()
+                WHERE service_name = $3
+                """,
+                model_id, display_name or model_id, service_name
             )
-            if exists:
-                await db.execute(
-                    """
-                    UPDATE ai_model_config
-                    SET model_id = $1, display_name = $2, updated_at = NOW()
-                    WHERE service_name = $3
-                    """,
-                    model_id, display_name or model_id, service_name
-                )
-            else:
-                await db.execute(
-                    """
-                    INSERT INTO ai_model_config (service_name, model_id, display_name, is_active)
-                    VALUES ($1, $2, $3, true)
-                    """,
-                    service_name, model_id, display_name or model_id
-                )
         else:
-            exists = await fetchone(
-                db,
-                "SELECT id FROM ai_model_config WHERE service_name = ?",
-                (service_name,)
+            await db.execute(
+                """
+                INSERT INTO ai_model_config (service_name, model_id, display_name, is_active)
+                VALUES ($1, $2, $3, true)
+                """,
+                service_name, model_id, display_name or model_id
             )
-            if exists:
-                await execute(
-                    db,
-                    """
-                    UPDATE ai_model_config
-                    SET model_id = ?, display_name = ?, updated_at = CURRENT_TIMESTAMP
-                    WHERE service_name = ?
-                    """,
-                    (model_id, display_name or model_id, service_name)
-                )
-            else:
-                await execute(
-                    db,
-                    """
-                    INSERT INTO ai_model_config (service_name, model_id, display_name, is_active)
-                    VALUES (?, ?, ?, 1)
-                    """,
-                    (service_name, model_id, display_name or model_id)
-                )
-            await db.commit()
 
     # Refresh cache
     await refresh_settings_cache()
@@ -399,80 +299,58 @@ async def set_model_config(models: Dict[str, str]):
 
 async def init_default_settings():
     """Initialize default settings in database if they don't exist."""
-    from app.config import get_settings as get_app_settings
     from app.database import get_db
-    from app.db_utils import execute, fetchone
-
-    app_settings = get_app_settings()
 
     async with get_db() as db:
-        # Ensure global_settings table exists and has defaults
-        if app_settings.use_postgres:
-            # Check if use_openrouter setting exists
+        # Ensure global_settings table has defaults
+        row = await db.fetchrow(
+            "SELECT id FROM global_settings WHERE setting_key = $1",
+            "use_openrouter"
+        )
+        if not row:
+            await db.execute(
+                """
+                INSERT INTO global_settings (setting_key, setting_value, setting_type, description)
+                VALUES ($1, $2, $3, $4)
+                """,
+                "use_openrouter", "true", "boolean", "Whether to use OpenRouter for AI calls"
+            )
+
+        # Initialize default model configs
+        for service_name, model_id in DEFAULT_MODELS.items():
             row = await db.fetchrow(
-                "SELECT id FROM global_settings WHERE setting_key = $1",
-                "use_openrouter"
+                "SELECT id FROM ai_model_config WHERE service_name = $1",
+                service_name
             )
             if not row:
                 await db.execute(
                     """
-                    INSERT INTO global_settings (setting_key, setting_value, setting_type, description)
-                    VALUES ($1, $2, $3, $4)
+                    INSERT INTO ai_model_config (service_name, model_id, display_name, is_active)
+                    VALUES ($1, $2, $3, true)
                     """,
-                    "use_openrouter", "true", "boolean", "Whether to use OpenRouter for AI calls"
+                    service_name, model_id, model_id
                 )
-        else:
-            # SQLite - table created by init_db, just ensure default value
-            row = await fetchone(
-                db,
-                "SELECT id FROM global_settings WHERE setting_key = ?",
-                ("use_openrouter",)
-            )
-            if not row:
-                await execute(
-                    db,
-                    """
-                    INSERT INTO global_settings (setting_key, setting_value, setting_type, description)
-                    VALUES (?, ?, ?, ?)
-                    """,
-                    ("use_openrouter", "true", "boolean", "Whether to use OpenRouter for AI calls")
-                )
-                await db.commit()
-
-        # Initialize default model configs
-        for service_name, model_id in DEFAULT_MODELS.items():
-            if app_settings.use_postgres:
-                row = await db.fetchrow(
-                    "SELECT id FROM ai_model_config WHERE service_name = $1",
-                    service_name
-                )
-                if not row:
-                    await db.execute(
-                        """
-                        INSERT INTO ai_model_config (service_name, model_id, display_name, is_active)
-                        VALUES ($1, $2, $3, true)
-                        """,
-                        service_name, model_id, model_id
-                    )
-            else:
-                row = await fetchone(
-                    db,
-                    "SELECT id FROM ai_model_config WHERE service_name = ?",
-                    (service_name,)
-                )
-                if not row:
-                    await execute(
-                        db,
-                        """
-                        INSERT INTO ai_model_config (service_name, model_id, display_name, is_active)
-                        VALUES (?, ?, ?, 1)
-                        """,
-                        (service_name, model_id, model_id)
-                    )
-
-        if not app_settings.use_postgres:
-            await db.commit()
 
     # Refresh cache with database values
     await refresh_settings_cache()
     logger.info("Default settings initialized in database")
+
+
+async def load_api_keys_from_db():
+    """Load API keys from global_settings into os.environ on startup.
+
+    This restores API keys that were saved via the admin panel so they
+    survive process restarts and Railway redeploys.
+    """
+    key_names = [
+        "OPENROUTER_API_KEY",
+        "GEMINI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "OPENAI_API_KEY",
+    ]
+    for key_name in key_names:
+        value = await get_global_setting(key_name.lower())
+        if value:
+            os.environ[key_name] = value
+            logger.info(f"Loaded {key_name} from database")
+    logger.info("API key loading from database complete")

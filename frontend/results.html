@@ -44,6 +44,16 @@
     <script src="/static/components.js"></script>
     <script src="/static/error-logger.js"></script>
     <style>
+        :root {
+            --terminal-bg: #1a1a2e;
+            --terminal-header: #16213e;
+            --terminal-border: #0f3460;
+            --terminal-text: #e0e0e0;
+            --terminal-accent: #00d9ff;
+            --terminal-chunk: #b8d4b8;
+            --terminal-error: #ff6b6b;
+            --terminal-complete: #51cf66;
+        }
         body { font-family: 'Inter', sans-serif; }
         /* Device Preview Styles */
         .mobile-preview {
@@ -118,8 +128,8 @@
         }
         /* Live Agent Streaming Terminal */
         .agent-terminal {
-            background: #1a1a2e;
-            border: 1px solid #16213e;
+            background: var(--terminal-bg);
+            border: 1px solid var(--terminal-header);
             border-radius: 8px;
             font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', monospace;
             font-size: 13px;
@@ -127,12 +137,12 @@
             overflow: hidden;
         }
         .agent-terminal-header {
-            background: #16213e;
+            background: var(--terminal-header);
             padding: 8px 12px;
             display: flex;
             align-items: center;
             gap: 8px;
-            border-bottom: 1px solid #0f3460;
+            border-bottom: 1px solid var(--terminal-border);
         }
         .agent-terminal-header .dot {
             width: 10px;
@@ -151,20 +161,20 @@
             padding: 16px;
             max-height: 300px;
             overflow-y: auto;
-            color: #e0e0e0;
+            color: var(--terminal-text);
         }
         .agent-terminal-body::-webkit-scrollbar {
             width: 6px;
         }
         .agent-terminal-body::-webkit-scrollbar-track {
-            background: #1a1a2e;
+            background: var(--terminal-bg);
         }
         .agent-terminal-body::-webkit-scrollbar-thumb {
-            background: #0f3460;
+            background: var(--terminal-border);
             border-radius: 3px;
         }
         .agent-step-marker {
-            color: #00d9ff;
+            color: var(--terminal-accent);
             font-weight: 600;
             margin: 12px 0 4px 0;
             display: flex;
@@ -176,7 +186,7 @@
             font-size: 10px;
         }
         .agent-chunk {
-            color: #b8d4b8;
+            color: var(--terminal-chunk);
             white-space: pre-wrap;
             word-break: break-word;
         }
@@ -184,7 +194,7 @@
             display: inline-block;
             width: 8px;
             height: 14px;
-            background: #00d9ff;
+            background: var(--terminal-accent);
             animation: blink 1s infinite;
             vertical-align: middle;
             margin-left: 2px;
@@ -194,11 +204,11 @@
             51%, 100% { opacity: 0; }
         }
         .agent-error {
-            color: #ff6b6b;
+            color: var(--terminal-error);
             font-weight: 500;
         }
         .agent-complete {
-            color: #51cf66;
+            color: var(--terminal-complete);
             font-weight: 500;
         }
         @media (max-width: 768px) {
@@ -556,7 +566,7 @@
         Copied to clipboard!
     </div>
 
-    <script>
+    <script type="module">
         // Require authentication
         Auth.requireAuth();
 
@@ -1492,13 +1502,13 @@
                             <div class="mt-2 space-y-2 text-sm">
                                 ${output.step1_draft ? `
                                     <div class="p-3 bg-still-border/30 rounded border border-still-border">
-                                        <strong style="color: var(--platform-linkedin-text);">Step 1 (Draft):</strong>
+                                        <strong style="color: var(--platform-linkedin);">Step 1 (Draft):</strong>
                                         <p class="mt-1 whitespace-pre-wrap text-blue-300/80">${escapeHtml(output.step1_draft)}</p>
                                     </div>
                                 ` : ''}
                                 ${output.step2_edited ? `
                                     <div class="p-3 bg-still-border/30 rounded border border-still-border">
-                                        <strong style="color: var(--platform-linkedin-text);">Step 2 (Edited):</strong>
+                                        <strong style="color: var(--platform-linkedin);">Step 2 (Edited):</strong>
                                         <p class="mt-1 whitespace-pre-wrap text-blue-300/80">${escapeHtml(output.step2_edited)}</p>
                                     </div>
                                 ` : ''}

@@ -86,26 +86,14 @@ async def blacklist_token(token: str):
         expires_at = datetime.utcnow() + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
 
     async with get_db() as db:
-        if settings.use_postgres:
-            # PostgreSQL: use ON CONFLICT
-            await db.execute(
-                """
-                INSERT INTO revoked_tokens (token_hash, expires_at)
-                VALUES ($1, $2)
-                ON CONFLICT (token_hash) DO UPDATE SET expires_at = $2
-                """,
-                token_hash, expires_at
-            )
-        else:
-            # SQLite: use INSERT OR REPLACE
-            await db.execute(
-                """
-                INSERT OR REPLACE INTO revoked_tokens (token_hash, expires_at)
-                VALUES (?, ?)
-                """,
-                (token_hash, expires_at)
-            )
-            await db.commit()
+        await db.execute(
+            """
+            INSERT INTO revoked_tokens (token_hash, expires_at)
+            VALUES ($1, $2)
+            ON CONFLICT (token_hash) DO UPDATE SET expires_at = $2
+            """,
+            token_hash, expires_at
+        )
 
 
 async def is_token_blacklisted(token: str) -> bool:
@@ -120,14 +108,7 @@ async def is_token_blacklisted(token: str) -> bool:
 async def cleanup_expired_tokens():
     """Remove expired tokens from the blacklist."""
     async with get_db() as db:
-        if settings.use_postgres:
-            await db.execute("DELETE FROM revoked_tokens WHERE expires_at < NOW()")
-        else:
-            await db.execute(
-                "DELETE FROM revoked_tokens WHERE expires_at < ?",
-                (datetime.utcnow(),)
-            )
-            await db.commit()
+        await db.execute("DELETE FROM revoked_tokens WHERE expires_at < NOW()")
 
 
 def validate_email(email: str) -> bool:

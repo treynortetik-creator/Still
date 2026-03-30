@@ -21,6 +21,7 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = ""  # PostgreSQL connection string from Supabase (set via DATABASE_URL env var)
+    db_ssl_verify: bool = True
 
     # Application
     debug: bool = False  # Default to False for security
@@ -53,6 +54,22 @@ class Settings(BaseSettings):
     # Railway/Production deployment
     railway_environment: str = ""  # Set automatically by Railway
     railway_public_domain: str = ""  # Set automatically by Railway
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def validate_database_url(cls, v: str) -> str:
+        if not v:
+            import warnings
+            warnings.warn(
+                "DATABASE_URL not set! The application will fail to start.",
+                UserWarning
+            )
+            return v
+        if not v.startswith(("postgresql://", "postgres://")):
+            raise ValueError(
+                f"DATABASE_URL must start with 'postgresql://' or 'postgres://'. Got: {v[:20]}..."
+            )
+        return v
 
     @field_validator("secret_key", mode="before")
     @classmethod
@@ -108,19 +125,6 @@ class Settings(BaseSettings):
     @property
     def clients_dir(self) -> Path:
         return self.data_dir / "clients"
-
-    @property
-    def database_dir(self) -> Path:
-        # Railway volume mount path for persistent database (only used for SQLite fallback)
-        railway_volume = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH")
-        if railway_volume:
-            return Path(railway_volume) / "database"
-        return self.base_dir / "database"
-
-    @property
-    def use_postgres(self) -> bool:
-        """PostgreSQL is the only supported database."""
-        return True
 
     class Config:
         env_file = ".env"

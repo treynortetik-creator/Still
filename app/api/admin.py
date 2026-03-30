@@ -6,7 +6,6 @@ from fastapi import APIRouter, HTTPException, Query, Body, Depends
 from typing import Optional, Dict
 import httpx
 
-from app.config import get_settings
 from app.models.admin import (
     ApiKeyRequest,
     OpenRouterToggle,
@@ -17,14 +16,13 @@ from app.models.admin import (
     AIModelConfigRequest,
 )
 from app.database import get_db
-from app.db_utils import execute, fetchone, fetchall
+from app.db_utils import execute, fetchone, fetchall, fetchval, safe_json
 from app.services import settings_manager
 from app.api.auth import verify_admin
 from app.services.ai_editor import get_editor_config, save_editor_config, DEFAULT_EDITOR_PROMPT
 from app.services.sommelier import get_sommelier_config, save_sommelier_config, DEFAULT_PARSE_PROMPT, DEFAULT_RERANK_PROMPT
 from app.services.lifecycle import check_expiring_stills, get_lifecycle_summary
 
-app_settings = get_settings()
 router = APIRouter()
 
 
@@ -133,7 +131,7 @@ async def list_prompts(_: bool = Depends(verify_admin)):
                 "template_name": row["template_name"],
                 "model": row["model"],
                 "max_tokens": row["max_tokens"],
-                "variables": json.loads(row["variables"]) if row["variables"] else [],
+                "variables": safe_json(row["variables"], []),
                 "version": row["version"],
                 "updated_at": row["updated_at"],
             }
@@ -164,7 +162,7 @@ async def get_prompt(template_name: str, _: bool = Depends(verify_admin)):
             "model": row["model"],
             "max_tokens": row["max_tokens"],
             "prompt_content": row["prompt_content"],
-            "variables": json.loads(row["variables"]) if row["variables"] else [],
+            "variables": safe_json(row["variables"], []),
             "version": row["version"],
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
@@ -222,8 +220,6 @@ async def update_prompt(
             """,
             tuple(params)
         )
-        if not app_settings.use_postgres:
-            await db.commit()
 
         return {"message": "Template updated", "version": new_version}
 
@@ -599,22 +595,31 @@ async def get_settings_endpoint(_: bool = Depends(verify_admin)):
 @router.post("/settings/apikey")
 async def save_api_key(request: ApiKeyRequest, _: bool = Depends(verify_admin)):
     """
-    Save API key - stores in environment for current session.
-    Note: For permanent storage, keys should be set in Replit Secrets.
+    Save API key - stores in environment for immediate use and persists to database.
     """
     provider = request.provider.lower()
     key = request.key
-    
-    if provider == "openrouter":
-        os.environ["OPENROUTER_API_KEY"] = key
-    elif provider == "gemini":
-        os.environ["GEMINI_API_KEY"] = key
-    elif provider == "anthropic":
-        os.environ["ANTHROPIC_API_KEY"] = key
-    else:
+
+    provider_env_map = {
+        "openrouter": "OPENROUTER_API_KEY",
+        "gemini": "GEMINI_API_KEY",
+        "anthropic": "ANTHROPIC_API_KEY",
+        "openai": "OPENAI_API_KEY",
+    }
+
+    env_var = provider_env_map.get(provider)
+    if not env_var:
         raise HTTPException(status_code=400, detail=f"Unknown provider: {provider}")
-    
-    return {"status": "ok", "message": f"{provider} API key saved for this session"}
+
+    # Set in environment for immediate use in this process
+    os.environ[env_var] = key
+
+    # Persist to database so it survives restarts
+    await settings_manager.set_global_setting(
+        env_var.lower(), key, "string", f"API key for {provider}"
+    )
+
+    return {"status": "ok", "message": f"{provider} API key saved"}
 
 
 @router.post("/settings/openrouter")
@@ -656,24 +661,14 @@ async def save_refresh_settings(request: RefreshSettingsRequest, _: bool = Depen
         ]
 
         for key, value in settings_to_save:
-            if app_settings.use_postgres:
-                await db.execute(
-                    """
-                    INSERT INTO global_settings (setting_key, setting_value)
-                    VALUES ($1, $2)
-                    ON CONFLICT (setting_key) DO UPDATE SET setting_value = $2
-                    """,
-                    key, value
-                )
-            else:
-                await execute(
-                    db,
-                    "INSERT OR REPLACE INTO global_settings (setting_key, setting_value) VALUES (?, ?)",
-                    (key, value)
-                )
-
-        if not app_settings.use_postgres:
-            await db.commit()
+            await db.execute(
+                """
+                INSERT INTO global_settings (setting_key, setting_value)
+                VALUES ($1, $2)
+                ON CONFLICT (setting_key) DO UPDATE SET setting_value = $2
+                """,
+                key, value
+            )
 
     return {"status": "ok", "message": "Refresh settings saved"}
 
@@ -692,50 +687,27 @@ async def get_error_logs(
     try:
         async with get_db() as db:
             # First check if the error_logs table exists
-            if app_settings.use_postgres:
-                table_check = await db.fetchrow(
-                    "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'error_logs'"
-                )
-                table_exists = table_check is not None
-            else:
-                cursor = await db.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name='error_logs'"
-                )
-                table_exists = await cursor.fetchone()
+            table_check = await db.fetchrow(
+                "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = 'error_logs'"
+            )
+            table_exists = table_check is not None
 
             if not table_exists:
                 # Create the table if it doesn't exist
-                if app_settings.use_postgres:
-                    await db.execute("""
-                        CREATE TABLE IF NOT EXISTS error_logs (
-                            id SERIAL PRIMARY KEY,
-                            job_id TEXT,
-                            user_id INTEGER,
-                            error_type TEXT,
-                            error_message TEXT,
-                            stack_trace TEXT,
-                            source TEXT DEFAULT 'backend',
-                            endpoint TEXT,
-                            additional_context JSONB,
-                            created_at TIMESTAMP DEFAULT NOW()
-                        )
-                    """)
-                else:
-                    await db.execute("""
-                        CREATE TABLE IF NOT EXISTS error_logs (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            job_id TEXT,
-                            user_id INTEGER,
-                            error_type TEXT,
-                            error_message TEXT,
-                            stack_trace TEXT,
-                            source TEXT DEFAULT 'backend',
-                            endpoint TEXT,
-                            additional_context TEXT,
-                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                        )
-                    """)
-                    await db.commit()
+                await db.execute("""
+                    CREATE TABLE IF NOT EXISTS error_logs (
+                        id SERIAL PRIMARY KEY,
+                        job_id TEXT,
+                        user_id INTEGER,
+                        error_type TEXT,
+                        error_message TEXT,
+                        stack_trace TEXT,
+                        source TEXT DEFAULT 'backend',
+                        endpoint TEXT,
+                        additional_context JSONB,
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )
+                """)
                 return {"error_logs": [], "message": "Error logs table created"}
 
             query = """
@@ -830,12 +802,14 @@ async def get_openrouter_models(_: bool = Depends(verify_admin)):
 # Service names that can have models configured
 PIPELINE_SERVICES = [
     "transcription",
+    "summarization",
     "distillation",
     "distillation_pass2",
     "atomization",
     "drafting",
     "editing",
     "factcheck",
+    "sommelier",
     "workshop_ai_edit",
 ]
 
@@ -947,8 +921,6 @@ async def update_model_config(
                 )
             )
 
-        if not app_settings.use_postgres:
-            await db.commit()
 
         # Refresh the settings cache so changes take effect immediately
         await settings_manager.refresh_settings_cache()
@@ -1084,3 +1056,160 @@ async def get_user_lifecycle_summary(user_id: int, _: bool = Depends(verify_admi
     """Get lifecycle status counts for a user."""
     summary = await get_lifecycle_summary(user_id)
     return summary
+
+
+# ========== Admin Library Endpoints ==========
+
+@router.get("/library/stats")
+async def admin_library_stats(
+    user_id: Optional[int] = Query(None, description="Filter by user ID (omit for all users)"),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Get library statistics across all users or for a specific user.
+    When user_id is None, aggregates across ALL users.
+    """
+    async with get_db() as db:
+        if user_id is not None:
+            type_rows = await fetchall(
+                db,
+                """
+                SELECT entry_type, COUNT(*) as count
+                FROM content_library
+                WHERE user_id = ?
+                GROUP BY entry_type
+                """,
+                (user_id,)
+            )
+            total = await fetchval(
+                db,
+                "SELECT COUNT(*) FROM content_library WHERE user_id = ?",
+                (user_id,)
+            )
+        else:
+            type_rows = await fetchall(
+                db,
+                """
+                SELECT entry_type, COUNT(*) as count
+                FROM content_library
+                GROUP BY entry_type
+                """,
+                ()
+            )
+            total = await fetchval(
+                db,
+                "SELECT COUNT(*) FROM content_library",
+                ()
+            )
+
+        type_counts = {row["entry_type"]: row["count"] for row in type_rows}
+
+        return {
+            "total_entries": total,
+            "by_type": type_counts,
+        }
+
+
+@router.get("/library")
+async def admin_library_list(
+    entry_type: Optional[str] = Query(None, description="Filter by entry type"),
+    search: Optional[str] = Query(None, description="Search in content", max_length=200),
+    limit: int = Query(50, description="Number of results", ge=1, le=100),
+    offset: int = Query(0, description="Offset for pagination", ge=0),
+    user_id: Optional[int] = Query(None, description="Filter by user ID (omit for all users)"),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Browse library entries across all users or filtered by user.
+    When user_id is None, returns entries across ALL users.
+    """
+    async with get_db() as db:
+        query = """
+            SELECT cl.*, u.email as user_email
+            FROM content_library cl
+            LEFT JOIN users u ON cl.user_id = u.id
+            WHERE 1=1
+        """
+        params = []
+
+        if user_id is not None:
+            query += " AND cl.user_id = ?"
+            params.append(user_id)
+
+        if entry_type:
+            query += " AND cl.entry_type = ?"
+            params.append(entry_type)
+
+        if search:
+            query += " AND cl.content LIKE ?"
+            params.append(f"%{search}%")
+
+        query += " ORDER BY cl.date_added DESC LIMIT ?"
+        params.append(limit)
+
+        if offset > 0:
+            query += " OFFSET ?"
+            params.append(offset)
+
+        rows = await fetchall(db, query, tuple(params))
+
+        entries = []
+        for row in rows:
+            entries.append({
+                "id": row["id"],
+                "user_id": row["user_id"],
+                "user_email": row.get("user_email"),
+                "entry_type": row["entry_type"],
+                "content": row["content"],
+                "source": row["source"],
+                "speaker": row.get("speaker"),
+                "date_added": row["date_added"],
+                "times_used": row["times_used"] or 0,
+            })
+
+        # Count query with same filters
+        count_query = "SELECT COUNT(*) FROM content_library WHERE 1=1"
+        count_params = []
+
+        if user_id is not None:
+            count_query += " AND user_id = ?"
+            count_params.append(user_id)
+
+        if entry_type:
+            count_query += " AND entry_type = ?"
+            count_params.append(entry_type)
+
+        if search:
+            count_query += " AND content LIKE ?"
+            count_params.append(f"%{search}%")
+
+        total = await fetchval(db, count_query, tuple(count_params))
+
+        return {
+            "entries": entries,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }
+
+
+@router.delete("/library/{entry_id}")
+async def admin_delete_library_entry(
+    entry_id: int,
+    _: bool = Depends(verify_admin),
+):
+    """
+    Delete a library entry without user ownership check (admin-only).
+    """
+    async with get_db() as db:
+        row = await fetchone(
+            db,
+            "SELECT id FROM content_library WHERE id = ?",
+            (entry_id,)
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail="Entry not found")
+
+        await execute(db, "DELETE FROM content_library WHERE id = ?", (entry_id,))
+
+    return {"message": "Entry deleted successfully"}

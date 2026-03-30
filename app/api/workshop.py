@@ -3,7 +3,6 @@ from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Query
 
-from app.config import get_settings
 from app.database import get_db
 from app.db_utils import execute, fetchone, fetchall
 from app.api.auth import get_current_user_id
@@ -19,7 +18,6 @@ from app.models.workshop import (
     AIEditRequest,
 )
 
-settings = get_settings()
 router = APIRouter()
 
 
@@ -199,8 +197,6 @@ async def update_workshop_content(
             """,
             (data.content, now, output_id)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
         # Get updated record
         updated = await fetchone(
@@ -250,8 +246,6 @@ async def update_workshop_status(
             """,
             (data.status, now, output_id)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
         return WorkshopUpdateResponse(
             id=output_id,
@@ -284,8 +278,6 @@ async def delete_workshop_output(
 
         # Delete the output
         await execute(db, "DELETE FROM outputs WHERE id = ?", (output_id,))
-        if not settings.use_postgres:
-            await db.commit()
 
         return {"message": "Output deleted successfully"}
 

@@ -4,13 +4,11 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from typing import Optional
 
-from app.config import get_settings
 from app.api.auth import get_current_user_id
-from app.database import get_db
-from app.db_utils import execute, fetchone, fetchall
+from app.database import get_db, transaction
+from app.db_utils import execute, fetchone, fetchall, safe_json
 from app.utils.background_tasks import create_background_task
 
-settings = get_settings()
 from app.models.autopilot import (
     SourceCreate,
     SourceUpdate,
@@ -27,7 +25,7 @@ router = APIRouter()
 
 def parse_source_row(row) -> SourceResponse:
     """Convert database row to SourceResponse."""
-    asset_types = json.loads(row["asset_types"]) if row["asset_types"] else ["linkedin"]
+    asset_types = safe_json(row["asset_types"], ["linkedin"])
     return SourceResponse(
         id=row["id"],
         source_type=row["source_type"],
@@ -62,47 +60,21 @@ async def create_source(
             raise HTTPException(status_code=400, detail="Source URL already exists")
 
         # Insert source
-        if settings.use_postgres:
-            row = await db.fetchrow(
-                """
-                INSERT INTO autopilot_sources
-                (user_id, source_type, source_url, source_name, check_frequency, target_persona, asset_types)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-                RETURNING *
-                """,
-                user_id,
-                source.source_type,
-                source.source_url,
-                source.source_name,
-                source.check_frequency,
-                source.target_persona,
-                json.dumps(source.asset_types),
-            )
-        else:
-            cursor = await db.execute(
-                """
-                INSERT INTO autopilot_sources
-                (user_id, source_type, source_url, source_name, check_frequency, target_persona, asset_types)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    user_id,
-                    source.source_type,
-                    source.source_url,
-                    source.source_name,
-                    source.check_frequency,
-                    source.target_persona,
-                    json.dumps(source.asset_types),
-                ),
-            )
-            source_id = cursor.lastrowid
-            await db.commit()
-
-            # Fetch created source
-            row = await fetchone(
-                db,
-                "SELECT * FROM autopilot_sources WHERE id = ?", (source_id,)
-            )
+        row = await db.fetchrow(
+            """
+            INSERT INTO autopilot_sources
+            (user_id, source_type, source_url, source_name, check_frequency, target_persona, asset_types)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING *
+            """,
+            user_id,
+            source.source_type,
+            source.source_url,
+            source.source_name,
+            source.check_frequency,
+            source.target_persona,
+            json.dumps(source.asset_types),
+        )
 
     return parse_source_row(row)
 
@@ -198,8 +170,6 @@ async def update_source(
                 f"UPDATE autopilot_sources SET {', '.join(updates)} WHERE id = ?",
                 tuple(params),
             )
-            if not settings.use_postgres:
-                await db.commit()
 
         # Fetch updated source
         row = await fetchone(
@@ -226,6 +196,8 @@ async def delete_source(
         if not existing:
             raise HTTPException(status_code=404, detail="Source not found")
 
+    # Wrap multi-delete in a transaction
+    async with transaction() as db:
         # Delete associated items first
         await execute(
             db,
@@ -234,8 +206,6 @@ async def delete_source(
 
         # Delete source
         await execute(db, "DELETE FROM autopilot_sources WHERE id = ?", (source_id,))
-        if not settings.use_postgres:
-            await db.commit()
 
     return {"message": "Source deleted successfully"}
 
@@ -340,8 +310,8 @@ async def get_autopilot_stats(
         # Active sources
         row = await fetchone(
             db,
-            "SELECT COUNT(*) as count FROM autopilot_sources WHERE user_id = ? AND is_active = TRUE",
-            (user_id,),
+            "SELECT COUNT(*) as count FROM autopilot_sources WHERE user_id = ? AND is_active = ?",
+            (user_id, True),
         )
         active_sources = row["count"] if row else 0
 
@@ -357,30 +327,17 @@ async def get_autopilot_stats(
         )
         pending_items = row["count"] if row else 0
 
-        # Items processed today - use CURRENT_DATE for PostgreSQL compatibility
-        if settings.use_postgres:
-            row = await db.fetchrow(
-                """
-                SELECT COUNT(*) as count FROM autopilot_items ai
-                JOIN autopilot_sources s ON ai.source_id = s.id
-                WHERE s.user_id = $1
-                AND ai.processing_status = 'complete'
-                AND DATE(ai.created_at) = CURRENT_DATE
-                """,
-                user_id,
-            )
-        else:
-            row = await fetchone(
-                db,
-                """
-                SELECT COUNT(*) as count FROM autopilot_items ai
-                JOIN autopilot_sources s ON ai.source_id = s.id
-                WHERE s.user_id = ?
-                AND ai.processing_status = 'complete'
-                AND DATE(ai.created_at) = DATE('now')
-                """,
-                (user_id,),
-            )
+        # Items processed today
+        row = await db.fetchrow(
+            """
+            SELECT COUNT(*) as count FROM autopilot_items ai
+            JOIN autopilot_sources s ON ai.source_id = s.id
+            WHERE s.user_id = $1
+            AND ai.processing_status = 'complete'
+            AND DATE(ai.created_at) = CURRENT_DATE
+            """,
+            user_id,
+        )
         items_today = row["count"] if row else 0
 
         # Total items processed
@@ -437,8 +394,6 @@ async def skip_item(
             "UPDATE autopilot_items SET processing_status = 'skipped' WHERE id = ?",
             (item_id,),
         )
-        if not settings.use_postgres:
-            await db.commit()
 
     return {"message": "Item skipped"}
 
@@ -472,8 +427,6 @@ async def process_item(
             "UPDATE autopilot_items SET processing_status = 'pending' WHERE id = ?",
             (item_id,),
         )
-        if not settings.use_postgres:
-            await db.commit()
 
     # Create job and process
     from app.services.autopilot import create_job_from_feed_item

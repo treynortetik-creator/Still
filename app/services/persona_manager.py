@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 from app.config import get_settings
-from app.db_utils import fetchone, fetchall
+from app.db_utils import fetchone, fetchall, safe_json
 
 settings = get_settings()
 
@@ -157,12 +157,12 @@ def _row_to_persona_dict(row) -> dict:
         "role": row["role"],
         "title": f"{row['name']} ({row['role']})",
         "industry": row["industry"],
-        "pain_points": json.loads(row["pain_points"]) if row["pain_points"] else [],
-        "goals": json.loads(row["goals"]) if row["goals"] else [],
-        "priorities": json.loads(row["goals"]) if row["goals"] else [],
+        "pain_points": safe_json(row["pain_points"], []),
+        "goals": safe_json(row["goals"], []),
+        "priorities": safe_json(row["goals"], []),
         "language_level": row["language_level"] if "language_level" in (row.keys() if hasattr(row, 'keys') else dict(row).keys()) else "Professional",
-        "tone_preferences": json.loads(row["tone_preferences"]) if row["tone_preferences"] else None,
-        "content_preferences": json.loads(row["content_preferences"]) if row["content_preferences"] else None,
+        "tone_preferences": safe_json(row["tone_preferences"]),
+        "content_preferences": safe_json(row["content_preferences"]),
         "is_default": bool(row["is_default"]),
         "is_custom": True,
         "created_at": row["created_at"],

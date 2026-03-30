@@ -163,8 +163,6 @@ async def upload_content(
                 5,
             )
         )
-        if not settings.use_postgres:
-            await db.commit()
 
     # Start background processing
     from app.services.pipeline import process_job
@@ -287,8 +285,6 @@ async def upload_text(
                 content,  # Text content is already the transcript
             )
         )
-        if not settings.use_postgres:
-            await db.commit()
 
     # Start background processing
     from app.services.pipeline import process_job
@@ -410,8 +406,6 @@ async def quick_distill(
                 5,
             )
         )
-        if not settings.use_postgres:
-            await db.commit()
 
     # Start background processing
     from app.services.pipeline import process_job

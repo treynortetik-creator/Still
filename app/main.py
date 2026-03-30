@@ -1,5 +1,6 @@
 """Main FastAPI application for ContentMultiplier."""
 import asyncio
+import json
 import traceback
 import logging
 from contextlib import asynccontextmanager
@@ -17,6 +18,12 @@ from datetime import datetime
 from app.config import get_settings
 from app.database import init_db, close_postgres_pool
 from app.rate_limiter import limiter
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 logger = logging.getLogger(__name__)
 from app.api import upload, jobs, library, admin, auth, personas, export, feedback, edit
@@ -65,18 +72,18 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
             await execute(
                 db,
                 """
-                INSERT INTO error_logs (error_type, error_message, stack_trace, context)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO error_logs (error_type, error_message, stack_trace, source, endpoint, additional_context)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
                     type(exc).__name__,
-                    str(exc)[:1000],  # Limit message length
-                    tb[:5000],  # Limit stack trace length
-                    f"URL: {request.url}, Method: {request.method}",
+                    str(exc)[:1000],
+                    tb[:5000],
+                    "backend",
+                    f"{request.method} {request.url.path}",
+                    json.dumps({"full_url": str(request.url), "method": request.method}),
                 )
             )
-            if not get_settings().use_postgres:
-                await db.commit()
     except Exception as log_err:
         logger.error(f"Failed to log error to database: {log_err}")
 
@@ -122,9 +129,6 @@ async def lifespan(app: FastAPI):
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     settings.prompts_dir.mkdir(parents=True, exist_ok=True)
     settings.clients_dir.mkdir(parents=True, exist_ok=True)
-    if not settings.use_postgres:
-        settings.database_dir.mkdir(parents=True, exist_ok=True)
-
     # Initialize database
     await init_db()
     logger.info("Database initialized")
@@ -139,6 +143,10 @@ async def lifespan(app: FastAPI):
     await settings_manager.init_default_settings()
     logger.info("Settings initialized from database")
 
+    # Load API keys from database into environment
+    await settings_manager.load_api_keys_from_db()
+    logger.info("API keys loaded from database")
+
     # Start autopilot scheduler
     from app.services.scheduler import start_scheduler, stop_scheduler
     await start_scheduler()
@@ -152,9 +160,8 @@ async def lifespan(app: FastAPI):
     await stop_scheduler()
 
     # Close PostgreSQL connection pool
-    if settings.use_postgres:
-        await close_postgres_pool()
-        logger.info("PostgreSQL pool closed")
+    await close_postgres_pool()
+    logger.info("PostgreSQL pool closed")
 
 
 app = FastAPI(
@@ -335,7 +342,16 @@ async def api_info():
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy"}
+    try:
+        from app.database import _pg_pool
+        if _pg_pool is None:
+            return JSONResponse(status_code=503, content={"status": "unhealthy", "database": "pool not initialized"})
+        result = await _pg_pool.fetchval("SELECT 1")
+        if result == 1:
+            return {"status": "healthy", "database": "connected"}
+        return JSONResponse(status_code=503, content={"status": "unhealthy", "database": "query failed"})
+    except Exception as e:
+        return JSONResponse(status_code=503, content={"status": "unhealthy", "database": str(e)})
 
 
 if __name__ == "__main__":

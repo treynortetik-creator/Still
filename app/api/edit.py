@@ -5,8 +5,7 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
-from app.config import get_settings
-from app.database import get_db
+from app.database import get_db, transaction
 from app.db_utils import execute, fetchone, fetchall
 from app.api.auth import get_current_user_id
 from app.services.content_editor import (
@@ -16,7 +15,6 @@ from app.services.content_editor import (
     TONE_PRESETS
 )
 
-settings = get_settings()
 router = APIRouter()
 
 
@@ -105,8 +103,6 @@ async def adjust_content_tone(
             "UPDATE users SET total_cost_incurred = total_cost_incurred + ? WHERE id = ?",
             (cost, user_id)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
     return {
         "output_id": data.output_id,
@@ -165,8 +161,6 @@ async def apply_changes(
             "UPDATE users SET total_cost_incurred = total_cost_incurred + ? WHERE id = ?",
             (cost, user_id)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
     return {
         "output_id": data.output_id,
@@ -202,9 +196,11 @@ async def save_edit(
         if not row:
             raise HTTPException(status_code=404, detail="Output not found")
 
-        # Get current content for history
-        current_content = row["step3_final"] or row["step2_edited"] or row["step1_draft"]
+    # Get current content for history
+    current_content = row["step3_final"] or row["step2_edited"] or row["step1_draft"]
 
+    # Wrap multi-write in a transaction
+    async with transaction() as db:
         # Save to edit history
         await execute(
             db,
@@ -226,14 +222,11 @@ async def save_edit(
             (data.edited_content, output_id)
         )
 
-        if not settings.use_postgres:
-            await db.commit()
-
-        return {
-            "success": True,
-            "output_id": output_id,
-            "message": "Edit saved successfully"
-        }
+    return {
+        "success": True,
+        "output_id": output_id,
+        "message": "Edit saved successfully"
+    }
 
 
 @router.get("/edit/{output_id}/history")
@@ -309,10 +302,12 @@ async def revert_to_version(
         if not row:
             raise HTTPException(status_code=404, detail="Edit record not found")
 
-        # The previous_content is what we want to revert TO
-        revert_content = row["previous_content"]
-        current_content = row["current_content"]
+    # The previous_content is what we want to revert TO
+    revert_content = row["previous_content"]
+    current_content = row["current_content"]
 
+    # Wrap multi-write in a transaction
+    async with transaction() as db:
         # Save current as new edit history entry
         await execute(
             db,
@@ -330,12 +325,9 @@ async def revert_to_version(
             (revert_content, output_id)
         )
 
-        if not settings.use_postgres:
-            await db.commit()
-
-        return {
-            "success": True,
-            "output_id": output_id,
-            "reverted_to_edit_id": edit_id,
-            "content": revert_content
-        }
+    return {
+        "success": True,
+        "output_id": output_id,
+        "reverted_to_edit_id": edit_id,
+        "content": revert_content
+    }

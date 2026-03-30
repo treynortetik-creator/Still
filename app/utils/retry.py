@@ -3,14 +3,12 @@ import asyncio
 import functools
 import logging
 import traceback
-from typing import TypeVar, Callable, Optional, Type
-from datetime import datetime
+from typing import TypeVar, Callable, Optional
 
 from app.database import get_db
 
 logger = logging.getLogger(__name__)
 from app.db_utils import execute
-from app.config import get_settings
 
 T = TypeVar('T')
 
@@ -31,18 +29,15 @@ async def log_error(
 ):
     """Log an error to the database for monitoring."""
     try:
-        settings = get_settings()
         async with get_db() as db:
             await execute(
                 db,
                 """
-                INSERT INTO error_logs (job_id, user_id, error_type, error_message, context)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO error_logs (job_id, user_id, error_type, error_message, source, endpoint, additional_context)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (job_id, user_id, error_type, error_message[:2000], context)
+                (job_id, user_id, error_type, error_message[:2000], "backend", context, None)
             )
-            if not settings.use_postgres:
-                await db.commit()
     except Exception as e:
         # Don't let error logging failures break the app
         logger.error(f"Failed to log error: {e}")
@@ -162,86 +157,3 @@ def with_retry(
     return decorator
 
 
-class CircuitBreaker:
-    """
-    Circuit breaker pattern implementation for protecting against cascading failures.
-
-    States:
-    - CLOSED: Normal operation, requests go through
-    - OPEN: Failing, requests are rejected immediately
-    - HALF_OPEN: Testing if service recovered
-    """
-
-    def __init__(
-        self,
-        failure_threshold: int = 5,
-        recovery_timeout: float = 60.0,
-        half_open_max_calls: int = 1,
-    ):
-        self.failure_threshold = failure_threshold
-        self.recovery_timeout = recovery_timeout
-        self.half_open_max_calls = half_open_max_calls
-
-        self.failures = 0
-        self.last_failure_time: Optional[datetime] = None
-        self.state = "closed"
-        self.half_open_calls = 0
-
-    def _should_allow(self) -> bool:
-        """Check if we should allow a request through."""
-        if self.state == "closed":
-            return True
-
-        if self.state == "open":
-            # Check if recovery timeout has passed
-            if self.last_failure_time:
-                elapsed = (datetime.now() - self.last_failure_time).total_seconds()
-                if elapsed >= self.recovery_timeout:
-                    self.state = "half_open"
-                    self.half_open_calls = 0
-                    return True
-            return False
-
-        if self.state == "half_open":
-            return self.half_open_calls < self.half_open_max_calls
-
-        return True
-
-    def record_success(self):
-        """Record a successful call."""
-        if self.state == "half_open":
-            self.state = "closed"
-            self.failures = 0
-        elif self.state == "closed":
-            self.failures = 0
-
-    def record_failure(self):
-        """Record a failed call."""
-        self.failures += 1
-        self.last_failure_time = datetime.now()
-
-        if self.state == "half_open":
-            self.state = "open"
-        elif self.failures >= self.failure_threshold:
-            self.state = "open"
-
-    async def call(self, func: Callable[..., T], *args, **kwargs) -> T:
-        """Execute a function with circuit breaker protection."""
-        if not self._should_allow():
-            raise ConnectionError(f"Circuit breaker is {self.state}, request rejected")
-
-        if self.state == "half_open":
-            self.half_open_calls += 1
-
-        try:
-            result = await func(*args, **kwargs)
-            self.record_success()
-            return result
-        except Exception as e:
-            self.record_failure()
-            raise
-
-
-# Create circuit breakers for different services
-gemini_circuit_breaker = CircuitBreaker(failure_threshold=5, recovery_timeout=60.0)
-claude_circuit_breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=90.0)

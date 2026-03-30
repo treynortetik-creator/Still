@@ -5,12 +5,10 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 
-from app.config import get_settings
 from app.database import get_db
-from app.db_utils import execute, fetchone, fetchall
+from app.db_utils import execute, fetchone, fetchall, safe_json
 from app.api.auth import get_current_user_id
 
-settings = get_settings()
 from app.services.swipe_analyzer import (
     analyze_swipe_collection,
     get_style_dna,
@@ -71,7 +69,7 @@ async def list_swipes(
                 "source_url": row["source_url"],
                 "source_type": row["source_type"],
                 "title": row["title"],
-                "tags": json.loads(row["tags"]) if row["tags"] else [],
+                "tags": safe_json(row["tags"], []),
                 "notes": row["notes"],
                 "created_at": row["created_at"],
             }
@@ -108,40 +106,21 @@ async def create_swipe(
         raise HTTPException(status_code=400, detail="Content must be at least 10 characters")
 
     async with get_db() as db:
-        if settings.use_postgres:
-            row = await db.fetchrow(
-                """
-                INSERT INTO swipe_files (user_id, content, source_url, source_type, title, tags, notes)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-                RETURNING id
-                """,
-                user_id,
-                data.content.strip(),
-                data.source_url,
-                data.source_type or "general",
-                data.title,
-                json.dumps(data.tags) if data.tags else None,
-                data.notes,
-            )
-            swipe_id = row["id"]
-        else:
-            cursor = await db.execute(
-                """
-                INSERT INTO swipe_files (user_id, content, source_url, source_type, title, tags, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    user_id,
-                    data.content.strip(),
-                    data.source_url,
-                    data.source_type or "general",
-                    data.title,
-                    json.dumps(data.tags) if data.tags else None,
-                    data.notes,
-                )
-            )
-            await db.commit()
-            swipe_id = cursor.lastrowid
+        row = await db.fetchrow(
+            """
+            INSERT INTO swipe_files (user_id, content, source_url, source_type, title, tags, notes)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id
+            """,
+            user_id,
+            data.content.strip(),
+            data.source_url,
+            data.source_type or "general",
+            data.title,
+            json.dumps(data.tags) if data.tags else None,
+            data.notes,
+        )
+        swipe_id = row["id"]
 
         return {
             "id": swipe_id,
@@ -171,7 +150,7 @@ async def get_swipe(
             "source_url": row["source_url"],
             "source_type": row["source_type"],
             "title": row["title"],
-            "tags": json.loads(row["tags"]) if row["tags"] else [],
+            "tags": safe_json(row["tags"], []),
             "notes": row["notes"],
             "created_at": row["created_at"],
         }
@@ -226,8 +205,6 @@ async def update_swipe(
             f"UPDATE swipe_files SET {', '.join(updates)} WHERE id = ?",
             tuple(params)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
         return {"message": "Swipe updated successfully"}
 
@@ -244,17 +221,10 @@ async def delete_swipe(
             "DELETE FROM swipe_files WHERE id = ? AND user_id = ?",
             (swipe_id, user_id)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
         # Check if any rows were affected
-        if settings.use_postgres:
-            # PostgreSQL returns command tag like "DELETE 1"
-            if result == "DELETE 0":
-                raise HTTPException(status_code=404, detail="Swipe not found")
-        else:
-            if result == 0:
-                raise HTTPException(status_code=404, detail="Swipe not found")
+        if result == "DELETE 0":
+            raise HTTPException(status_code=404, detail="Swipe not found")
 
         return {"message": "Swipe deleted successfully"}
 
@@ -294,7 +264,7 @@ async def get_swipe_stats(
         )
         tag_counts = {}
         for row in tag_rows:
-            tags = json.loads(row["tags"]) if row["tags"] else []
+            tags = safe_json(row["tags"], [])
             for tag in tags:
                 tag_counts[tag] = tag_counts.get(tag, 0) + 1
 

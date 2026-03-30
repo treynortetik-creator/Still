@@ -4,15 +4,13 @@ import logging
 from datetime import date, datetime, timedelta
 from typing import Tuple, Optional, Dict
 
-from app.config import get_settings
 from app.database import get_db
-from app.db_utils import execute, fetchone, fetchall
+from app.db_utils import execute, fetchone, fetchall, safe_json
 from app.services.ai_client import call_llm_text, calculate_openrouter_cost
 from app.services.prompt_manager import get_rendered_prompt
 from app.utils.json_parser import parse_llm_json
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 def _row_to_source_dict(row) -> Dict:
@@ -21,13 +19,13 @@ def _row_to_source_dict(row) -> Dict:
         "id": row["id"],
         "job_id": row["job_id"],
         "user_id": row["user_id"],
-        "core_narratives": json.loads(row["core_narratives"]) if row["core_narratives"] else [],
-        "statistics": json.loads(row["statistics"]) if row["statistics"] else [],
-        "quotable_moments": json.loads(row["quotable_moments"]) if row["quotable_moments"] else [],
+        "core_narratives": safe_json(row["core_narratives"], []),
+        "statistics": safe_json(row["statistics"], []),
+        "quotable_moments": safe_json(row["quotable_moments"], []),
         "primary_pain_point": row["primary_pain_point"],
         "the_promise": row["the_promise"],
-        "objections_qa": json.loads(row["objections_qa"]) if row["objections_qa"] else [],
-        "key_visuals": json.loads(row["key_visuals"]) if row["key_visuals"] else [],
+        "objections_qa": safe_json(row["objections_qa"], []),
+        "key_visuals": safe_json(row["key_visuals"], []),
         "funnel_stage": row["funnel_stage"],
         "review_date": row["review_date"],
         "is_approved": row["is_approved"],
@@ -120,59 +118,32 @@ async def save_source_of_truth(
         source_id: The ID of the created source record
     """
     async with get_db() as db:
-        # Insert source record
-        if settings.use_postgres:
-            # Convert review_date string to date object for PostgreSQL
-            review_date_str = source_data.get("review_date")
-            review_date = date.fromisoformat(review_date_str) if review_date_str else date.today() + timedelta(days=180)
+        # Convert review_date string to date object for PostgreSQL
+        review_date_str = source_data.get("review_date")
+        review_date = date.fromisoformat(review_date_str) if review_date_str else date.today() + timedelta(days=180)
 
-            row = await db.fetchrow(
-                """
-                INSERT INTO sources (
-                    job_id, user_id, core_narratives, statistics, quotable_moments,
-                    primary_pain_point, the_promise, objections_qa, key_visuals,
-                    funnel_stage, review_date
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-                RETURNING id
-                """,
-                job_id,
-                user_id,
-                json.dumps(source_data.get("core_narratives", [])),
-                json.dumps(source_data.get("statistics", [])),
-                json.dumps(source_data.get("quotable_moments", [])),
-                source_data.get("primary_pain_point", ""),
-                source_data.get("the_promise", ""),
-                json.dumps(source_data.get("objections_qa", [])),
-                json.dumps(source_data.get("key_visuals", [])),
-                source_data.get("funnel_stage", "awareness"),
-                review_date,
-            )
-            source_id = row["id"]
-        else:
-            cursor = await db.execute(
-                """
-                INSERT INTO sources (
-                    job_id, user_id, core_narratives, statistics, quotable_moments,
-                    primary_pain_point, the_promise, objections_qa, key_visuals,
-                    funnel_stage, review_date
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    job_id,
-                    user_id,
-                    json.dumps(source_data.get("core_narratives", [])),
-                    json.dumps(source_data.get("statistics", [])),
-                    json.dumps(source_data.get("quotable_moments", [])),
-                    source_data.get("primary_pain_point", ""),
-                    source_data.get("the_promise", ""),
-                    json.dumps(source_data.get("objections_qa", [])),
-                    json.dumps(source_data.get("key_visuals", [])),
-                    source_data.get("funnel_stage", "awareness"),
-                    source_data.get("review_date"),
-                )
-            )
-            source_id = cursor.lastrowid
-            await db.commit()
+        row = await db.fetchrow(
+            """
+            INSERT INTO sources (
+                job_id, user_id, core_narratives, statistics, quotable_moments,
+                primary_pain_point, the_promise, objections_qa, key_visuals,
+                funnel_stage, review_date
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            RETURNING id
+            """,
+            job_id,
+            user_id,
+            json.dumps(source_data.get("core_narratives", [])),
+            json.dumps(source_data.get("statistics", [])),
+            json.dumps(source_data.get("quotable_moments", [])),
+            source_data.get("primary_pain_point", ""),
+            source_data.get("the_promise", ""),
+            json.dumps(source_data.get("objections_qa", [])),
+            json.dumps(source_data.get("key_visuals", [])),
+            source_data.get("funnel_stage", "awareness"),
+            review_date,
+        )
+        source_id = row["id"]
 
         # Update job with source_id
         await execute(
@@ -180,8 +151,6 @@ async def save_source_of_truth(
             "UPDATE jobs SET source_id = ? WHERE id = ?",
             (source_id, job_id)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
     logger.info(f"Saved Source of Truth {source_id} for job {job_id}")
     return source_id
@@ -204,8 +173,6 @@ async def approve_source_of_truth(source_id: int) -> None:
             """,
             (True, datetime.now(), source_id)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
     logger.info(f"Source of Truth {source_id} approved")
 
@@ -268,8 +235,6 @@ async def update_source_of_truth(
 
     async with get_db() as db:
         await execute(db, query, tuple(values))
-        if not settings.use_postgres:
-            await db.commit()
 
     logger.info(f"Updated Source of Truth {source_id}")
 

@@ -6,7 +6,7 @@ from datetime import datetime
 
 from app.database import get_db
 from app.config import get_settings
-from app.db_utils import execute, fetchone, fetchall
+from app.db_utils import execute, fetchone, fetchall, safe_json
 
 logger = logging.getLogger(__name__)
 from app.services.pipeline import process_job
@@ -31,7 +31,7 @@ async def process_batch(batch_id: str):
         if not row:
             return
 
-        job_ids = json.loads(row["job_ids"])
+        job_ids = safe_json(row["job_ids"], [])
         user_id = row["user_id"]
 
     # Update batch status to processing
@@ -61,8 +61,6 @@ async def process_batch(batch_id: str):
                         """,
                         (str(e), job_id)
                     )
-                    if not settings.use_postgres:
-                        await db.commit()
             finally:
                 # Update batch progress after each job completes
                 await update_batch_progress(batch_id)
@@ -85,8 +83,6 @@ async def update_batch_status(batch_id: str, status: str):
             "UPDATE batches SET status = ? WHERE id = ?",
             (status, batch_id)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
 
 async def update_batch_progress(batch_id: str):
@@ -101,7 +97,7 @@ async def update_batch_progress(batch_id: str):
         if not row:
             return
 
-        job_ids = json.loads(row["job_ids"])
+        job_ids = safe_json(row["job_ids"], [])
 
         # Count completed and failed jobs
         stats = await fetchone(
@@ -132,8 +128,6 @@ async def update_batch_progress(batch_id: str):
                 batch_id
             )
         )
-        if not settings.use_postgres:
-            await db.commit()
 
 
 async def finalize_batch(batch_id: str):
@@ -169,8 +163,6 @@ async def finalize_batch(batch_id: str):
             """,
             (status, datetime.utcnow(), batch_id)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
         # Get user_id for webhook
         batch_row = await fetchone(

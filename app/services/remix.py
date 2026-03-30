@@ -4,13 +4,11 @@ import logging
 from typing import Dict, List, Tuple
 from collections import defaultdict
 
-from app.config import get_settings
 from app.database import get_db
-from app.db_utils import execute, fetchone, fetchall
+from app.db_utils import execute, fetchone, fetchall, safe_json
 from app.services.ai_client import call_llm_text, calculate_openrouter_cost
 from app.utils.json_parser import parse_llm_json
 
-settings = get_settings()
 logger = logging.getLogger(__name__)
 
 
@@ -55,7 +53,7 @@ async def analyze_library_for_remix(user_id: int) -> Tuple[Dict, float]:
         # Prepare stills for analysis
         stills_text = []
         for i, row in enumerate(rows, 1):
-            tags = json.loads(row["tags"]) if row["tags"] else []
+            tags = safe_json(row["tags"], [])
             stills_text.append(f"""
 [Still #{i}] Type: {row["still_type"]}
 Content: {row["content"]}
@@ -158,8 +156,6 @@ Focus on quality over quantity. Only include suggestions that would genuinely ma
             "UPDATE users SET total_cost_incurred = total_cost_incurred + ? WHERE id = ?",
             (cost, user_id)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
     result["still_count"] = len(rows)
     return result, cost
@@ -198,7 +194,7 @@ async def get_stills_by_topic(user_id: int, topic: str) -> List[Dict]:
                 "id": row["id"],
                 "still_type": row["still_type"],
                 "content": row["content"],
-                "tags": json.loads(row["tags"]) if row["tags"] else [],
+                "tags": safe_json(row["tags"], []),
                 "source_file": row["source_file"],
             }
             for row in rows
@@ -237,7 +233,7 @@ async def get_library_stats(user_id: int) -> Dict:
         )
         tag_counts = defaultdict(int)
         for row in tag_rows:
-            tags = json.loads(row["tags"]) if row["tags"] else []
+            tags = safe_json(row["tags"], [])
             for tag in tags:
                 tag_counts[tag] += 1
 
@@ -333,7 +329,5 @@ Return ONLY the content, no explanations."""
             "UPDATE users SET total_cost_incurred = total_cost_incurred + ? WHERE id = ?",
             (cost, user_id)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
     return response_text.strip(), cost

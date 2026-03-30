@@ -5,12 +5,10 @@ from typing import Optional
 from collections import defaultdict
 from fastapi import APIRouter, HTTPException, Depends, Query
 
-from app.config import get_settings
 from app.database import get_db
 from app.db_utils import execute, fetchone, fetchall
 from app.api.auth import get_current_user_id
 
-settings = get_settings()
 from app.models.calendar import (
     ScheduleCreate,
     ScheduleUpdate,
@@ -80,50 +78,21 @@ async def schedule_content(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM:SS")
 
-        if settings.use_postgres:
-            row = await db.fetchrow(
-                """
-                INSERT INTO content_schedule
-                (user_id, output_id, scheduled_date, scheduled_time, platform, notes)
-                VALUES ($1, $2, $3, $4, $5, $6)
-                RETURNING *
-                """,
-                user_id,
-                data.output_id,
-                scheduled_date_obj,
-                scheduled_time_obj,
-                data.platform,
-                data.notes
-            )
-            schedule = dict(row)
-        else:
-            await execute(
-                db,
-                """
-                INSERT INTO content_schedule
-                (user_id, output_id, scheduled_date, scheduled_time, platform, notes)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    user_id,
-                    data.output_id,
-                    scheduled_date_obj.isoformat(),  # SQLite stores dates as strings
-                    scheduled_time_obj.isoformat(),  # SQLite stores times as strings
-                    data.platform,
-                    data.notes
-                )
-            )
-            await db.commit()
-
-            # Get created schedule
-            cursor = await db.execute("SELECT last_insert_rowid()")
-            schedule_id = (await cursor.fetchone())[0]
-
-            schedule = await fetchone(
-                db,
-                "SELECT * FROM content_schedule WHERE id = ?",
-                (schedule_id,)
-            )
+        row = await db.fetchrow(
+            """
+            INSERT INTO content_schedule
+            (user_id, output_id, scheduled_date, scheduled_time, platform, notes)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING *
+            """,
+            user_id,
+            data.output_id,
+            scheduled_date_obj,
+            scheduled_time_obj,
+            data.platform,
+            data.notes
+        )
+        schedule = dict(row)
 
         if not schedule:
             raise HTTPException(
@@ -345,8 +314,7 @@ async def update_schedule(
             except ValueError:
                 raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
             updates.append("scheduled_date = ?")
-            # Use date object for PostgreSQL, string for SQLite
-            values.append(scheduled_date_obj if settings.use_postgres else data.scheduled_date)
+            values.append(scheduled_date_obj)
 
         if data.scheduled_time is not None:
             # Convert string to time object for asyncpg (PostgreSQL requires proper time types)
@@ -355,8 +323,7 @@ async def update_schedule(
             except ValueError:
                 raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM:SS")
             updates.append("scheduled_time = ?")
-            # Use time object for PostgreSQL, string for SQLite
-            values.append(scheduled_time_obj if settings.use_postgres else data.scheduled_time)
+            values.append(scheduled_time_obj)
 
         if data.platform is not None:
             valid_platforms = {"linkedin", "blog", "email", "email_sequence"}
@@ -384,8 +351,6 @@ async def update_schedule(
                 f"UPDATE content_schedule SET {', '.join(updates)} WHERE id = ?",
                 tuple(values)
             )
-            if not settings.use_postgres:
-                await db.commit()
 
         # Get updated schedule with content
         updated = await fetchone(
@@ -436,7 +401,5 @@ async def delete_schedule(
             "DELETE FROM content_schedule WHERE id = ?",
             (schedule_id,)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
     return {"message": "Schedule removed"}

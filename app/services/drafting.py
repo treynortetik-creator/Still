@@ -11,7 +11,6 @@ from app.services.distillation import select_stills_for_content_type, group_stil
 from app.services.brand_voice_analyzer import get_brand_voice_template_vars
 from app.services.source_of_truth import get_source_of_truth_template_vars
 from app.utils.json_parser import parse_llm_json
-from app.config import get_settings
 from app.database import get_db
 from app.db_utils import execute, fetchall
 
@@ -38,42 +37,21 @@ async def record_still_usage(still_ids: List[str], output_id: int) -> None:
         return
 
     now = datetime.utcnow().isoformat()
-    settings = get_settings()
 
     try:
         async with get_db() as db:
-            if settings.use_postgres:
-                # PostgreSQL - update stills
-                await db.execute("""
-                    UPDATE stills
-                    SET usage_count = COALESCE(usage_count, 0) + 1,
-                        last_used_at = $1
-                    WHERE id = ANY($2)
-                """, now, still_ids)
+            await db.execute("""
+                UPDATE stills
+                SET usage_count = COALESCE(usage_count, 0) + 1,
+                    last_used_at = $1
+                WHERE id = ANY($2)
+            """, now, still_ids)
 
-                # Update stills_used on output
-                await db.execute("""
-                    UPDATE outputs
-                    SET stills_used = $1
-                    WHERE id = $2
-                """, json.dumps(still_ids), output_id)
-            else:
-                # SQLite
-                placeholders = ','.join('?' * len(still_ids))
-                await db.execute(f"""
-                    UPDATE stills
-                    SET usage_count = COALESCE(usage_count, 0) + 1,
-                        last_used_at = ?
-                    WHERE id IN ({placeholders})
-                """, [now] + still_ids)
-
-                await db.execute("""
-                    UPDATE outputs
-                    SET stills_used = ?
-                    WHERE id = ?
-                """, (json.dumps(still_ids), output_id))
-
-                await db.commit()
+            await db.execute("""
+                UPDATE outputs
+                SET stills_used = $1
+                WHERE id = $2
+            """, json.dumps(still_ids), output_id)
 
         logger.info(f"Recorded usage of {len(still_ids)} stills for output {output_id}")
 

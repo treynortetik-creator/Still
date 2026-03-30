@@ -1,12 +1,11 @@
 """Persona management and brand voice preview API."""
-import json
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.api.auth import get_current_user_id
 from app.database import get_db
-from app.db_utils import fetchall
+from app.db_utils import fetchall, safe_json
 from app.services.persona_manager import get_persona, list_personas, load_personas
 from app.services.ai_client import call_llm_text
 from app.utils.json_parser import parse_llm_json
@@ -46,12 +45,12 @@ def _row_to_persona_dict(row) -> dict:
         "role": row["role"],
         "title": f"{row['name']} ({row['role']})",
         "industry": row["industry"],
-        "pain_points": json.loads(row["pain_points"]) if row["pain_points"] else [],
-        "goals": json.loads(row["goals"]) if row["goals"] else [],
-        "priorities": json.loads(row["goals"]) if row["goals"] else [],
+        "pain_points": safe_json(row["pain_points"], []),
+        "goals": safe_json(row["goals"], []),
+        "priorities": safe_json(row["goals"], []),
         "language_level": "Professional",
-        "tone_preferences": json.loads(row["tone_preferences"]) if row["tone_preferences"] else None,
-        "content_preferences": json.loads(row["content_preferences"]) if row["content_preferences"] else None,
+        "tone_preferences": safe_json(row["tone_preferences"]),
+        "content_preferences": safe_json(row["content_preferences"]),
         "is_default": bool(row["is_default"]),
         "is_custom": True,
         "created_at": row["created_at"],

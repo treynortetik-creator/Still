@@ -2,11 +2,9 @@
 import json
 import logging
 from typing import List, Dict, Optional, Tuple
-from app.config import get_settings
 from app.database import get_db
 from app.db_utils import execute, fetchall
 
-settings = get_settings()
 logger = logging.getLogger(__name__)
 from app.services.ai_client import call_llm_text, calculate_openrouter_cost
 from app.services.brand_voice_analyzer import get_brand_voice_profile
@@ -74,29 +72,16 @@ async def get_editor_config() -> Dict[str, str]:
 async def save_editor_config(config_key: str, config_value: str) -> None:
     """Save AI editor configuration to database."""
     async with get_db() as db:
-        if settings.use_postgres:
-            await db.execute(
-                """
-                INSERT INTO ai_editor_config (config_key, config_value, updated_at)
-                VALUES ($1, $2, NOW())
-                ON CONFLICT(config_key) DO UPDATE SET
-                    config_value = EXCLUDED.config_value,
-                    updated_at = NOW()
-                """,
-                config_key, config_value
-            )
-        else:
-            await db.execute(
-                """
-                INSERT INTO ai_editor_config (config_key, config_value, updated_at)
-                VALUES (?, ?, CURRENT_TIMESTAMP)
-                ON CONFLICT(config_key) DO UPDATE SET
-                    config_value = excluded.config_value,
-                    updated_at = CURRENT_TIMESTAMP
-                """,
-                (config_key, config_value)
-            )
-            await db.commit()
+        await db.execute(
+            """
+            INSERT INTO ai_editor_config (config_key, config_value, updated_at)
+            VALUES ($1, $2, NOW())
+            ON CONFLICT(config_key) DO UPDATE SET
+                config_value = EXCLUDED.config_value,
+                updated_at = NOW()
+            """,
+            config_key, config_value
+        )
 
 
 async def get_ai_edit_suggestions(

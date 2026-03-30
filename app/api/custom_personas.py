@@ -5,13 +5,10 @@ from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 
-from app.config import get_settings
 from app.database import get_db
-from app.db_utils import execute, fetchone, fetchall
+from app.db_utils import execute, fetchone, fetchall, safe_json
 from app.api.auth import get_current_user_id
 from app.models.persona import PersonaCreate, PersonaUpdate, PersonaResponse, PersonaListResponse
-
-settings = get_settings()
 router = APIRouter()
 
 
@@ -24,11 +21,11 @@ def _row_to_persona_dict(row) -> dict:
         "role": row["role"],
         "title": f"{row['name']} ({row['role']})",  # For compatibility with default personas
         "industry": row["industry"],
-        "pain_points": json.loads(row["pain_points"]) if row["pain_points"] else [],
-        "goals": json.loads(row["goals"]) if row["goals"] else [],
-        "priorities": json.loads(row["goals"]) if row["goals"] else [],  # Alias for compatibility
-        "tone_preferences": json.loads(row["tone_preferences"]) if row["tone_preferences"] else None,
-        "content_preferences": json.loads(row["content_preferences"]) if row["content_preferences"] else None,
+        "pain_points": safe_json(row["pain_points"], []),
+        "goals": safe_json(row["goals"], []),
+        "priorities": safe_json(row["goals"], []),  # Alias for compatibility
+        "tone_preferences": safe_json(row["tone_preferences"]),
+        "content_preferences": safe_json(row["content_preferences"]),
         "language_level": row["language_level"] if "language_level" in (row.keys() if hasattr(row, 'keys') else dict(row).keys()) else "Professional",
         "is_default": bool(row["is_default"]),
         "is_custom": True,
@@ -69,8 +66,6 @@ async def create_persona(
                 now,
             )
         )
-        if not settings.use_postgres:
-            await db.commit()
 
         # Set language_level if column exists (safe for pre-migration DBs)
         try:
@@ -80,8 +75,6 @@ async def create_persona(
                     "UPDATE personas SET language_level = ? WHERE id = ?",
                     (persona_data.language_level, persona_id)
                 )
-                if not settings.use_postgres:
-                    await db.commit()
         except Exception:
             pass  # Column doesn't exist yet - migration pending
 
@@ -98,10 +91,10 @@ async def create_persona(
         name=row["name"],
         role=row["role"],
         industry=row["industry"],
-        pain_points=json.loads(row["pain_points"]),
-        goals=json.loads(row["goals"]),
-        tone_preferences=json.loads(row["tone_preferences"]) if row["tone_preferences"] else None,
-        content_preferences=json.loads(row["content_preferences"]) if row["content_preferences"] else None,
+        pain_points=safe_json(row["pain_points"], []),
+        goals=safe_json(row["goals"], []),
+        tone_preferences=safe_json(row["tone_preferences"]),
+        content_preferences=safe_json(row["content_preferences"]),
         is_default=bool(row["is_default"]),
         created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else datetime.utcnow(),
         updated_at=datetime.fromisoformat(row["updated_at"]) if row["updated_at"] else datetime.utcnow(),
@@ -200,8 +193,6 @@ async def update_persona(
             f"UPDATE personas SET {', '.join(update_fields)} WHERE id = ? AND user_id = ?",
             tuple(params)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
         # Fetch updated persona
         row = await fetchone(
@@ -235,7 +226,5 @@ async def delete_persona(
             "DELETE FROM personas WHERE id = ? AND user_id = ?",
             (persona_id, user_id)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
     return {"message": "Persona deleted successfully"}

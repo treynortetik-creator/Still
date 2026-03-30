@@ -6,7 +6,7 @@ from typing import Optional
 
 from app.config import get_settings
 from app.database import get_db
-from app.db_utils import execute, fetchone, fetchval
+from app.db_utils import execute, fetchone, fetchval, safe_json
 
 settings = get_settings()
 
@@ -157,9 +157,6 @@ async def init_prompts_from_files():
                 )
             )
 
-        # Commit for SQLite (PostgreSQL auto-commits)
-        if not settings.use_postgres:
-            await db.commit()
 
 
 async def get_prompt(template_name: str) -> Optional[dict]:
@@ -187,7 +184,7 @@ async def get_prompt(template_name: str) -> Optional[dict]:
             "model": row["model"],
             "max_tokens": row["max_tokens"],
             "prompt_content": row["prompt_content"],
-            "variables": json.loads(row["variables"]) if row["variables"] else [],
+            "variables": safe_json(row["variables"], []),
         }
 
 

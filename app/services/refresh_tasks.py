@@ -3,14 +3,12 @@ import logging
 from datetime import datetime, timedelta, date
 from typing import Dict, List, Optional
 
-from app.config import get_settings
 from app.database import get_db
 from app.db_utils import execute, fetchall, fetchone
 from app.services.settings_manager import get_global_setting
 from app.services.library_manager import calculate_similarity
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 def get_date_param(dt: datetime) -> date:
@@ -158,59 +156,32 @@ async def run_refresh_maintenance(user_id: int = None) -> Dict[str, int]:
         user_params = (user_id,) if user_id else ()
 
         # 1. Mark stills expiring soon as needs_review
-        if settings.use_postgres:
-            cursor = await db.fetch(f"""
-                UPDATE stills
-                SET status = 'needs_review'
-                WHERE status = 'active'
-                AND expiration_type != 'evergreen'
-                AND expiration_date IS NOT NULL
-                AND expiration_date <= $1
-                AND expiration_date > $2
-                {user_filter.replace('?', '$3') if user_id else ''}
-                RETURNING id
-            """, warning_date, today, *user_params)
-            results["stills_marked_needs_review"] = len(cursor)
-        else:
-            cursor = await db.execute(f"""
-                UPDATE stills
-                SET status = 'needs_review'
-                WHERE status = 'active'
-                AND expiration_type != 'evergreen'
-                AND expiration_date IS NOT NULL
-                AND expiration_date <= ?
-                AND expiration_date > ?
-                {user_filter}
-            """, (warning_date, today) + user_params)
-            results["stills_marked_needs_review"] = cursor.rowcount
-            await db.commit()
+        cursor = await db.fetch(f"""
+            UPDATE stills
+            SET status = 'needs_review'
+            WHERE status = 'active'
+            AND expiration_type != 'evergreen'
+            AND expiration_date IS NOT NULL
+            AND expiration_date <= $1
+            AND expiration_date > $2
+            {user_filter.replace('?', '$3') if user_id else ''}
+            RETURNING id
+        """, warning_date, today, *user_params)
+        results["stills_marked_needs_review"] = len(cursor)
 
         # 2. Auto-retire expired stills (if enabled)
         if auto_retire:
-            if settings.use_postgres:
-                cursor = await db.fetch(f"""
-                    UPDATE stills
-                    SET status = 'retired'
-                    WHERE status IN ('active', 'needs_review')
-                    AND expiration_type != 'evergreen'
-                    AND expiration_date IS NOT NULL
-                    AND expiration_date < $1
-                    {user_filter.replace('?', '$2') if user_id else ''}
-                    RETURNING id
-                """, today, *user_params)
-                results["stills_retired"] = len(cursor)
-            else:
-                cursor = await db.execute(f"""
-                    UPDATE stills
-                    SET status = 'retired'
-                    WHERE status IN ('active', 'needs_review')
-                    AND expiration_type != 'evergreen'
-                    AND expiration_date IS NOT NULL
-                    AND expiration_date < ?
-                    {user_filter}
-                """, (today,) + user_params)
-                results["stills_retired"] = cursor.rowcount
-                await db.commit()
+            cursor = await db.fetch(f"""
+                UPDATE stills
+                SET status = 'retired'
+                WHERE status IN ('active', 'needs_review')
+                AND expiration_type != 'evergreen'
+                AND expiration_date IS NOT NULL
+                AND expiration_date < $1
+                {user_filter.replace('?', '$2') if user_id else ''}
+                RETURNING id
+            """, today, *user_params)
+            results["stills_retired"] = len(cursor)
 
         # 3. Count sources needing review
         row = await fetchone(db, f"""
@@ -329,9 +300,6 @@ async def merge_duplicate_stills(winner_id: str, loser_id: str, user_id: int) ->
     - retired_still_id: str
     - error: str (if failed)
     """
-    from app.config import get_settings
-    settings = get_settings()
-
     async with get_db() as db:
         # Verify both stills belong to user and are active
         winner = await fetchone(db,
@@ -356,8 +324,6 @@ async def merge_duplicate_stills(winner_id: str, loser_id: str, user_id: int) ->
             (loser_id,)
         )
 
-        if not settings.use_postgres:
-            await db.commit()
 
     return {
         "success": True,

@@ -4,9 +4,7 @@ import logging
 import traceback
 from typing import Optional
 
-from app.config import get_settings
 from app.database import get_db
-from app.db_utils import execute
 
 logger = logging.getLogger(__name__)
 
@@ -35,25 +33,15 @@ async def log_error(
         additional_context: Any extra info as dict (stored as JSONB)
     """
     try:
-        settings = get_settings()
         context_json = json.dumps(additional_context) if additional_context else None
 
         async with get_db() as db:
-            if settings.use_postgres:
-                await db.execute("""
-                    INSERT INTO error_logs
-                    (error_type, error_message, source, user_id, job_id, endpoint, stack_trace, additional_context)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                """, error_type or "unknown", error_message or "No message", source,
-                    user_id, job_id, endpoint, stack_trace, context_json)
-            else:
-                await execute(db, """
-                    INSERT INTO error_logs
-                    (error_type, error_message, source, user_id, job_id, endpoint, stack_trace, additional_context)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (error_type or "unknown", error_message or "No message", source,
-                      user_id, job_id, endpoint, stack_trace, context_json))
-                await db.commit()
+            await db.execute("""
+                INSERT INTO error_logs
+                (error_type, error_message, source, user_id, job_id, endpoint, stack_trace, additional_context)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            """, error_type or "unknown", error_message or "No message", source,
+                user_id, job_id, endpoint, stack_trace, context_json)
     except Exception as e:
         # Never raise - just log to console as fallback
         logger.error(f"Failed to log error to database: {e}")

@@ -4,15 +4,12 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import StreamingResponse
 from typing import Optional
 
-from app.config import get_settings
 from app.database import get_db
-from app.db_utils import fetchone, fetchall, fetchval, sql
+from app.db_utils import fetchone, fetchall, fetchval, sql, safe_json
 from app.models.job import JobStatus, JobStatusResponse
 from app.api.auth import get_current_user_id
 from app.rate_limiter import limiter
 from app.services.stream_manager import get_stream, get_or_create_stream
-
-settings = get_settings()
 
 router = APIRouter()
 
@@ -198,13 +195,9 @@ async def get_job_results(
         # Fetch all image prompts for these outputs in a single query (fixes N+1)
         image_prompts_by_output = {}
         if output_ids:
-            # Build parameterized IN clause
-            if settings.use_postgres:
-                placeholders = ",".join(f"${i+1}" for i in range(len(output_ids)))
-            else:
-                placeholders = ",".join("?" * len(output_ids))
+            placeholders = ",".join("?" * len(output_ids))
             query = f"SELECT id, output_id, prompt_text, platform, dimensions, style_modifiers FROM image_prompts WHERE output_id IN ({placeholders})"
-            prompt_rows = await fetchall(db, query, tuple(output_ids)) if not settings.use_postgres else await db.fetch(query, *output_ids)
+            prompt_rows = await fetchall(db, query, tuple(output_ids))
             for p in prompt_rows:
                 output_id = p["output_id"]
                 if output_id not in image_prompts_by_output:
@@ -226,11 +219,11 @@ async def get_job_results(
                 "step1_draft": row["step1_draft"],
                 "step2_edited": row["step2_edited"],
                 "step3_final": row["step3_final"],
-                "stills_used": json.loads(row["stills_used"]) if row["stills_used"] else [],
-                "citations": json.loads(row["citations"]) if row["citations"] else [],
-                "warnings": json.loads(row["warnings"]) if row["warnings"] else [],
-                "quality_scores": json.loads(row["quality_scores"]) if row["quality_scores"] else {},
-                "hook_variations": json.loads(row["hook_variations"]) if row["hook_variations"] else [],
+                "stills_used": safe_json(row["stills_used"], []),
+                "citations": safe_json(row["citations"], []),
+                "warnings": safe_json(row["warnings"], []),
+                "quality_scores": safe_json(row["quality_scores"], {}),
+                "hook_variations": safe_json(row["hook_variations"], []),
             }
             # Add email sequence fields if present
             if row["subject"]:
@@ -268,8 +261,8 @@ async def get_job_results(
                 "type": row["still_type"],
                 "content": row["content"],
                 "source_location": row["source_location"],
-                "tags": json.loads(row["tags"]) if row["tags"] else [],
-                "persona_relevance": json.loads(row["persona_relevance"]) if row["persona_relevance"] else {},
+                "tags": safe_json(row["tags"], []),
+                "persona_relevance": safe_json(row["persona_relevance"], {}),
                 "quote_attribution": row["quote_attribution"],
             })
 
@@ -278,8 +271,8 @@ async def get_job_results(
             "status": job["status"],
             "original_filename": job["original_filename"],
             "target_persona": job["target_persona"],
-            "asset_types": json.loads(job["asset_types"]) if job["asset_types"] else [],
-            "asset_quantities": json.loads(job["asset_quantities"]) if job["asset_quantities"] else {},
+            "asset_types": safe_json(job["asset_types"], []),
+            "asset_quantities": safe_json(job["asset_quantities"], {}),
             "outputs": outputs,
             "stills": stills,
             "atoms": stills,  # Keep for backwards compatibility
@@ -381,43 +374,22 @@ async def get_usage_stats(request: Request, user_id: int = Depends(get_current_u
         total_jobs = await fetchval(db, "SELECT COUNT(*) FROM jobs WHERE user_id = ?", (user_id,))
 
         # Get cost breakdown by month (last 6 months)
-        if settings.use_postgres:
-            monthly_query = """
-                SELECT
-                    TO_CHAR(created_at, 'YYYY-MM') as month,
-                    SUM(cost_incurred) as cost,
-                    COUNT(*) as job_count
-                FROM jobs
-                WHERE user_id = $1
-                    AND created_at >= CURRENT_DATE - INTERVAL '6 months'
-                GROUP BY TO_CHAR(created_at, 'YYYY-MM')
-                ORDER BY month DESC
-            """
-            monthly_rows = await db.fetch(monthly_query, user_id)
-            monthly_costs = [
-                {"month": row["month"], "cost": row["cost"], "jobs": row["job_count"]}
-                for row in monthly_rows
-            ]
-        else:
-            monthly_rows = await fetchall(
-                db,
-                """
-                SELECT
-                    strftime('%Y-%m', created_at) as month,
-                    SUM(cost_incurred) as cost,
-                    COUNT(*) as job_count
-                FROM jobs
-                WHERE user_id = ?
-                    AND created_at >= date('now', '-6 months')
-                GROUP BY strftime('%Y-%m', created_at)
-                ORDER BY month DESC
-                """,
-                (user_id,)
-            )
-            monthly_costs = [
-                {"month": row["month"], "cost": row["cost"], "jobs": row["job_count"]}
-                for row in monthly_rows
-            ]
+        monthly_query = """
+            SELECT
+                TO_CHAR(created_at, 'YYYY-MM') as month,
+                SUM(cost_incurred) as cost,
+                COUNT(*) as job_count
+            FROM jobs
+            WHERE user_id = $1
+                AND created_at >= CURRENT_DATE - INTERVAL '6 months'
+            GROUP BY TO_CHAR(created_at, 'YYYY-MM')
+            ORDER BY month DESC
+        """
+        monthly_rows = await db.fetch(monthly_query, user_id)
+        monthly_costs = [
+            {"month": row["month"], "cost": row["cost"], "jobs": row["job_count"]}
+            for row in monthly_rows
+        ]
 
         # Get content type breakdown
         content_rows = await fetchall(

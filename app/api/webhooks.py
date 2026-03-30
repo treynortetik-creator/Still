@@ -2,12 +2,10 @@
 import json
 from fastapi import APIRouter, HTTPException, Depends
 
-from app.config import get_settings
-from app.database import get_db
-from app.db_utils import execute, fetchone, fetchall
+from app.database import get_db, transaction
+from app.db_utils import execute, fetchone, fetchall, safe_json
 from app.api.auth import get_current_user_id
 
-settings = get_settings()
 from app.models.webhook import (
     WebhookCreate,
     WebhookUpdate,
@@ -69,45 +67,18 @@ async def create_webhook(
             )
 
         # Create webhook
-        if settings.use_postgres:
-            webhook = await db.fetchrow(
-                """
-                INSERT INTO webhooks (user_id, name, url, secret_key, trigger_events)
-                VALUES ($1, $2, $3, $4, $5)
-                RETURNING *
-                """,
-                user_id,
-                data.name,
-                data.url,
-                secret_key,
-                json.dumps(data.trigger_events)
-            )
-        else:
-            await execute(
-                db,
-                """
-                INSERT INTO webhooks (user_id, name, url, secret_key, trigger_events)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (
-                    user_id,
-                    data.name,
-                    data.url,
-                    secret_key,
-                    json.dumps(data.trigger_events)
-                )
-            )
-            await db.commit()
-
-            # Get the created webhook
-            cursor = await db.execute("SELECT last_insert_rowid()")
-            webhook_id = (await cursor.fetchone())[0]
-
-            webhook = await fetchone(
-                db,
-                "SELECT * FROM webhooks WHERE id = ?",
-                (webhook_id,)
-            )
+        webhook = await db.fetchrow(
+            """
+            INSERT INTO webhooks (user_id, name, url, secret_key, trigger_events)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING *
+            """,
+            user_id,
+            data.name,
+            data.url,
+            secret_key,
+            json.dumps(data.trigger_events)
+        )
 
         if not webhook:
             raise HTTPException(
@@ -121,7 +92,7 @@ async def create_webhook(
         name=webhook["name"],
         url=webhook["url"],
         secret_key=webhook["secret_key"],
-        trigger_events=json.loads(webhook["trigger_events"]),
+        trigger_events=safe_json(webhook["trigger_events"], []),
         is_active=bool(webhook["is_active"]),
         created_at=webhook["created_at"]
     )
@@ -147,7 +118,7 @@ async def list_webhooks(user_id: int = Depends(get_current_user_id)):
             name=row["name"],
             url=row["url"],
             secret_key_preview=mask_secret_key(row["secret_key"]),
-            trigger_events=json.loads(row["trigger_events"]),
+            trigger_events=safe_json(row["trigger_events"], []),
             is_active=bool(row["is_active"]),
             created_at=row["created_at"]
         )
@@ -178,7 +149,7 @@ async def get_webhook(
         name=webhook["name"],
         url=webhook["url"],
         secret_key_preview=mask_secret_key(webhook["secret_key"]),
-        trigger_events=json.loads(webhook["trigger_events"]),
+        trigger_events=safe_json(webhook["trigger_events"], []),
         is_active=bool(webhook["is_active"]),
         created_at=webhook["created_at"]
     )
@@ -241,8 +212,6 @@ async def update_webhook(
                 f"UPDATE webhooks SET {', '.join(updates)} WHERE id = ?",
                 tuple(values)
             )
-            if not settings.use_postgres:
-                await db.commit()
 
         # Fetch updated webhook
         webhook = await fetchone(
@@ -256,7 +225,7 @@ async def update_webhook(
         name=webhook["name"],
         url=webhook["url"],
         secret_key_preview=mask_secret_key(webhook["secret_key"]),
-        trigger_events=json.loads(webhook["trigger_events"]),
+        trigger_events=safe_json(webhook["trigger_events"], []),
         is_active=bool(webhook["is_active"]),
         created_at=webhook["created_at"]
     )
@@ -278,6 +247,8 @@ async def delete_webhook(
         if not existing:
             raise HTTPException(status_code=404, detail="Webhook not found")
 
+    # Wrap multi-delete in a transaction
+    async with transaction() as db:
         # Delete delivery records first
         await execute(
             db,
@@ -291,8 +262,6 @@ async def delete_webhook(
             "DELETE FROM webhooks WHERE id = ?",
             (webhook_id,)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
     return {"message": "Webhook deleted"}
 
@@ -349,7 +318,5 @@ async def regenerate_secret(
             "UPDATE webhooks SET secret_key = ? WHERE id = ?",
             (new_secret, webhook_id)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
     return {"secret_key": new_secret}

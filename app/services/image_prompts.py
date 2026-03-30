@@ -3,11 +3,9 @@ import json
 import logging
 from typing import Tuple, Optional
 
-from app.config import get_settings
 from app.services.ai_client import call_llm_text, calculate_openrouter_cost
 from app.utils.json_parser import parse_llm_json
 
-settings = get_settings()
 logger = logging.getLogger(__name__)
 
 # Platform-specific dimensions for images
@@ -181,8 +179,6 @@ async def save_image_prompts_to_db(output_id: int, prompts: list[dict]) -> None:
                     prompt.get("style_modifiers"),
                 )
             )
-        if not settings.use_postgres:
-            await db.commit()
 
 
 async def get_image_prompts_for_output(output_id: int) -> list[dict]:

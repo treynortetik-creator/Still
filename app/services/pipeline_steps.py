@@ -1,11 +1,9 @@
 """Pipeline step functions - extracted steps for the content generation pipeline."""
 import asyncio
-import json
 import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
-from app.config import get_settings
 from app.database import get_db
 from app.db_utils import execute, fetchone
 from app.models.job import JobStatus
@@ -18,21 +16,17 @@ from app.services.drafting import (
     draft_email_sequence,
 )
 from app.services.hook_generator import batch_generate_hooks
-from app.services.editing import batch_edit_content
-from app.services.factcheck import batch_factcheck_content
 from app.services.library_manager import add_stills_to_library, save_stills_to_db, save_outputs_to_db
-from app.services.scoring import batch_score_content
-from app.services.persona_manager import get_persona
+from app.services.review import batch_review_and_polish
 from app.services.image_prompts import batch_generate_image_prompts
 from app.services.webhook_manager import (
     trigger_webhook_event,
     get_job_webhook_payload,
     get_content_webhook_payload,
 )
-from app.services.stream_manager import get_or_create_stream, get_stream
+from app.services.stream_manager import get_stream
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 async def emit_stream_step(job_id: str, step_name: str, description: str = ""):
@@ -54,11 +48,11 @@ class PipelineContext:
     original_filename: str
     campaign_name: Optional[str]
     cleaned_transcript: str
-    source_id: Optional[str] = None
+    source_id: Optional[int] = None
+    source_data: Optional[dict] = None
     generate_image_prompts: bool = False
 
     # Accumulated during pipeline
-    total_cost: float = 0.0
     stills: list[dict] = field(default_factory=list)
     drafts: list[dict] = field(default_factory=list)
 
@@ -107,7 +101,6 @@ async def update_job_status(
     status: JobStatus,
     current_step: str,
     progress: int,
-    cost_to_add: float = 0.0,
     error_message: str = None,
 ):
     """Update job status in database."""
@@ -134,8 +127,6 @@ async def update_job_status(
                 (status.value, current_step, progress, job_id),
             )
 
-        if not settings.use_postgres:
-            await db.commit()
 
 
 # ============================================================================
@@ -161,24 +152,27 @@ async def step_distill(ctx: PipelineContext) -> StepResult:
         JobStatus.DISTILLING,
         "Step 1a: Distilling content stills (Pass 1)",
         25,
-        ctx.total_cost,
     )
-    ctx.total_cost = 0
+
+    distill_kwargs = {}
+    if ctx.source_data:
+        distill_kwargs["source_of_truth"] = ctx.source_data
 
     stills, still_cost = await distill_content(
-        ctx.cleaned_transcript, ctx.target_persona, ctx.job_id, ctx.user_id
+        ctx.cleaned_transcript, ctx.target_persona, ctx.job_id, ctx.user_id,
+        **distill_kwargs,
     )
     total_cost += still_cost
     logger.info(f"Job {ctx.job_id}: Pass 1 extracted {len(stills)} stills")
 
     # Pass 2: Deep extraction
     await update_job_status(
-        ctx.job_id, JobStatus.DISTILLING, "Step 1b: Deep extraction (Pass 2)", 35, total_cost
+        ctx.job_id, JobStatus.DISTILLING, "Step 1b: Deep extraction (Pass 2)", 35,
     )
-    total_cost = 0
 
     pass2_stills, pass2_cost = await distill_content_pass2(
-        ctx.cleaned_transcript, stills, ctx.target_persona, ctx.job_id, ctx.user_id
+        ctx.cleaned_transcript, stills, ctx.target_persona, ctx.job_id, ctx.user_id,
+        **distill_kwargs,
     )
     total_cost += pass2_cost
     logger.info(f"Job {ctx.job_id}: Pass 2 extracted {len(pass2_stills)} additional stills")
@@ -198,8 +192,6 @@ async def step_distill(ctx: PipelineContext) -> StepResult:
                     "UPDATE jobs SET source_summary = ? WHERE id = ?",
                     (source_summary, ctx.job_id),
                 )
-                if not settings.use_postgres:
-                    await db.commit()
             logger.info(f"Job {ctx.job_id}: Source summary saved ({len(source_summary)} chars)")
     except Exception as summary_err:
         logger.warning(f"Job {ctx.job_id}: Summary step failed (non-fatal): {summary_err}")
@@ -233,9 +225,8 @@ async def step_draft(ctx: PipelineContext) -> StepResult:
     await emit_stream_step(ctx.job_id, "draft", "Creating initial content drafts")
 
     await update_job_status(
-        ctx.job_id, JobStatus.DRAFTING, "Step 2: Drafting content", 50, ctx.total_cost
+        ctx.job_id, JobStatus.DRAFTING, "Step 2: Drafting content", 50,
     )
-    ctx.total_cost = 0
 
     all_drafts = []
 
@@ -318,84 +309,34 @@ async def step_draft(ctx: PipelineContext) -> StepResult:
     return StepResult(success=True, cost=total_cost)
 
 
-async def step_edit(ctx: PipelineContext) -> StepResult:
-    """Step 3: Edit drafts for audience."""
-    # Emit stream step marker
-    await emit_stream_step(ctx.job_id, "edit", "Polishing content for target audience")
+async def step_review(ctx: PipelineContext) -> StepResult:
+    """Step 3: Review & Polish (edit + factcheck + score combined)."""
+    await emit_stream_step(ctx.job_id, "review", "Editing, fact-checking, and scoring content")
+    await update_job_status(ctx.job_id, JobStatus.EDITING, "Step 3: Review & Polish", 70)
 
-    await update_job_status(
-        ctx.job_id, JobStatus.EDITING, "Step 3: Editing for audience", 70, ctx.total_cost
-    )
-    ctx.total_cost = 0
-
-    edited_drafts, edit_cost = await batch_edit_content(
-        ctx.drafts, ctx.target_persona, ctx.job_id, ctx.user_id
-    )
-
-    ctx.drafts = edited_drafts
-    return StepResult(success=True, cost=edit_cost)
-
-
-async def step_factcheck(ctx: PipelineContext) -> StepResult:
-    """Step 4: Fact-check content against source."""
-    # Emit stream step marker
-    await emit_stream_step(ctx.job_id, "factcheck", "Verifying accuracy and claims")
-
-    await update_job_status(
-        ctx.job_id, JobStatus.FACTCHECKING, "Step 4: Fact-checking content", 85, ctx.total_cost
-    )
-    ctx.total_cost = 0
-
-    factchecked_drafts, fc_cost = await batch_factcheck_content(
-        ctx.drafts, ctx.cleaned_transcript, ctx.job_id, ctx.user_id, source_id=ctx.source_id
-    )
-
-    ctx.drafts = factchecked_drafts
-    return StepResult(success=True, cost=fc_cost)
-
-
-async def step_score(ctx: PipelineContext) -> StepResult:
-    """Step 5: Score content quality."""
-    await update_job_status(
-        ctx.job_id, JobStatus.FACTCHECKING, "Step 5: Scoring content quality", 92, ctx.total_cost
-    )
-    ctx.total_cost = 0
-
-    # Get persona title for context
-    persona = await get_persona(ctx.target_persona, user_id=ctx.user_id)
-    persona_title = persona.get("title", "") if persona else ""
-
-    # Load brand voice for scoring context
-    from app.services.brand_voice_analyzer import get_brand_voice_template_vars
-    brand_vars = await get_brand_voice_template_vars(ctx.user_id)
-
-    scored_drafts, score_cost = await batch_score_content(
-        ctx.drafts,
-        persona_title,
-        brand_voice_summary=brand_vars.get("brand_voice_summary", ""),
-        brand_tone_markers=brand_vars.get("brand_tone_markers", ""),
-        brand_phrases_to_avoid=brand_vars.get("brand_phrases_to_avoid", ""),
-        user_id=ctx.user_id,
+    reviewed_drafts, review_cost = await batch_review_and_polish(
+        drafts=ctx.drafts,
+        original_transcript=ctx.cleaned_transcript,
+        persona_id=ctx.target_persona,
         job_id=ctx.job_id,
+        user_id=ctx.user_id,
+        source_id=ctx.source_id,
     )
-
-    ctx.drafts = scored_drafts
-    return StepResult(success=True, cost=score_cost)
+    ctx.drafts = reviewed_drafts
+    return StepResult(success=True, cost=review_cost)
 
 
 async def step_hooks(ctx: PipelineContext) -> StepResult:
-    """Step 6: Generate hook variations for LinkedIn posts."""
+    """Step 4: Generate hook variations for LinkedIn posts."""
     if "linkedin" not in ctx.asset_types:
         return StepResult(success=True, cost=0.0)
 
     await update_job_status(
         ctx.job_id,
         JobStatus.FACTCHECKING,
-        "Step 6: Generating hook variations",
-        96,
-        ctx.total_cost,
+        "Step 4: Generating hook variations",
+        90,
     )
-    ctx.total_cost = 0
 
     drafts_with_hooks, hook_cost = await batch_generate_hooks(
         ctx.drafts, ctx.target_persona, ctx.job_id, ctx.user_id
@@ -406,15 +347,14 @@ async def step_hooks(ctx: PipelineContext) -> StepResult:
 
 
 async def step_image_prompts(ctx: PipelineContext) -> StepResult:
-    """Step 7: Generate image prompts (optional)."""
+    """Step 5: Generate image prompts (optional)."""
     if not ctx.generate_image_prompts:
         logger.info(f"Job {ctx.job_id}: Skipping image prompt generation (disabled)")
         return StepResult(success=True, cost=0.0)
 
     await update_job_status(
-        ctx.job_id, JobStatus.FACTCHECKING, "Step 7: Generating image prompts", 98, ctx.total_cost
+        ctx.job_id, JobStatus.FACTCHECKING, "Step 5: Generating image prompts", 95,
     )
-    ctx.total_cost = 0
 
     drafts_with_images, img_cost = await batch_generate_image_prompts(
         ctx.drafts, ctx.job_id, ctx.user_id
@@ -434,7 +374,7 @@ async def step_finalize(ctx: PipelineContext) -> StepResult:
     await save_outputs_to_db(enriched_outputs, ctx.job_id, campaign_name=ctx.campaign_name)
 
     # Mark job complete
-    await update_job_status(ctx.job_id, JobStatus.COMPLETE, "Complete", 100, ctx.total_cost)
+    await update_job_status(ctx.job_id, JobStatus.COMPLETE, "Complete", 100)
 
     # Emit completion to stream
     stream = get_stream(ctx.job_id)
@@ -443,13 +383,9 @@ async def step_finalize(ctx: PipelineContext) -> StepResult:
 
     # Update completed_at timestamp
     async with get_db() as db:
-        if settings.use_postgres:
-            await db.execute("UPDATE jobs SET completed_at = NOW() WHERE id = $1", ctx.job_id)
-        else:
-            await execute(
-                db, "UPDATE jobs SET completed_at = CURRENT_TIMESTAMP WHERE id = ?", (ctx.job_id,)
-            )
-            await db.commit()
+        await execute(
+            db, "UPDATE jobs SET completed_at = CURRENT_TIMESTAMP WHERE id = ?", (ctx.job_id,)
+        )
 
     # Trigger webhooks
     try:
@@ -475,7 +411,6 @@ async def run_pipeline_steps(ctx: PipelineContext) -> StepResult:
     result = await step_distill(ctx)
     if not result.success:
         return result
-    ctx.total_cost += result.cost
 
     # Check if Quick Distill mode - stop after distillation
     async with get_db() as db:
@@ -484,55 +419,35 @@ async def run_pipeline_steps(ctx: PipelineContext) -> StepResult:
 
     if processing_mode == "quick_distill":
         await update_job_status(
-            ctx.job_id, JobStatus.COMPLETE, "Stills saved to Reserve", 100, ctx.total_cost
+            ctx.job_id, JobStatus.COMPLETE, "Stills saved to Reserve", 100,
         )
         async with get_db() as db:
-            if settings.use_postgres:
-                await db.execute("UPDATE jobs SET completed_at = NOW() WHERE id = $1", ctx.job_id)
-            else:
-                await execute(
-                    db,
-                    "UPDATE jobs SET completed_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    (ctx.job_id,),
-                )
-                await db.commit()
-        return StepResult(success=True, cost=ctx.total_cost)
+            await execute(
+                db,
+                "UPDATE jobs SET completed_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (ctx.job_id,),
+            )
+        return StepResult(success=True, cost=0.0)
 
     # Step 2: Drafting
     result = await step_draft(ctx)
     if not result.success:
         return result
-    ctx.total_cost += result.cost
 
-    # Step 3: Editing
-    result = await step_edit(ctx)
+    # Step 3: Review & Polish (edit + factcheck + score)
+    result = await step_review(ctx)
     if not result.success:
         return result
-    ctx.total_cost += result.cost
 
-    # Step 4: Fact-checking
-    result = await step_factcheck(ctx)
-    if not result.success:
-        return result
-    ctx.total_cost += result.cost
-
-    # Step 5: Scoring
-    result = await step_score(ctx)
-    if not result.success:
-        return result
-    ctx.total_cost += result.cost
-
-    # Step 6: Hook variations
+    # Step 4: Hook variations
     result = await step_hooks(ctx)
     if not result.success:
         return result
-    ctx.total_cost += result.cost
 
-    # Step 7: Image prompts (optional)
+    # Step 5: Image prompts (optional)
     result = await step_image_prompts(ctx)
     if not result.success:
         return result
-    ctx.total_cost += result.cost
 
     # Final: Save and complete
     result = await step_finalize(ctx)

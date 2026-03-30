@@ -177,28 +177,28 @@ export function updateNavbar() {
         // Build navbar with sanitized content - static HTML with escaped user data
         const adminLink = document.createElement('a');
         adminLink.href = '/admin/dashboard';
-        adminLink.className = 'text-gray-600 hover:text-gray-900 text-sm';
+        adminLink.className = 'text-still-muted hover:text-still-text text-sm';
         adminLink.innerHTML = '<svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg><span class="ml-1">Admin</span>';
 
         const emailSpan = document.createElement('span');
-        emailSpan.className = 'text-gray-600 text-sm ml-4';
+        emailSpan.className = 'text-still-muted text-sm ml-4';
         emailSpan.textContent = safeEmail; // textContent is XSS-safe
 
         const logoutBtn = document.createElement('button');
-        logoutBtn.className = 'text-gray-600 hover:text-gray-900 text-sm ml-4';
+        logoutBtn.className = 'text-still-muted hover:text-still-text text-sm ml-4';
         logoutBtn.textContent = 'Logout';
-        logoutBtn.onclick = () => Auth.logout();
+        logoutBtn.onclick = () => logout();
 
         navbarUserSection.replaceChildren(adminLink, emailSpan, logoutBtn);
     } else if (navbarUserSection) {
         const loginLink = document.createElement('a');
         loginLink.href = '/login.html';
-        loginLink.className = 'text-gray-600 hover:text-gray-900';
+        loginLink.className = 'text-still-muted hover:text-still-text';
         loginLink.textContent = 'Login';
 
         const registerLink = document.createElement('a');
         registerLink.href = '/register.html';
-        registerLink.className = 'ml-4 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700';
+        registerLink.className = 'ml-4 bg-still-copper text-white px-4 py-2 rounded-lg hover:bg-still-copper/80';
         registerLink.textContent = 'Get Started';
 
         navbarUserSection.replaceChildren(loginLink, registerLink);

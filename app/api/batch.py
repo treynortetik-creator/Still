@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 
 from app.config import get_settings
 from app.database import get_db
-from app.db_utils import execute, fetchone, fetchall
+from app.db_utils import execute, fetchone, fetchall, safe_json
 from app.models.job import JobStatus
 from app.models.batch import BatchResponse, BatchStatusResponse, BatchJobStatus, BatchListResponse, BatchListItem
 from app.api.auth import get_current_user_id
@@ -163,8 +163,6 @@ async def upload_batch(
                 datetime.utcnow(),
             )
         )
-        if not settings.use_postgres:
-            await db.commit()
 
     # Start batch processor
     from app.services.batch_processor import process_batch
@@ -194,7 +192,7 @@ async def get_batch_status(
         if not batch:
             raise HTTPException(status_code=404, detail="Batch not found")
 
-        job_ids = json.loads(batch["job_ids"])
+        job_ids = safe_json(batch["job_ids"], [])
 
         # Get all jobs in a single query (avoid N+1)
         if job_ids:
@@ -246,7 +244,7 @@ async def download_batch_zip(
         if not batch:
             raise HTTPException(status_code=404, detail="Batch not found")
 
-        job_ids = json.loads(batch["job_ids"])
+        job_ids = safe_json(batch["job_ids"], [])
 
         # Batch fetch all completed jobs (avoid N+1)
         if not job_ids:

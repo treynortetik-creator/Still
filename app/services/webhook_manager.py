@@ -12,7 +12,7 @@ import httpx
 
 from app.database import get_db
 from app.config import get_settings
-from app.db_utils import execute, fetchone, fetchall
+from app.db_utils import execute, fetchone, fetchall, safe_json
 from app.utils.background_tasks import create_background_task
 
 logger = logging.getLogger(__name__)
@@ -51,13 +51,13 @@ async def trigger_webhook_event(event_type: str, user_id: int, data: dict):
             """
             SELECT id, url, secret_key, trigger_events
             FROM webhooks
-            WHERE user_id = ? AND is_active = TRUE
+            WHERE user_id = ? AND is_active = ?
             """,
-            (user_id,)
+            (user_id, True)
         )
 
         for webhook in webhooks:
-            trigger_events = json.loads(webhook["trigger_events"])
+            trigger_events = safe_json(webhook["trigger_events"], [])
             if event_type not in trigger_events:
                 continue
 
@@ -70,30 +70,15 @@ async def trigger_webhook_event(event_type: str, user_id: int, data: dict):
             }
 
             # Create delivery record and get ID
-            if settings.use_postgres:
-                row = await db.fetchrow(
-                    """
-                    INSERT INTO webhook_deliveries (webhook_id, event_type, payload, attempts)
-                    VALUES ($1, $2, $3, 0)
-                    RETURNING id
-                    """,
-                    webhook["id"], event_type, json.dumps(payload)
-                )
-                delivery_id = row["id"]
-            else:
-                await execute(
-                    db,
-                    """
-                    INSERT INTO webhook_deliveries (webhook_id, event_type, payload, attempts)
-                    VALUES (?, ?, ?, 0)
-                    """,
-                    (webhook["id"], event_type, json.dumps(payload))
-                )
-                await db.commit()
-
-                # Get the delivery ID
-                cursor = await db.execute("SELECT last_insert_rowid()")
-                delivery_id = (await cursor.fetchone())[0]
+            row = await db.fetchrow(
+                """
+                INSERT INTO webhook_deliveries (webhook_id, event_type, payload, attempts)
+                VALUES ($1, $2, $3, 0)
+                RETURNING id
+                """,
+                webhook["id"], event_type, json.dumps(payload)
+            )
+            delivery_id = row["id"]
 
             # Trigger async delivery (fire and forget)
             create_background_task(
@@ -148,8 +133,6 @@ async def deliver_webhook(
                         """,
                         (response.status_code, response.text[:1000], attempt + 1, delivery_id)
                     )
-                    if not settings.use_postgres:
-                        await db.commit()
 
                 # Success if 2xx status
                 if 200 <= response.status_code < 300:
@@ -172,8 +155,6 @@ async def deliver_webhook(
                     """,
                     (f"Request error: {type(e).__name__}: {str(e)}", attempt + 1, delivery_id)
                 )
-                if not settings.use_postgres:
-                    await db.commit()
 
         # Wait before retry (with exponential backoff)
         if attempt < settings.webhook_max_retries - 1:
@@ -275,7 +256,7 @@ async def get_job_webhook_payload(job_id: str) -> dict:
             "original_filename": job["original_filename"],
             "file_type": job["file_type"],
             "target_persona": job["target_persona"],
-            "asset_types": json.loads(job["asset_types"]) if job["asset_types"] else [],
+            "asset_types": safe_json(job["asset_types"], []),
             "cost_incurred": job["cost_incurred"],
             "created_at": job["created_at"],
             "completed_at": job["completed_at"]
@@ -313,8 +294,8 @@ async def get_content_webhook_payload(job_id: str) -> dict:
                 "content_type": output["content_type"],
                 "variation_number": output["variation_number"],
                 "step3_final": output["step3_final"],
-                "quality_scores": json.loads(output["quality_scores"]) if output["quality_scores"] else None,
-                "hook_variations": json.loads(output["hook_variations"]) if output["hook_variations"] else None,
+                "quality_scores": safe_json(output["quality_scores"]),
+                "hook_variations": safe_json(output["hook_variations"]),
                 "subject": output["subject"],
                 "preview_text": output["preview_text"]
             })

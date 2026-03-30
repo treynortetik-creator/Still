@@ -3,13 +3,10 @@ import json
 import logging
 from typing import Dict, List, Tuple, Optional
 
-from app.config import get_settings
 from app.database import get_db
-from app.db_utils import execute, fetchone, fetchall
+from app.db_utils import execute, fetchone, fetchall, safe_json
 from app.services.ai_client import call_llm_text, calculate_openrouter_cost
 from app.utils.json_parser import parse_llm_json
-
-settings = get_settings()
 
 logger = logging.getLogger(__name__)
 
@@ -42,19 +39,11 @@ async def analyze_brand_voice(user_id: int, profile_id: int = None) -> Tuple[Dic
 
         if not profile_row:
             # Create default profile
-            if settings.use_postgres:
-                row = await db.fetchrow(
-                    "INSERT INTO brand_voice_profiles (user_id) VALUES ($1) RETURNING id",
-                    user_id
-                )
-                profile_id = row["id"]
-            else:
-                cursor = await db.execute(
-                    "INSERT INTO brand_voice_profiles (user_id) VALUES (?)",
-                    (user_id,)
-                )
-                await db.commit()
-                profile_id = cursor.lastrowid
+            row = await db.fetchrow(
+                "INSERT INTO brand_voice_profiles (user_id) VALUES ($1) RETURNING id",
+                user_id
+            )
+            profile_id = row["id"]
         else:
             profile_id = profile_row["id"]
 
@@ -144,67 +133,33 @@ OUTPUT FORMAT (valid JSON):
 
     # Save to database
     async with get_db() as db:
-        if settings.use_postgres:
-            await db.execute(
-                """
-                UPDATE brand_voice_profiles SET
-                    vocabulary_patterns = $1,
-                    sentence_structure = $2,
-                    tone_markers = $3,
-                    phrases_to_use = $4,
-                    phrases_to_avoid = $5,
-                    overall_summary = $6,
-                    sample_count = $7,
-                    updated_at = NOW()
-                WHERE id = $8
-                """,
-                json.dumps(result.get("vocabulary_patterns")),
-                json.dumps(result.get("sentence_structure")),
-                json.dumps(result.get("tone_markers")),
-                json.dumps(result.get("phrases_to_use")),
-                json.dumps(result.get("phrases_to_avoid")),
-                result.get("overall_summary"),
-                len(rows),
-                profile_id,
-            )
-            # Update user's cost
-            await db.execute(
-                "UPDATE users SET total_cost_incurred = total_cost_incurred + $1 WHERE id = $2",
-                cost, user_id
-            )
-        else:
-            await execute(
-                db,
-                """
-                UPDATE brand_voice_profiles SET
-                    vocabulary_patterns = ?,
-                    sentence_structure = ?,
-                    tone_markers = ?,
-                    phrases_to_use = ?,
-                    phrases_to_avoid = ?,
-                    overall_summary = ?,
-                    sample_count = ?,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-                """,
-                (
-                    json.dumps(result.get("vocabulary_patterns")),
-                    json.dumps(result.get("sentence_structure")),
-                    json.dumps(result.get("tone_markers")),
-                    json.dumps(result.get("phrases_to_use")),
-                    json.dumps(result.get("phrases_to_avoid")),
-                    result.get("overall_summary"),
-                    len(rows),
-                    profile_id,
-                )
-            )
-            # Update user's cost
-            await execute(
-                db,
-                "UPDATE users SET total_cost_incurred = total_cost_incurred + ? WHERE id = ?",
-                (cost, user_id)
-            )
-            await db.commit()
+        await db.execute(
+            """
+            UPDATE brand_voice_profiles SET
+                vocabulary_patterns = $1,
+                sentence_structure = $2,
+                tone_markers = $3,
+                phrases_to_use = $4,
+                phrases_to_avoid = $5,
+                overall_summary = $6,
+                sample_count = $7,
+                updated_at = NOW()
+            WHERE id = $8
+            """,
+            json.dumps(result.get("vocabulary_patterns")),
+            json.dumps(result.get("sentence_structure")),
+            json.dumps(result.get("tone_markers")),
+            json.dumps(result.get("phrases_to_use")),
+            json.dumps(result.get("phrases_to_avoid")),
+            result.get("overall_summary"),
+            len(rows),
+            profile_id,
+        )
+        # Update user's cost
+        await db.execute(
+            "UPDATE users SET total_cost_incurred = total_cost_incurred + $1 WHERE id = $2",
+            cost, user_id
+        )
 
     return result, cost
 
@@ -230,11 +185,11 @@ async def get_brand_voice_profile(user_id: int) -> Optional[Dict]:
         return {
             "id": row["id"],
             "profile_name": row["profile_name"],
-            "vocabulary_patterns": json.loads(row["vocabulary_patterns"]) if row["vocabulary_patterns"] else None,
-            "sentence_structure": json.loads(row["sentence_structure"]) if row["sentence_structure"] else None,
-            "tone_markers": json.loads(row["tone_markers"]) if row["tone_markers"] else [],
-            "phrases_to_use": json.loads(row["phrases_to_use"]) if row["phrases_to_use"] else [],
-            "phrases_to_avoid": json.loads(row["phrases_to_avoid"]) if row["phrases_to_avoid"] else [],
+            "vocabulary_patterns": safe_json(row["vocabulary_patterns"]),
+            "sentence_structure": safe_json(row["sentence_structure"]),
+            "tone_markers": safe_json(row["tone_markers"], []),
+            "phrases_to_use": safe_json(row["phrases_to_use"], []),
+            "phrases_to_avoid": safe_json(row["phrases_to_avoid"], []),
             "overall_summary": row["overall_summary"],
             "sample_count": row["sample_count"],
             "updated_at": row["updated_at"],
@@ -287,62 +242,35 @@ async def add_voice_sample(user_id: int, content: str, content_type: str = "gene
         )
 
         if not profile_row:
-            if settings.use_postgres:
-                row = await db.fetchrow(
-                    "INSERT INTO brand_voice_profiles (user_id) VALUES ($1) RETURNING id",
-                    user_id
-                )
-                profile_id = row["id"]
-            else:
-                cursor = await db.execute(
-                    "INSERT INTO brand_voice_profiles (user_id) VALUES (?)",
-                    (user_id,)
-                )
-                await db.commit()
-                profile_id = cursor.lastrowid
+            row = await db.fetchrow(
+                "INSERT INTO brand_voice_profiles (user_id) VALUES ($1) RETURNING id",
+                user_id
+            )
+            profile_id = row["id"]
         else:
             profile_id = profile_row["id"]
 
         # Add sample
-        if settings.use_postgres:
-            row = await db.fetchrow(
-                """
-                INSERT INTO brand_voice_samples (user_id, profile_id, content, content_type)
-                VALUES ($1, $2, $3, $4)
-                RETURNING id
-                """,
-                user_id, profile_id, content.strip(), content_type
-            )
-            return row["id"]
-        else:
-            cursor = await db.execute(
-                """
-                INSERT INTO brand_voice_samples (user_id, profile_id, content, content_type)
-                VALUES (?, ?, ?, ?)
-                """,
-                (user_id, profile_id, content.strip(), content_type)
-            )
-            await db.commit()
-            return cursor.lastrowid
+        row = await db.fetchrow(
+            """
+            INSERT INTO brand_voice_samples (user_id, profile_id, content, content_type)
+            VALUES ($1, $2, $3, $4)
+            RETURNING id
+            """,
+            user_id, profile_id, content.strip(), content_type
+        )
+        return row["id"]
 
 
 async def delete_voice_sample(user_id: int, sample_id: int) -> bool:
     """Delete a voice sample."""
     async with get_db() as db:
-        if settings.use_postgres:
-            result = await db.execute(
-                "DELETE FROM brand_voice_samples WHERE id = $1 AND user_id = $2",
-                sample_id, user_id
-            )
-            # asyncpg returns 'DELETE N' where N is the count
-            return result and result != "DELETE 0"
-        else:
-            cursor = await db.execute(
-                "DELETE FROM brand_voice_samples WHERE id = ? AND user_id = ?",
-                (sample_id, user_id)
-            )
-            await db.commit()
-            return cursor.rowcount > 0
+        result = await db.execute(
+            "DELETE FROM brand_voice_samples WHERE id = $1 AND user_id = $2",
+            sample_id, user_id
+        )
+        # asyncpg returns 'DELETE N' where N is the count
+        return result and result != "DELETE 0"
 
 
 async def get_voice_context_for_drafting(user_id: int) -> str:
@@ -437,7 +365,7 @@ async def get_brand_voice_config_context(user_id: int, content_type: str = None)
 
         # Core principles
         if row["core_principles"]:
-            principles = json.loads(row["core_principles"])
+            principles = safe_json(row["core_principles"], [])
             if principles:
                 context_parts.append("\nCORE PRINCIPLES:")
                 for principle in principles:
@@ -445,13 +373,13 @@ async def get_brand_voice_config_context(user_id: int, content_type: str = None)
 
         # Phrases to use
         if row["phrases_to_use"]:
-            phrases = json.loads(row["phrases_to_use"])
+            phrases = safe_json(row["phrases_to_use"], [])
             if phrases:
                 context_parts.append(f"\nUSE THESE PHRASES: {'; '.join(phrases)}")
 
         # Phrases to avoid
         if row["phrases_to_avoid"]:
-            avoid = json.loads(row["phrases_to_avoid"])
+            avoid = safe_json(row["phrases_to_avoid"], [])
             if avoid:
                 context_parts.append(f"AVOID THESE PHRASES: {'; '.join(avoid)}")
 
@@ -546,18 +474,18 @@ async def get_brand_voice_template_vars(user_id: int, content_type: str = None) 
 
             # Core principles as tone markers if no profile
             if row["core_principles"] and not result["brand_tone_markers"]:
-                principles = json.loads(row["core_principles"])
+                principles = safe_json(row["core_principles"], [])
                 if principles:
                     result["brand_tone_markers"] = "; ".join(principles)
 
             # Manual phrases override AI-detected ones
             if row["phrases_to_use"]:
-                phrases = json.loads(row["phrases_to_use"])
+                phrases = safe_json(row["phrases_to_use"], [])
                 if phrases:
                     result["brand_phrases_to_use"] = "; ".join(phrases)
 
             if row["phrases_to_avoid"]:
-                avoid = json.loads(row["phrases_to_avoid"])
+                avoid = safe_json(row["phrases_to_avoid"], [])
                 if avoid:
                     result["brand_phrases_to_avoid"] = "; ".join(avoid)
 

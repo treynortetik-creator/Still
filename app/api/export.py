@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse, Response
 
 from app.database import get_db
-from app.db_utils import fetchone, fetchall
+from app.db_utils import fetchone, fetchall, safe_json
 from app.api.auth import get_current_user_id
 
 router = APIRouter()
@@ -96,11 +96,11 @@ async def get_job_with_outputs(job_id: str, user_id: int) -> tuple[dict, list[di
                 "step1_draft": row["step1_draft"],
                 "step2_edited": row["step2_edited"],
                 "step3_final": row["step3_final"],
-                "stills_used": json.loads(row["stills_used"]) if row["stills_used"] else [],
-                "citations": json.loads(row["citations"]) if row["citations"] else [],
-                "warnings": json.loads(row["warnings"]) if row["warnings"] else [],
-                "quality_scores": json.loads(row["quality_scores"]) if row["quality_scores"] else {},
-                "hook_variations": json.loads(row["hook_variations"]) if row["hook_variations"] else [],
+                "stills_used": safe_json(row["stills_used"], []),
+                "citations": safe_json(row["citations"], []),
+                "warnings": safe_json(row["warnings"], []),
+                "quality_scores": safe_json(row["quality_scores"], {}),
+                "hook_variations": safe_json(row["hook_variations"], []),
             })
 
         # Get stills
@@ -122,8 +122,8 @@ async def get_job_with_outputs(job_id: str, user_id: int) -> tuple[dict, list[di
                 "type": row["still_type"],
                 "content": row["content"],
                 "source_location": row["source_location"],
-                "tags": json.loads(row["tags"]) if row["tags"] else [],
-                "persona_relevance": json.loads(row["persona_relevance"]) if row["persona_relevance"] else {},
+                "tags": safe_json(row["tags"], []),
+                "persona_relevance": safe_json(row["persona_relevance"], {}),
                 "quote_attribution": row["quote_attribution"],
             })
 

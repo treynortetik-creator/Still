@@ -123,7 +123,7 @@ function escapeHtml(text) {
 
 async function loadStats() {
     try {
-        const response = await fetch('/api/library/stats');
+        const response = await fetch('/api/admin/library/stats');
         const data = await response.json();
 
         document.getElementById('count-total').textContent = data.total_entries;
@@ -152,7 +152,7 @@ async function loadLibrary() {
     params.set('offset', currentPage * pageSize);
 
     try {
-        const response = await fetch(`/api/library?${params}`);
+        const response = await fetch(`/api/admin/library?${params}`);
         const data = await response.json();
 
         const tbody = document.getElementById('library-table');
@@ -230,7 +230,7 @@ async function deleteEntry(id) {
     if (!confirm('Are you sure you want to delete this entry?')) return;
 
     try {
-        const response = await fetch(`/api/library/${id}`, { method: 'DELETE' });
+        const response = await fetch(`/api/admin/library/${id}`, { method: 'DELETE' });
         if (response.ok) {
             loadLibrary();
             loadStats();

@@ -3,11 +3,10 @@ import json
 import logging
 import os
 import traceback
-from pathlib import Path
 
 from app.config import get_settings
 from app.database import get_db
-from app.db_utils import execute, fetchone
+from app.db_utils import execute, fetchone, safe_json
 from app.models.job import JobStatus
 from app.services.transcription import transcribe_file, cleanup_transcript, extract_document_content
 from app.services.source_of_truth import (
@@ -15,9 +14,8 @@ from app.services.source_of_truth import (
     save_source_of_truth,
     approve_source_of_truth,
 )
-from app.services.editing import batch_edit_content
-from app.services.factcheck import batch_factcheck_content
 from app.services.drafting import draft_linkedin_posts, draft_blog_post
+from app.services.review import batch_review_and_polish
 from app.services.library_manager import save_outputs_to_db
 from app.services.pipeline_steps import (
     PipelineContext,
@@ -44,8 +42,6 @@ async def log_error_to_db(job_id: str, user_id: int, error_type: str, error_mess
                 """,
                 (job_id, user_id, error_type, error_message, stack_trace)
             )
-            if not settings.use_postgres:
-                await db.commit()
     except Exception as log_err:
         logger.warning(f"Failed to log error to database: {log_err}")
 
@@ -98,7 +94,7 @@ def _determine_step_context(current_step: str) -> str:
 
 
 async def _handle_pipeline_error(
-    e: Exception, job_id: str, user_id: int, total_cost: float = 0.0
+    e: Exception, job_id: str, user_id: int,
 ):
     """Common error handling for pipeline failures."""
     error_type = type(e).__name__
@@ -132,7 +128,7 @@ async def _handle_pipeline_error(
 
     await update_job_status(
         job_id, JobStatus.FAILED,
-        "Failed", 0, total_cost, user_error
+        "Failed", 0, user_error
     )
 
 
@@ -148,7 +144,6 @@ async def process_job(job_id: str):
     4. Fact-check
     5. Save results
     """
-    total_cost = 0.0
     user_id = None
 
     # Initialize stream for live updates
@@ -164,8 +159,8 @@ async def process_job(job_id: str):
 
         user_id = job_data["user_id"]
         target_persona = job_data["target_persona"]
-        asset_types = json.loads(job_data["asset_types"]) if job_data["asset_types"] else ["linkedin"]
-        asset_quantities = json.loads(job_data["asset_quantities"]) if job_data["asset_quantities"] else {}
+        asset_types = safe_json(job_data["asset_types"], ["linkedin"])
+        asset_quantities = safe_json(job_data["asset_quantities"], {})
         original_filename = job_data["original_filename"]
         file_type = job_data["file_type"]
         magic_words = job_data.get("magic_words")
@@ -179,7 +174,7 @@ async def process_job(job_id: str):
             await log_error_to_db(job_id, user_id, "API_KEY_MISSING", api_error, "")
             await update_job_status(
                 job_id, JobStatus.FAILED,
-                "Configuration Error", 0, 0,
+                "Configuration Error", 0,
                 f"API Configuration Error: {api_error} Please configure the required API keys in Admin > Settings."
             )
             return
@@ -214,10 +209,9 @@ async def process_job(job_id: str):
                         "Extracting document content...", 15
                     )
 
-                extracted_content, extract_cost = await extract_document_content(
+                extracted_content, _cost = await extract_document_content(
                     file_path, job_id, user_id
                 )
-                total_cost += extract_cost
 
                 cleaned_transcript = extracted_content
                 transcript = extracted_content
@@ -228,8 +222,6 @@ async def process_job(job_id: str):
                         "UPDATE jobs SET transcript = ?, cleaned_transcript = ? WHERE id = ?",
                         (transcript, cleaned_transcript, job_id)
                     )
-                    if not settings.use_postgres:
-                        await db.commit()
 
         elif is_audio_video:
             # ======== AUDIO/VIDEO PATH: Transcribe → Cleanup ========
@@ -242,10 +234,9 @@ async def process_job(job_id: str):
                 if not file_path.exists():
                     raise FileNotFoundError(f"Upload file not found: {file_path}")
 
-                transcript, trans_cost = await transcribe_file(
+                transcript, _cost = await transcribe_file(
                     file_path, file_type, job_id, user_id, magic_words
                 )
-                total_cost += trans_cost
 
                 async with get_db() as db:
                     await execute(
@@ -253,20 +244,16 @@ async def process_job(job_id: str):
                         "UPDATE jobs SET transcript = ? WHERE id = ?",
                         (transcript, job_id)
                     )
-                    if not settings.use_postgres:
-                        await db.commit()
 
             if not cleaned_transcript:
                 await update_job_status(
                     job_id, JobStatus.CLEANING,
-                    "Step 0b: Cleaning transcript", 20, total_cost
+                    "Step 0b: Cleaning transcript", 20,
                 )
-                total_cost = 0
 
                 source_text = transcript or job_data.get("transcript", "")
 
-                cleaned_transcript, clean_cost = await cleanup_transcript(source_text)
-                total_cost += clean_cost
+                cleaned_transcript, _cost = await cleanup_transcript(source_text)
 
                 async with get_db() as db:
                     await execute(
@@ -274,22 +261,18 @@ async def process_job(job_id: str):
                         "UPDATE jobs SET cleaned_transcript = ? WHERE id = ?",
                         (cleaned_transcript, job_id)
                     )
-                    if not settings.use_postgres:
-                        await db.commit()
 
         else:
             # ======== TEXT UPLOAD PATH (file_type == "text") ========
             if not cleaned_transcript:
                 await update_job_status(
                     job_id, JobStatus.CLEANING,
-                    "Processing text content", 20, total_cost
+                    "Processing text content", 20,
                 )
-                total_cost = 0
 
                 source_text = transcript or job_data.get("transcript", "")
 
-                cleaned_transcript, clean_cost = await cleanup_transcript(source_text)
-                total_cost += clean_cost
+                cleaned_transcript, _cost = await cleanup_transcript(source_text)
 
                 async with get_db() as db:
                     await execute(
@@ -297,20 +280,16 @@ async def process_job(job_id: str):
                         "UPDATE jobs SET cleaned_transcript = ? WHERE id = ?",
                         (cleaned_transcript, job_id)
                     )
-                    if not settings.use_postgres:
-                        await db.commit()
 
         # ======== STEP 0c: SOURCE OF TRUTH GENERATION ========
         await update_job_status(
             job_id, JobStatus.ANALYZING,
-            "Step 0c: Generating Source of Truth", 22, total_cost
+            "Step 0c: Generating Source of Truth", 22,
         )
-        total_cost = 0
 
-        source_data, sot_cost = await generate_source_of_truth(
+        source_data, _sot_cost = await generate_source_of_truth(
             cleaned_transcript, job_id, user_id
         )
-        total_cost += sot_cost
         logger.info(f"Job {job_id}: Generated Source of Truth with {len(source_data.get('statistics', []))} statistics")
 
         source_id = await save_source_of_truth(job_id, user_id, source_data)
@@ -323,7 +302,7 @@ async def process_job(job_id: str):
         else:
             await update_job_status(
                 job_id, JobStatus.AWAITING_APPROVAL,
-                "Awaiting Source of Truth approval", 24, total_cost
+                "Awaiting Source of Truth approval", 24,
             )
             logger.info(f"Job {job_id}: Paused for Source of Truth approval")
             return
@@ -339,14 +318,14 @@ async def process_job(job_id: str):
             campaign_name=campaign_name,
             cleaned_transcript=cleaned_transcript,
             source_id=source_id,
+            source_data=source_data,
             generate_image_prompts=job_data.get("generate_image_prompts", False),
-            total_cost=total_cost,
         )
 
         await run_pipeline_steps(ctx)
 
     except Exception as e:
-        await _handle_pipeline_error(e, job_id, user_id if user_id else 0, total_cost)
+        await _handle_pipeline_error(e, job_id, user_id if user_id else 0)
 
 
 async def process_job_from_library(job_id: str, still_content: list[dict]):
@@ -355,7 +334,6 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
 
     Skips transcription and distillation steps.
     """
-    total_cost = 0.0
     user_id = 0
 
     logger.debug(f"[RESERVE] Starting process_job_from_library for job {job_id}")
@@ -370,8 +348,8 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
 
         target_persona = job_data["target_persona"]
         user_id = job_data["user_id"]
-        asset_types = json.loads(job_data["asset_types"]) if job_data["asset_types"] else ["linkedin"]
-        asset_quantities = json.loads(job_data["asset_quantities"]) if job_data["asset_quantities"] else {}
+        asset_types = safe_json(job_data["asset_types"], ["linkedin"])
+        asset_quantities = safe_json(job_data["asset_quantities"], {})
         campaign_name = job_data.get("campaign_name")
 
         logger.debug(f"[RESERVE] Job config: persona={target_persona}, assets={asset_types}, quantities={asset_quantities}")
@@ -394,7 +372,7 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
         logger.debug(f"[RESERVE] Starting DRAFTING step")
         await update_job_status(
             job_id, JobStatus.DRAFTING,
-            "Drafting content from Reserve", 50, 0
+            "Drafting content from Reserve", 50,
         )
 
         all_drafts = []
@@ -402,11 +380,10 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
         if "linkedin" in asset_types:
             count = asset_quantities.get("linkedin", 2)
             logger.debug(f"[RESERVE] Drafting {count} LinkedIn posts...")
-            linkedin_drafts, li_cost = await draft_linkedin_posts(
+            linkedin_drafts, _li_cost = await draft_linkedin_posts(
                 stills, target_persona, count, job_id, user_id
             )
-            logger.debug(f"[RESERVE] LinkedIn drafts complete: {len(linkedin_drafts)} drafts, cost={li_cost}")
-            total_cost += li_cost
+            logger.debug(f"[RESERVE] LinkedIn drafts complete: {len(linkedin_drafts)} drafts")
 
             for i, draft in enumerate(linkedin_drafts):
                 all_drafts.append({
@@ -417,10 +394,9 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
                 })
 
         if "blog" in asset_types:
-            blog_draft, blog_cost = await draft_blog_post(
+            blog_draft, _blog_cost = await draft_blog_post(
                 stills, target_persona, job_id, user_id
             )
-            total_cost += blog_cost
 
             all_drafts.append({
                 "content_type": "blog",
@@ -430,46 +406,35 @@ async def process_job_from_library(job_id: str, still_content: list[dict]):
                 "stills_used": blog_draft.get("stills_used", blog_draft.get("atoms_used", [])),
             })
 
-        # ======== STEP 3: EDITING ========
+        # ======== STEP 3: REVIEW & POLISH ========
         await update_job_status(
             job_id, JobStatus.EDITING,
-            "Editing for audience", 70, total_cost
-        )
-        total_cost = 0
-
-        edited_drafts, edit_cost = await batch_edit_content(
-            all_drafts, target_persona, job_id, user_id
-        )
-        total_cost += edit_cost
-
-        # ======== STEP 4: FACT-CHECKING ========
-        await update_job_status(
-            job_id, JobStatus.FACTCHECKING,
-            "Final review", 85, total_cost
+            "Review & Polish", 70,
         )
 
         still_text = "\n\n".join([s["content"] for s in stills])
-        factchecked_drafts, fc_cost = await batch_factcheck_content(
-            edited_drafts, still_text, job_id, user_id
+        reviewed_drafts, _review_cost = await batch_review_and_polish(
+            drafts=all_drafts,
+            original_transcript=still_text,
+            persona_id=target_persona,
+            job_id=job_id,
+            user_id=user_id,
         )
-        total_cost += fc_cost
 
         # Save results
-        enriched_outputs = enrich_outputs_with_topics(factchecked_drafts, stills)
+        enriched_outputs = enrich_outputs_with_topics(reviewed_drafts, stills)
         await save_outputs_to_db(enriched_outputs, job_id, campaign_name=campaign_name)
 
         # Mark complete
         await update_job_status(
             job_id, JobStatus.COMPLETE,
-            "Complete", 100, total_cost
+            "Complete", 100,
         )
 
         async with get_db() as db:
-            if settings.use_postgres:
-                await db.execute("UPDATE jobs SET completed_at = NOW() WHERE id = $1", job_id)
-            else:
-                await execute(db, "UPDATE jobs SET completed_at = CURRENT_TIMESTAMP WHERE id = ?", (job_id,))
-                await db.commit()
+            await execute(
+                db, "UPDATE jobs SET completed_at = CURRENT_TIMESTAMP WHERE id = ?", (job_id,)
+            )
 
     except Exception as e:
         await _handle_pipeline_error(e, job_id, user_id)
@@ -482,7 +447,6 @@ async def resume_pipeline_from_distillation(job_id: str):
     This is called when user approves the Source of Truth via API.
     The pipeline continues from distillation onwards (skipping transcription/cleanup/SOT generation).
     """
-    total_cost = 0.0
     user_id = None
 
     # Initialize stream for live updates
@@ -497,8 +461,8 @@ async def resume_pipeline_from_distillation(job_id: str):
 
         user_id = job_data["user_id"]
         target_persona = job_data.get("target_persona")
-        asset_types = json.loads(job_data["asset_types"]) if job_data.get("asset_types") else ["linkedin"]
-        asset_quantities = json.loads(job_data["asset_quantities"]) if job_data.get("asset_quantities") else {}
+        asset_types = safe_json(job_data.get("asset_types"), ["linkedin"])
+        asset_quantities = safe_json(job_data.get("asset_quantities"), {})
         original_filename = job_data.get("original_filename", "unknown")
         campaign_name = job_data.get("campaign_name")
         cleaned_transcript = job_data.get("cleaned_transcript")
@@ -507,14 +471,14 @@ async def resume_pipeline_from_distillation(job_id: str):
         if not cleaned_transcript:
             raise ValueError("No cleaned transcript found - cannot resume pipeline")
 
-        # Get source_id from sources table
-        async with get_db() as db:
-            source_row = await fetchone(
-                db,
-                "SELECT id FROM sources WHERE job_id = ?",
-                (job_id,)
-            )
-            source_id = source_row["id"] if source_row else None
+        # Get source from sources table (both id and data for distillation)
+        from app.services.source_of_truth import get_source_of_truth_by_job
+        source_id = None
+        source_data = None
+        sot = await get_source_of_truth_by_job(job_id)
+        if sot:
+            source_id = sot.get("id")
+            source_data = sot
 
         # ======== RUN SHARED PIPELINE STEPS ========
         ctx = PipelineContext(
@@ -527,8 +491,8 @@ async def resume_pipeline_from_distillation(job_id: str):
             campaign_name=campaign_name,
             cleaned_transcript=cleaned_transcript,
             source_id=source_id,
+            source_data=source_data,
             generate_image_prompts=generate_image_prompts,
-            total_cost=total_cost,
         )
 
         await run_pipeline_steps(ctx)

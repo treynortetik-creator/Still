@@ -1,5 +1,8 @@
 -- PostgreSQL Schema for ContentMultiplier
 -- Run this in Supabase SQL Editor: https://supabase.com/dashboard/project/tvlvnplhybumuoiflthb/sql
+--
+-- This file matches the runtime schema defined in app/database.py _init_postgres_tables().
+-- Last regenerated: 2026-03-30
 
 -- =============================================================================
 -- TABLES
@@ -42,7 +45,9 @@ CREATE TABLE IF NOT EXISTS error_logs (
     error_type TEXT NOT NULL,
     error_message TEXT,
     stack_trace TEXT,
-    context TEXT,
+    source TEXT DEFAULT 'backend',
+    endpoint TEXT,
+    additional_context JSONB,
     created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -60,17 +65,45 @@ CREATE TABLE IF NOT EXISTS jobs (
     processing_mode TEXT DEFAULT 'autopilot',
     campaign_name TEXT,
     magic_words TEXT,
+    generate_image_prompts BOOLEAN DEFAULT FALSE,
     current_step TEXT,
     progress INTEGER DEFAULT 0,
     transcript TEXT,
     cleaned_transcript TEXT,
+    source_summary TEXT,
     error_message TEXT,
     created_at TIMESTAMP DEFAULT NOW(),
     completed_at TIMESTAMP,
     cost_incurred FLOAT DEFAULT 0.0
 );
 
--- Stills (content stills - formerly called atoms)
+-- Sources (Source of Truth — extracted from content for reuse)
+-- Must be created before stills so stills can FK to sources
+CREATE TABLE IF NOT EXISTS sources (
+    id SERIAL PRIMARY KEY,
+    job_id TEXT NOT NULL UNIQUE REFERENCES jobs(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    core_narratives JSONB NOT NULL,
+    statistics JSONB NOT NULL,
+    quotable_moments JSONB NOT NULL,
+    primary_pain_point TEXT NOT NULL,
+    the_promise TEXT NOT NULL,
+    objections_qa JSONB,
+    key_visuals JSONB,
+    funnel_stage TEXT NOT NULL CHECK(funnel_stage IN ('awareness', 'consideration', 'decision')),
+    review_date DATE NOT NULL,
+    is_approved BOOLEAN DEFAULT FALSE,
+    approved_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Add source_id and auto_approve_source to jobs (added after sources table exists)
+-- These are added via DO blocks at runtime; included here for fresh installs.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS source_id INTEGER REFERENCES sources(id);
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS auto_approve_source BOOLEAN DEFAULT FALSE;
+
+-- Stills (content stills — formerly called atoms)
 CREATE TABLE IF NOT EXISTS stills (
     id TEXT PRIMARY KEY,
     job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
@@ -83,10 +116,21 @@ CREATE TABLE IF NOT EXISTS stills (
     persona_relevance JSONB,
     quote_attribution TEXT,
     created_at TIMESTAMP DEFAULT NOW(),
-    times_used INTEGER DEFAULT 0,
-    last_used TIMESTAMP,
+    usage_count INTEGER DEFAULT 0,
+    last_used_at TIMESTAMP,
     campaign_name TEXT,
-    topics JSONB
+    topics JSONB,
+    source_id INTEGER REFERENCES sources(id),
+    status TEXT DEFAULT 'active',
+    best_formats TEXT[],
+    funnel_stage TEXT,
+    expiration_type TEXT,
+    expiration_date DATE,
+    performance TEXT DEFAULT 'untested',
+    CHECK (status IS NULL OR status IN ('active', 'evergreen', 'needs_review', 'retired')),
+    CHECK (funnel_stage IS NULL OR funnel_stage IN ('awareness', 'consideration', 'decision')),
+    CHECK (expiration_type IS NULL OR expiration_type IN ('date_bound', 'event_bound', 'evergreen')),
+    CHECK (performance IS NULL OR performance IN ('high', 'medium', 'low', 'untested'))
 );
 
 -- Outputs (generated content)
@@ -134,7 +178,7 @@ CREATE TABLE IF NOT EXISTS content_library (
     user_notes TEXT,
     campaign_name TEXT,
     topics JSONB,
-    job_id TEXT REFERENCES jobs(id),
+    job_id TEXT REFERENCES jobs(id) ON DELETE SET NULL,
     -- Lifecycle fields (added in migration 004)
     status TEXT DEFAULT 'active' CHECK (status IS NULL OR status IN ('active', 'evergreen', 'needs_review', 'retired')),
     best_formats TEXT[],
@@ -378,6 +422,7 @@ CREATE TABLE IF NOT EXISTS brand_voice_config (
     user_id INTEGER NOT NULL UNIQUE REFERENCES users(id),
     company_name TEXT,
     industry TEXT,
+    company_info TEXT,
     tone_linkedin TEXT,
     tone_blog TEXT,
     tone_email TEXT,
@@ -398,55 +443,127 @@ CREATE TABLE IF NOT EXISTS ai_editor_config (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Global settings (key-value store for application-wide configuration)
+CREATE TABLE IF NOT EXISTS global_settings (
+    id SERIAL PRIMARY KEY,
+    setting_key TEXT UNIQUE NOT NULL,
+    setting_value TEXT NOT NULL,
+    setting_type TEXT DEFAULT 'string',
+    description TEXT,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
 -- =============================================================================
 -- INDEXES
 -- =============================================================================
 
+-- Jobs
 CREATE INDEX IF NOT EXISTS idx_jobs_user_id ON jobs(user_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
+CREATE INDEX IF NOT EXISTS idx_jobs_user_created ON jobs(user_id, created_at DESC);
+
+-- Stills
 CREATE INDEX IF NOT EXISTS idx_stills_user_id ON stills(user_id);
 CREATE INDEX IF NOT EXISTS idx_stills_job_id ON stills(job_id);
 CREATE INDEX IF NOT EXISTS idx_stills_type ON stills(still_type);
+CREATE INDEX IF NOT EXISTS idx_stills_job_type ON stills(job_id, still_type);
+CREATE INDEX IF NOT EXISTS idx_stills_campaign ON stills(campaign_name);
+CREATE INDEX IF NOT EXISTS idx_stills_source ON stills(source_id);
+CREATE INDEX IF NOT EXISTS idx_stills_status ON stills(status);
+CREATE INDEX IF NOT EXISTS idx_stills_funnel_stage ON stills(funnel_stage);
+CREATE INDEX IF NOT EXISTS idx_stills_expiration ON stills(expiration_date);
+
+-- Sources
+CREATE INDEX IF NOT EXISTS idx_sources_job ON sources(job_id);
+CREATE INDEX IF NOT EXISTS idx_sources_user ON sources(user_id);
+CREATE INDEX IF NOT EXISTS idx_sources_approved ON sources(is_approved);
+
+-- Content library
 CREATE INDEX IF NOT EXISTS idx_content_library_user_id ON content_library(user_id);
 CREATE INDEX IF NOT EXISTS idx_content_library_type ON content_library(entry_type);
-CREATE INDEX IF NOT EXISTS idx_rate_limits_user ON rate_limits(user_id, action_type, timestamp);
-CREATE INDEX IF NOT EXISTS idx_error_logs_user ON error_logs(user_id, created_at);
-CREATE INDEX IF NOT EXISTS idx_output_feedback_output ON output_feedback(output_id);
-CREATE INDEX IF NOT EXISTS idx_output_feedback_user ON output_feedback(user_id);
-CREATE INDEX IF NOT EXISTS idx_output_edits_output ON output_edits(output_id);
-CREATE INDEX IF NOT EXISTS idx_swipe_files_user ON swipe_files(user_id);
-CREATE INDEX IF NOT EXISTS idx_swipe_analysis_user ON swipe_analysis(user_id);
-CREATE INDEX IF NOT EXISTS idx_memory_rules_user ON memory_rules(user_id, is_active);
-CREATE INDEX IF NOT EXISTS idx_brand_voice_profiles_user ON brand_voice_profiles(user_id);
-CREATE INDEX IF NOT EXISTS idx_brand_voice_samples_profile ON brand_voice_samples(profile_id);
-CREATE INDEX IF NOT EXISTS idx_personas_user ON personas(user_id);
-CREATE INDEX IF NOT EXISTS idx_batches_user ON batches(user_id);
-CREATE INDEX IF NOT EXISTS idx_batches_status ON batches(status);
-CREATE INDEX IF NOT EXISTS idx_image_prompts_output ON image_prompts(output_id);
-CREATE INDEX IF NOT EXISTS idx_webhooks_user ON webhooks(user_id);
-CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_webhook ON webhook_deliveries(webhook_id);
-CREATE INDEX IF NOT EXISTS idx_content_schedule_user ON content_schedule(user_id);
-CREATE INDEX IF NOT EXISTS idx_content_schedule_date ON content_schedule(scheduled_date);
-CREATE INDEX IF NOT EXISTS idx_content_schedule_status ON content_schedule(status);
-CREATE INDEX IF NOT EXISTS idx_autopilot_sources_user ON autopilot_sources(user_id);
-CREATE INDEX IF NOT EXISTS idx_autopilot_sources_active ON autopilot_sources(is_active, next_check);
-CREATE INDEX IF NOT EXISTS idx_autopilot_items_source ON autopilot_items(source_id);
-CREATE INDEX IF NOT EXISTS idx_autopilot_items_status ON autopilot_items(processing_status);
-CREATE INDEX IF NOT EXISTS idx_ai_model_config_service ON ai_model_config(service_name);
-CREATE INDEX IF NOT EXISTS idx_brand_voice_config_user ON brand_voice_config(user_id);
-CREATE INDEX IF NOT EXISTS idx_revoked_tokens_expires ON revoked_tokens(expires_at);
-CREATE INDEX IF NOT EXISTS idx_jobs_user_created ON jobs(user_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_outputs_job_type ON outputs(job_id, content_type);
-CREATE INDEX IF NOT EXISTS idx_outputs_job_status ON outputs(job_id, status);
-CREATE INDEX IF NOT EXISTS idx_content_schedule_user_date ON content_schedule(user_id, scheduled_date);
-CREATE INDEX IF NOT EXISTS idx_stills_job_type ON stills(job_id, still_type);
 CREATE INDEX IF NOT EXISTS idx_content_library_user_type ON content_library(user_id, entry_type);
-CREATE INDEX IF NOT EXISTS idx_autopilot_items_user_status ON autopilot_items(user_id, processing_status);
-CREATE INDEX IF NOT EXISTS idx_error_logs_type ON error_logs(user_id, error_type, created_at);
-CREATE INDEX IF NOT EXISTS idx_stills_campaign ON stills(campaign_name);
-CREATE INDEX IF NOT EXISTS idx_outputs_campaign ON outputs(campaign_name);
 CREATE INDEX IF NOT EXISTS idx_content_library_campaign ON content_library(campaign_name);
+CREATE INDEX IF NOT EXISTS idx_content_library_job ON content_library(job_id);
 CREATE INDEX IF NOT EXISTS idx_content_library_status ON content_library(status);
 CREATE INDEX IF NOT EXISTS idx_content_library_funnel_stage ON content_library(funnel_stage);
 CREATE INDEX IF NOT EXISTS idx_content_library_expiration_date ON content_library(expiration_date);
 CREATE INDEX IF NOT EXISTS idx_content_library_times_used ON content_library(times_used);
+
+-- Outputs
+CREATE INDEX IF NOT EXISTS idx_outputs_job_type ON outputs(job_id, content_type);
+CREATE INDEX IF NOT EXISTS idx_outputs_job_status ON outputs(job_id, status);
+CREATE INDEX IF NOT EXISTS idx_outputs_campaign ON outputs(campaign_name);
+
+-- Rate limits & error logs
+CREATE INDEX IF NOT EXISTS idx_rate_limits_user ON rate_limits(user_id, action_type, timestamp);
+CREATE INDEX IF NOT EXISTS idx_error_logs_user ON error_logs(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_error_logs_type ON error_logs(user_id, error_type, created_at);
+
+-- Feedback & edits
+CREATE INDEX IF NOT EXISTS idx_output_feedback_output ON output_feedback(output_id);
+CREATE INDEX IF NOT EXISTS idx_output_feedback_user ON output_feedback(user_id);
+CREATE INDEX IF NOT EXISTS idx_output_edits_output ON output_edits(output_id);
+
+-- Swipe files & analysis
+CREATE INDEX IF NOT EXISTS idx_swipe_files_user ON swipe_files(user_id);
+CREATE INDEX IF NOT EXISTS idx_swipe_analysis_user ON swipe_analysis(user_id);
+
+-- Memory & brand voice
+CREATE INDEX IF NOT EXISTS idx_memory_rules_user ON memory_rules(user_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_brand_voice_profiles_user ON brand_voice_profiles(user_id);
+CREATE INDEX IF NOT EXISTS idx_brand_voice_samples_profile ON brand_voice_samples(profile_id);
+CREATE INDEX IF NOT EXISTS idx_brand_voice_config_user ON brand_voice_config(user_id);
+
+-- Personas & batches
+CREATE INDEX IF NOT EXISTS idx_personas_user ON personas(user_id);
+CREATE INDEX IF NOT EXISTS idx_batches_user ON batches(user_id);
+CREATE INDEX IF NOT EXISTS idx_batches_status ON batches(status);
+
+-- Image prompts
+CREATE INDEX IF NOT EXISTS idx_image_prompts_output ON image_prompts(output_id);
+
+-- Webhooks
+CREATE INDEX IF NOT EXISTS idx_webhooks_user ON webhooks(user_id);
+CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_webhook ON webhook_deliveries(webhook_id);
+
+-- Content schedule
+CREATE INDEX IF NOT EXISTS idx_content_schedule_user ON content_schedule(user_id);
+CREATE INDEX IF NOT EXISTS idx_content_schedule_date ON content_schedule(scheduled_date);
+CREATE INDEX IF NOT EXISTS idx_content_schedule_status ON content_schedule(status);
+CREATE INDEX IF NOT EXISTS idx_content_schedule_user_date ON content_schedule(user_id, scheduled_date);
+
+-- Autopilot
+CREATE INDEX IF NOT EXISTS idx_autopilot_sources_user ON autopilot_sources(user_id);
+CREATE INDEX IF NOT EXISTS idx_autopilot_sources_active ON autopilot_sources(is_active, next_check);
+CREATE INDEX IF NOT EXISTS idx_autopilot_items_source ON autopilot_items(source_id);
+CREATE INDEX IF NOT EXISTS idx_autopilot_items_status ON autopilot_items(processing_status);
+CREATE INDEX IF NOT EXISTS idx_autopilot_items_user_status ON autopilot_items(user_id, processing_status);
+
+-- AI model config
+CREATE INDEX IF NOT EXISTS idx_ai_model_config_service ON ai_model_config(service_name);
+
+-- Revoked tokens
+CREATE INDEX IF NOT EXISTS idx_revoked_tokens_expires ON revoked_tokens(expires_at);
+
+-- Global settings
+CREATE INDEX IF NOT EXISTS idx_global_settings_key ON global_settings(setting_key);
+
+-- =============================================================================
+-- DEFAULT DATA
+-- =============================================================================
+
+-- Default user
+INSERT INTO users (email, subscription_tier)
+VALUES ('default@contentmultiplier.com', 'pro')
+ON CONFLICT (email) DO NOTHING;
+
+-- Default global settings (refresh/lifecycle configuration)
+INSERT INTO global_settings (setting_key, setting_value, setting_type, description)
+VALUES
+    ('still_matching_model', 'google/gemini-2.5-flash', 'string', 'AI model for matching stills during refresh'),
+    ('fuzzy_match_high_threshold', '0.85', 'float', 'High confidence threshold for fuzzy matching'),
+    ('fuzzy_match_low_threshold', '0.50', 'float', 'Low confidence threshold for fuzzy matching'),
+    ('auto_retire_expired', 'true', 'boolean', 'Automatically retire expired stills'),
+    ('expiration_warning_days', '30', 'integer', 'Days before expiration to show warning')
+ON CONFLICT (setting_key) DO NOTHING;

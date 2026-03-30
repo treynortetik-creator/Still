@@ -3,13 +3,10 @@ import json
 import logging
 from typing import Tuple, Dict
 
-from app.config import get_settings
 from app.database import get_db
-from app.db_utils import fetchall, fetchone, execute
+from app.db_utils import fetchall, fetchone, execute, safe_json
 from app.services.ai_client import call_llm_text, calculate_openrouter_cost
 from app.utils.json_parser import parse_llm_json
-
-settings = get_settings()
 
 logger = logging.getLogger(__name__)
 
@@ -101,29 +98,16 @@ async def save_sommelier_config(config_key: str, config_value: str) -> None:
     """Save Sommelier configuration to database."""
     try:
         async with get_db() as db:
-            if settings.use_postgres:
-                await db.execute(
-                    """
-                    INSERT INTO ai_editor_config (config_key, config_value, updated_at)
-                    VALUES ($1, $2, NOW())
-                    ON CONFLICT(config_key) DO UPDATE SET
-                        config_value = EXCLUDED.config_value,
-                        updated_at = NOW()
-                    """,
-                    config_key, config_value
-                )
-            else:
-                await db.execute(
-                    """
-                    INSERT INTO ai_editor_config (config_key, config_value, updated_at)
-                    VALUES (?, ?, CURRENT_TIMESTAMP)
-                    ON CONFLICT(config_key) DO UPDATE SET
-                        config_value = excluded.config_value,
-                        updated_at = CURRENT_TIMESTAMP
-                    """,
-                    (config_key, config_value)
-                )
-                await db.commit()
+            await db.execute(
+                """
+                INSERT INTO ai_editor_config (config_key, config_value, updated_at)
+                VALUES ($1, $2, NOW())
+                ON CONFLICT(config_key) DO UPDATE SET
+                    config_value = EXCLUDED.config_value,
+                    updated_at = NOW()
+                """,
+                config_key, config_value
+            )
     except Exception as e:
         logger.error(f"Error saving sommelier config to database: {e}", exc_info=True)
         raise
@@ -205,7 +189,7 @@ async def search_stills(
         logger.info(f"Sommelier: User {user_id} has {stills_total} stills + {reserve_total} Reserve items, searching with keywords: {search_keywords[:5]}")
 
         # Build search query - search across content and tags in BOTH tables
-        like_op = "ILIKE" if settings.use_postgres else "LIKE"
+        like_op = "ILIKE"
 
         # Build keyword conditions
         conditions = []
@@ -249,7 +233,7 @@ async def search_stills(
                 "type": row["entry_type"],
                 "content": row["content"][:500],  # Truncate for prompt
                 "source": row["source"],
-                "tags": json.loads(row["tags"]) if row["tags"] else [],
+                "tags": safe_json(row["tags"], []),
                 "source_table": row["source_table"],
             })
 
@@ -329,8 +313,8 @@ async def search_stills(
                         "content": row["content"],
                         "source": row.get("source", ""),
                         "source_timestamp": row.get("source_timestamp"),
-                        "tags": json.loads(row["tags"]) if row["tags"] else [],
-                        "persona_relevance": json.loads(row["persona_relevance"]) if row.get("persona_relevance") else {},
+                        "tags": safe_json(row["tags"], []),
+                        "persona_relevance": safe_json(row.get("persona_relevance"), {}),
                         "times_used": row.get("times_used", 0),
                         "relevance_score": ranking.get("relevance_score", 3),
                         "why_relevant": ranking.get("why_relevant", "Matched search criteria"),

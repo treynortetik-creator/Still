@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 from typing import Tuple, Optional, Any
 import openai
+from openai import AsyncOpenAI
 
 from app.config import get_settings
 from app.services import settings_manager
@@ -17,17 +18,29 @@ settings = get_settings()
 logger = logging.getLogger(__name__)
 
 
-def get_openrouter_client() -> openai.OpenAI:
-    """Get OpenRouter client (OpenAI-compatible)."""
+def _get_openrouter_api_key() -> str:
+    """Get the OpenRouter API key from settings or env."""
     api_key = settings.openrouter_api_key or os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         raise ValueError(
             "OPENROUTER_API_KEY not configured. "
             "Please set it in your .env file or environment variables."
         )
+    return api_key
 
+
+def get_openrouter_client() -> openai.OpenAI:
+    """Get OpenRouter client (OpenAI-compatible)."""
     return openai.OpenAI(
-        api_key=api_key,
+        api_key=_get_openrouter_api_key(),
+        base_url=settings.openrouter_base_url,
+    )
+
+
+def get_async_openrouter_client() -> AsyncOpenAI:
+    """Get async OpenRouter client (OpenAI-compatible) for non-blocking streaming."""
+    return AsyncOpenAI(
+        api_key=_get_openrouter_api_key(),
         base_url=settings.openrouter_base_url,
     )
 
@@ -96,12 +109,13 @@ async def call_llm_text(
     model_name = settings_manager.get_model_for_step(step)
     model = normalize_model_name(model_name)
 
-    client = get_openrouter_client()
-
     messages = [{"role": "user", "content": prompt}]
 
-    # If streaming is enabled and we have a stream manager, use streaming
-    if stream_manager:
+    # Only stream for the drafting step — other steps (editing, factcheck,
+    # scoring, etc.) return structured JSON where streaming is useless.
+    use_streaming = stream_manager and step == "drafting"
+
+    if use_streaming:
         kwargs = {
             "model": model,
             "messages": messages,
@@ -119,21 +133,15 @@ async def call_llm_text(
             kwargs["response_format"] = {"type": "json_object"}
 
         try:
-            # Run sync streaming call in thread executor
-            loop = asyncio.get_running_loop()
+            async_client = get_async_openrouter_client()
+            stream = await async_client.chat.completions.create(**kwargs)
 
-            def create_stream():
-                return client.chat.completions.create(**kwargs)
-
-            stream = await loop.run_in_executor(None, create_stream)
-
-            # Collect chunks
+            # Collect chunks with native async iteration (no event loop blocking)
             full_response = []
-            for chunk in stream:
+            async for chunk in stream:
                 if chunk.choices and chunk.choices[0].delta.content:
                     text = chunk.choices[0].delta.content
                     full_response.append(text)
-                    # Emit to stream manager
                     await stream_manager.emit_chunk(text)
 
             response_text = "".join(full_response)
@@ -146,9 +154,11 @@ async def call_llm_text(
 
         except Exception as e:
             logger.warning(f"Streaming failed, falling back to non-streaming: {e}")
-            # Fall through to non-streaming call
+            # Fall through to non-streaming call with retry logic
 
-    # Non-streaming call (original implementation)
+    # Non-streaming call (with retry logic) - uses async client
+    client = get_async_openrouter_client()
+
     async def do_call():
         kwargs = {
             "model": model,
@@ -167,7 +177,7 @@ async def call_llm_text(
         if response_format == "json":
             kwargs["response_format"] = {"type": "json_object"}
 
-        return client.chat.completions.create(**kwargs)
+        return await client.chat.completions.create(**kwargs)
 
     response = await retry_async(
         do_call,
@@ -213,7 +223,7 @@ async def call_llm_with_file(
     model_name = settings_manager.get_model_for_step(step)
     model = normalize_model_name(model_name)
 
-    client = get_openrouter_client()
+    client = get_async_openrouter_client()
 
     # Determine MIME type
     ext = file_path.suffix.lower()
@@ -280,7 +290,7 @@ async def call_llm_with_file(
         if max_tokens is not None:
             kwargs["max_tokens"] = max_tokens
 
-        return client.chat.completions.create(**kwargs)
+        return await client.chat.completions.create(**kwargs)
 
     response = await retry_async(
         do_call,

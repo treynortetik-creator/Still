@@ -3,14 +3,12 @@ import json
 import logging
 from typing import Dict, List, Tuple, Optional
 
-from app.config import get_settings
 from app.database import get_db
-from app.db_utils import execute, fetchone, fetchall
+from app.db_utils import execute, fetchone, fetchall, safe_json
 from app.services.ai_client import call_llm_text, calculate_openrouter_cost
 from app.utils.json_parser import parse_llm_json
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 async def analyze_swipe_collection(
@@ -48,7 +46,7 @@ async def analyze_swipe_collection(
         swipes_text = []
         for i, row in enumerate(rows, 1):
             source_type = row["source_type"] or "general"
-            tags = json.loads(row["tags"]) if row["tags"] else []
+            tags = safe_json(row["tags"], [])
             notes = row["notes"] or ""
 
             swipes_text.append(f"""
@@ -154,8 +152,6 @@ OUTPUT FORMAT (valid JSON):
             "UPDATE users SET total_cost_incurred = total_cost_incurred + ? WHERE id = ?",
             (cost, user_id)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
     return result, cost
 
@@ -177,7 +173,7 @@ async def get_style_dna(user_id: int) -> Optional[Dict]:
             return None
 
         return {
-            "patterns": json.loads(row["patterns"]) if row["patterns"] else {},
+            "patterns": safe_json(row["patterns"], {}),
             "summary": row["summary"],
             "swipe_count": row["swipe_count"],
             "updated_at": row["updated_at"],

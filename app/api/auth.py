@@ -1,5 +1,4 @@
 """Authentication API endpoints."""
-import json
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Header, Request
 from typing import Optional
@@ -183,7 +182,7 @@ async def get_current_user_id(authorization: Optional[str] = Header(None)) -> in
         raise HTTPException(status_code=401, detail="Invalid authorization header")
 
     token = parts[1]
-    payload = decode_access_token(token)
+    payload = await decode_access_token_async(token)
 
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
@@ -208,7 +207,7 @@ async def get_current_user_id_optional(authorization: Optional[str] = Header(Non
         return None
 
     token = parts[1]
-    payload = decode_access_token(token)
+    payload = await decode_access_token_async(token)
 
     if not payload:
         return None
@@ -295,7 +294,7 @@ async def verify_admin(
 
     # Handle Bearer token (check for admin role in token)
     elif auth_type == "bearer":
-        payload = decode_access_token(credentials)
+        payload = await decode_access_token_async(credentials)
         if not payload:
             raise HTTPException(status_code=401, detail="Invalid or expired token")
 

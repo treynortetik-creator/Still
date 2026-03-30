@@ -100,9 +100,6 @@ async def bulk_retire(
             AND user_id = ?
         """, tuple(request.still_ids) + (user_id,))
 
-        from app.config import get_settings
-        if not get_settings().use_postgres:
-            await db.commit()
 
     return {"success": True, "retired_count": len(request.still_ids)}
 
@@ -127,9 +124,6 @@ async def bulk_extend_review(
             AND user_id = ?
         """, (new_date,) + tuple(request.source_ids) + (user_id,))
 
-        from app.config import get_settings
-        if not get_settings().use_postgres:
-            await db.commit()
 
     return {"success": True, "extended_count": len(request.source_ids), "new_date": new_date.isoformat()}
 
@@ -233,9 +227,6 @@ async def mark_output_performer(
                 AND user_id = ?
             """, tuple(request.still_ids) + (user_id,))
 
-        from app.config import get_settings
-        if not get_settings().use_postgres:
-            await db.commit()
 
     return {"success": True, "stills_updated": len(request.still_ids)}
 

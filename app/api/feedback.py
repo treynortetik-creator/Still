@@ -5,12 +5,9 @@ from pydantic import BaseModel
 from typing import Optional, Literal
 from datetime import datetime
 
-from app.config import get_settings
 from app.database import get_db
 from app.db_utils import execute, fetchone, fetchall
 from app.api.auth import get_current_user_id
-
-settings = get_settings()
 
 router = APIRouter()
 
@@ -77,28 +74,15 @@ async def submit_feedback(
             feedback_id = existing["id"]
         else:
             # Insert new feedback
-            if settings.use_postgres:
-                row = await db.fetchrow(
-                    """
-                    INSERT INTO output_feedback (output_id, user_id, feedback, comment)
-                    VALUES ($1, $2, $3, $4)
-                    RETURNING id
-                    """,
-                    data.output_id, user_id, data.feedback, data.comment
-                )
-                feedback_id = row["id"]
-            else:
-                cursor = await db.execute(
-                    """
-                    INSERT INTO output_feedback (output_id, user_id, feedback, comment)
-                    VALUES (?, ?, ?, ?)
-                    """,
-                    (data.output_id, user_id, data.feedback, data.comment)
-                )
-                feedback_id = cursor.lastrowid
-
-        if not settings.use_postgres:
-            await db.commit()
+            row = await db.fetchrow(
+                """
+                INSERT INTO output_feedback (output_id, user_id, feedback, comment)
+                VALUES ($1, $2, $3, $4)
+                RETURNING id
+                """,
+                data.output_id, user_id, data.feedback, data.comment
+            )
+            feedback_id = row["id"]
 
         # Fetch and return the feedback
         row = await fetchone(
@@ -157,16 +141,10 @@ async def delete_feedback(
             "DELETE FROM output_feedback WHERE output_id = ? AND user_id = ?",
             (output_id, user_id)
         )
-        if not settings.use_postgres:
-            await db.commit()
 
         # Check if any rows were affected
-        if settings.use_postgres:
-            if result == "DELETE 0":
-                raise HTTPException(status_code=404, detail="Feedback not found")
-        else:
-            if result == 0:
-                raise HTTPException(status_code=404, detail="Feedback not found")
+        if result == "DELETE 0":
+            raise HTTPException(status_code=404, detail="Feedback not found")
 
         return {"success": True, "message": "Feedback removed"}
 

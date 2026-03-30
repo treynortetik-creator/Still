@@ -4,12 +4,10 @@ import logging
 from typing import Optional, List, Tuple
 from difflib import SequenceMatcher
 
-from app.config import get_settings
 from app.database import get_db
-from app.db_utils import execute, fetchone, fetchall, fetchval
+from app.db_utils import execute, fetchone, fetchall, fetchval, safe_json
 from app.services.settings_manager import get_global_setting
 
-settings = get_settings()
 logger = logging.getLogger(__name__)
 
 
@@ -300,8 +298,6 @@ async def add_stills_to_library(
             )
             count += 1
 
-        if not settings.use_postgres:
-            await db.commit()
 
     return count
 
@@ -369,11 +365,7 @@ async def save_stills_to_db(
                     })
                     continue
 
-            # Handle best_formats: PostgreSQL uses TEXT[], SQLite uses JSON
-            if settings.use_postgres:
-                best_formats_value = validated["best_formats"]  # Pass as list for PostgreSQL array
-            else:
-                best_formats_value = json.dumps(validated["best_formats"])  # JSON for SQLite
+            best_formats_value = validated["best_formats"]  # PostgreSQL TEXT[] array
 
             await execute(
                 db,
@@ -410,8 +402,6 @@ async def save_stills_to_db(
             )
             result["saved"] += 1
 
-        if not settings.use_postgres:
-            await db.commit()
 
     if result["skipped_duplicates"] > 0:
         logger.info(f"Duplicate detection: saved {result['saved']}, skipped {result['skipped_duplicates']} duplicates")
@@ -432,75 +422,38 @@ async def save_outputs_to_db(outputs: list[dict], job_id: str, campaign_name: Op
             # Validate and sanitize the output data
             validated = validate_output(output)
 
-            if settings.use_postgres:
-                # PostgreSQL: use RETURNING to get the inserted ID
-                row = await db.fetchrow(
-                    """
-                    INSERT INTO outputs (
-                        job_id, content_type, variation_number,
-                        step1_draft, step2_edited, step3_final,
-                        stills_used, citations, warnings, quality_scores,
-                        hook_variations, subject, preview_text,
-                        email_day, email_purpose, sequence_name,
-                        topics, campaign_name
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-                    RETURNING id
-                    """,
-                    job_id,
-                    validated["content_type"],
-                    validated["variation_number"],
-                    validated["content"] or validated["step1_draft"],
-                    validated["step2_edited"],
-                    validated["step3_final"],
-                    json.dumps(validated["stills_used"]),
-                    json.dumps(validated["citations"]),
-                    json.dumps(validated["warnings"]),
-                    json.dumps(validated["quality_scores"]) if validated["quality_scores"] else None,
-                    json.dumps(validated["hook_variations"]) if validated["hook_variations"] else None,
-                    validated["subject"],
-                    validated["preview_text"],
-                    validated["email_day"],
-                    validated["email_purpose"],
-                    validated["sequence_name"],
-                    json.dumps(validated["topics"]),
-                    campaign_name or validated["campaign_name"],
-                )
-                output_id = row["id"]
-            else:
-                # SQLite: use lastrowid
-                cursor = await db.execute(
-                    """
-                    INSERT INTO outputs (
-                        job_id, content_type, variation_number,
-                        step1_draft, step2_edited, step3_final,
-                        stills_used, citations, warnings, quality_scores,
-                        hook_variations, subject, preview_text,
-                        email_day, email_purpose, sequence_name,
-                        topics, campaign_name
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        job_id,
-                        validated["content_type"],
-                        validated["variation_number"],
-                        validated["content"] or validated["step1_draft"],
-                        validated["step2_edited"],
-                        validated["step3_final"],
-                        json.dumps(validated["stills_used"]),
-                        json.dumps(validated["citations"]),
-                        json.dumps(validated["warnings"]),
-                        json.dumps(validated["quality_scores"]) if validated["quality_scores"] else None,
-                        json.dumps(validated["hook_variations"]) if validated["hook_variations"] else None,
-                        validated["subject"],
-                        validated["preview_text"],
-                        validated["email_day"],
-                        validated["email_purpose"],
-                        validated["sequence_name"],
-                        json.dumps(validated["topics"]),
-                        campaign_name or validated["campaign_name"],
-                    )
-                )
-                output_id = cursor.lastrowid
+            row = await db.fetchrow(
+                """
+                INSERT INTO outputs (
+                    job_id, content_type, variation_number,
+                    step1_draft, step2_edited, step3_final,
+                    stills_used, citations, warnings, quality_scores,
+                    hook_variations, subject, preview_text,
+                    email_day, email_purpose, sequence_name,
+                    topics, campaign_name
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+                RETURNING id
+                """,
+                job_id,
+                validated["content_type"],
+                validated["variation_number"],
+                validated["content"] or validated["step1_draft"],
+                validated["step2_edited"],
+                validated["step3_final"],
+                json.dumps(validated["stills_used"]),
+                json.dumps(validated["citations"]),
+                json.dumps(validated["warnings"]),
+                json.dumps(validated["quality_scores"]) if validated["quality_scores"] else None,
+                json.dumps(validated["hook_variations"]) if validated["hook_variations"] else None,
+                validated["subject"],
+                validated["preview_text"],
+                validated["email_day"],
+                validated["email_purpose"],
+                validated["sequence_name"],
+                json.dumps(validated["topics"]),
+                campaign_name or validated["campaign_name"],
+            )
+            output_id = row["id"]
 
             count += 1
 
@@ -528,8 +481,6 @@ async def save_outputs_to_db(outputs: list[dict], job_id: str, campaign_name: Op
                     )
                 )
 
-        if not settings.use_postgres:
-            await db.commit()
 
     return count
 
@@ -560,8 +511,8 @@ async def get_library_entries_by_ids(entry_ids: list[int], user_id: int) -> list
                 "content": row["content"],
                 "source": row["source"],
                 "source_timestamp": row["source_timestamp"],
-                "tags": json.loads(row["tags"]) if row["tags"] else [],
-                "persona_relevance": json.loads(row["persona_relevance"]) if row["persona_relevance"] else {},
+                "tags": safe_json(row["tags"], []),
+                "persona_relevance": safe_json(row["persona_relevance"], {}),
             })
 
         return entries
