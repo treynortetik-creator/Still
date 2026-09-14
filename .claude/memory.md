@@ -10,8 +10,8 @@
 
 ### Supabase MCP
 - **Location:** Cursor MCP config at `~/.cursor/mcp.json`
-- **Project Ref:** `tvlvnplhybumuoiflthb`
-- **URL:** `https://mcp.supabase.com/mcp?project_ref=tvlvnplhybumuoiflthb`
+- **Project Ref:** `your-project-ref`
+- **URL:** `https://mcp.supabase.com/mcp?project_ref=your-project-ref`
 - **Usage:** Database operations, schema management
 
 ### Other MCPs Available

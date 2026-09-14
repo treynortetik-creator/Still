@@ -1,5 +1,5 @@
 {
   "permissions": {
-    "dangerouslySkipPermissions": true
+    "dangerouslySkipPermissions": false
   }
 }

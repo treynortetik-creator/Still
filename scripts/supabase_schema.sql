@@ -1,5 +1,5 @@
 -- PostgreSQL Schema for ContentMultiplier
--- Run this in Supabase SQL Editor: https://supabase.com/dashboard/project/tvlvnplhybumuoiflthb/sql
+-- Run this in Supabase SQL Editor: https://supabase.com/dashboard/project/your-project-ref/sql
 --
 -- This file matches the runtime schema defined in app/database.py _init_postgres_tables().
 -- Last regenerated: 2026-03-30
